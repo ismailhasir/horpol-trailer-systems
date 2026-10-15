@@ -19,10 +19,9 @@ const ui = useUi(lang);
     <div>
       <h2>{ui.footer_contact}</h2>
       <address>
-        <span class="mono ltr">{site.contact.phone}</span>
-        <span class="mono ltr">{site.contact.email}</span>
+        <a class="mono ltr" href={`tel:${site.contact.phone.replace(/[^0-9+]/g, '')}`}>{site.contact.phone}</a>
+        <a class="mono ltr" href={`mailto:${site.contact.email}`}>{site.contact.email}</a>
         <span>{site.contact.address[lang]}</span>
-        <span>{ui.footer_hours}</span>
       </address>
     </div>
     <div>

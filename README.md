@@ -57,7 +57,7 @@ src/
   data/                ürün verisi (geçici)
   i18n/                arayüz metinleri (4 dil)
   lib/                 teklif listesi (sepet), yardımcılar
-  config/site.ts       iletişim ve sosyal medya bilgileri (yer tutucu)
+  config/site.ts       iletişim bilgileri; sosyal medya adresleri yer tutucu
   styles/              global.css (tema) ve configurator.css
 public/brand/          logo
 docs/                  README görseli
@@ -67,7 +67,7 @@ docs/                  README görseli
 
 - **Sipariş gönderimi yok:** form doğrulanır ama sunucuya gitmez; e-posta/kayıt altyapısı sırada.
 - **3D lamba ve dorse modelleri temsilidir** (kodla çizilir); gerçek GLB modeller gelince değişecek.
-- Ürün fotoğrafları, teknik değerler, iletişim ve sosyal medya adresleri **geçici/örnek**.
+- Ürün fotoğrafları, teknik değerler ve sosyal medya adresleri **geçici/örnek** (iletişim bilgileri gerçektir).
 - Adet sınırları ve uzunluk kısıtları örnektir, satış ekibiyle doğrulanmalı.
 - Rusça ve Arapça metinler yerli çevirmen onayı bekliyor.
 - Konfigüratörün mobil düzeni ve Arapça görünümü kapsamlı test edilmedi.

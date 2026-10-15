@@ -9,7 +9,8 @@ export interface SummaryRow {
   mono?: boolean;
 }
 
-export function summaryRows(c: Config, t: CUi, lang: Lang): SummaryRow[] {
+/** setQty: aynı siparişten kaç set istendiği (1 ise satır eklenmez) */
+export function summaryRows(c: Config, t: CUi, lang: Lang, setQty = 1): SummaryRow[] {
   const nf = new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: c.length === '13.6' ? 2 : 0 });
   const rows: SummaryRow[] = [
     { label: t.sum_trailer, value: trailerName(t, c.trailer) },
@@ -21,12 +22,13 @@ export function summaryRows(c: Config, t: CUi, lang: Lang): SummaryRow[] {
     if (!ch.qty) continue;
     rows.push({ label: summaryLabel(t, cat.id), value: `${ch.qty} × ${productById(cat.id, ch.product).code}`, mono: true });
   }
+  if (setQty > 1) rows.push({ label: t.set_qty, value: String(setQty) });
   return rows;
 }
 
 /** Düz metin (e-posta / teklif formu için) */
-export function summaryText(c: Config, t: CUi, lang: Lang): string {
-  return [t.summary_title, ...summaryRows(c, t, lang).map((r) => `${r.label}: ${r.value}`)].join('\n');
+export function summaryText(c: Config, t: CUi, lang: Lang, setQty = 1): string {
+  return [t.summary_title, ...summaryRows(c, t, lang, setQty).map((r) => `${r.label}: ${r.value}`)].join('\n');
 }
 
 export { categoryName };

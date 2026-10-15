@@ -1,6 +1,6 @@
 // Teklif listesi (sepet): tarayıcıda saklanır. Depolama engelliyse bellekte çalışmaya devam eder.
 // Yalnızca ürün kimliği ve adet saklanır; adlar gösterim anında dile göre ürün verisinden alınır.
-// İleride (ADR-013 ek) konfigüratör seti de bu listeye girecek.
+// Yalnızca ana sayfa ürünleri içindir. Konfigüratör siparişi ayrıdır (ADR-016), buraya girmez.
 import { useEffect, useState } from 'preact/hooks';
 
 export interface CartItem {
@@ -53,6 +53,43 @@ export function restoreItem(item: CartItem) {
   write([...readCart().filter((i) => i.id !== item.id), item]);
 }
 
+// Sipariş adedi (çarpan): listedeki TÜM ürünler bu sayıyla çarpılır (aynı siparişten birden fazla verilmiş gibi).
+const MKEY = 'horpol.quote.mult.v1';
+let multMemory: number | null = null;
+export function readMult(): number {
+  if (multMemory) return multMemory;
+  try {
+    const n = Number(localStorage.getItem(MKEY));
+    return Number.isFinite(n) && n >= 1 ? Math.min(MAX, Math.floor(n)) : 1;
+  } catch {
+    return 1;
+  }
+}
+export function setMult(n: number) {
+  const v = Math.max(1, Math.min(MAX, Math.floor(n) || 1));
+  try {
+    localStorage.setItem(MKEY, String(v));
+    multMemory = null;
+  } catch {
+    multMemory = v;
+  }
+  window.dispatchEvent(new CustomEvent('cart:change'));
+}
+export function useMult(): number {
+  const [n, setN] = useState(1);
+  useEffect(() => {
+    const sync = () => setN(readMult());
+    sync();
+    window.addEventListener('cart:change', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('cart:change', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+  return n;
+}
+
 export function clearCart() {
   write([]);
 }
@@ -72,77 +109,10 @@ export function useCart(): CartItem[] {
   return items;
 }
 
-// --- Konfigüratör setleri (ADR-013): yapılandırma adres satırı biçiminde saklanır ---
-export interface CartSet {
-  id: string;
-  /** yapılandırma (toQuery çıktısı) */
-  q: string;
-  qty: number;
-}
-const SKEY = 'horpol.sets.v1';
-let setMemory: CartSet[] | null = null;
-
-export function readSets(): CartSet[] {
-  if (setMemory) return setMemory;
-  try {
-    const v = localStorage.getItem(SKEY);
-    const parsed = v ? (JSON.parse(v) as CartSet[]) : [];
-    return Array.isArray(parsed) ? parsed.filter((s) => s && typeof s.q === 'string' && s.qty > 0) : [];
-  } catch {
-    return [];
-  }
-}
-function writeSets(items: CartSet[]) {
-  try {
-    localStorage.setItem(SKEY, JSON.stringify(items));
-    setMemory = null;
-  } catch {
-    setMemory = items;
-  }
-  window.dispatchEvent(new CustomEvent('cart:change'));
-}
-/** Aynı yapılandırma zaten listedeyse adedini artırır. Set kimliğini döndürür. */
-export function addSet(q: string, qty = 1): string {
-  const items = readSets().map((s) => ({ ...s }));
-  const found = items.find((s) => s.q === q);
-  if (found) {
-    found.qty = Math.min(MAX, found.qty + qty);
-    writeSets(items);
-    return found.id;
-  }
-  const id = `set-${Date.now().toString(36)}`;
-  items.push({ id, q, qty });
-  writeSets(items);
-  return id;
-}
-export function setSetQty(id: string, qty: number) {
-  writeSets(readSets().map((s) => (s.id === id ? { ...s, qty: Math.max(1, Math.min(MAX, Math.floor(qty) || 1)) } : s)));
-}
-export function removeSet(id: string) {
-  writeSets(readSets().filter((s) => s.id !== id));
-}
-export function restoreSet(item: CartSet) {
-  writeSets([...readSets().filter((s) => s.id !== item.id), item]);
-}
-export function useSets(): CartSet[] {
-  const [items, setItems] = useState<CartSet[]>([]);
-  useEffect(() => {
-    const sync = () => setItems(readSets());
-    sync();
-    window.addEventListener('cart:change', sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener('cart:change', sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
-  return items;
-}
-
 /** Sayfadaki adalar arası haberleşme (ürün penceresi, sepet çekmecesi, bildirim). */
 export const openProduct = (id: string) => window.dispatchEvent(new CustomEvent('hts:product', { detail: id }));
 /** stage 'form': çekmece doğrudan teklif formuyla açılır */
-export const openCart = (stage: 'list' | 'form' = 'list') => window.dispatchEvent(new CustomEvent('hts:cart', { detail: stage }));
+export const openCart = () => window.dispatchEvent(new CustomEvent('hts:cart'));
 export const openSearch = () => window.dispatchEvent(new CustomEvent('hts:search'));
 export interface ToastDetail {
   msg: string;

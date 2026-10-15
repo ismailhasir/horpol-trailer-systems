@@ -33,7 +33,7 @@ Giriş: `Devam Noktası.md` → `Dökümantasyon Wiki.md`. Kararlar: `02 - Karar
 - Sayfalar ürün verisini yalnızca `src/data/products.ts` + `src/lib/catalog.ts` üzerinden okur.
 - Yeni arayüz metni: `src/i18n/ui.ts` içinde **4 dile birden** (tr, en, ru, ar). RU/AR çevirmen onayı bekliyor.
 - Renkler yalnızca `src/styles/global.css` başındaki token'lardan. Arapça için `left/right` yok, mantıksal özellikler.
-- İletişim bilgileri uydurma yer tutucu, yalnızca `src/config/site.ts`. Bilinmeyen iş bilgisini (rakam, süre, iddia) uydurma.
+- İletişim bilgileri gerçek (kullanıcı verdi), sosyal medya adresleri yer tutucu; hepsi yalnızca `src/config/site.ts`. Bilinmeyen iş bilgisini (rakam, süre, iddia) uydurma.
 - Ürün görselleri ve hero görseli **geçici**; yenileri `src/assets/` altına konur, `getImage` ile optimize edilir.
 - Yazı tipleri: IBM Plex (`@fontsource`, `400.css` biçimi: `unicode-range` içerir). Alt küme dosyalarını (`latin-400.css`) kullanma.
 - Teklif listesi anahtarı `horpol.quote.v1` (`src/lib/cart.ts`). Ada bileşenleri arası haberleşme `hts:*` olaylarıyla.

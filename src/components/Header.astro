@@ -10,8 +10,10 @@ interface Props {
   lang: Lang;
   path: string;
   items: DetailItem[];
+  /** Ürün arama ve teklif listesi (ana sayfa siparişi). Konfigüratör sayfasında false. */
+  shop?: boolean;
 }
-const { lang, path, items } = Astro.props;
+const { lang, path, items, shop = true } = Astro.props;
 const ui = useUi(lang);
 const home = `/${lang}/`;
 const links = [
@@ -34,7 +36,7 @@ const links = [
     <div class="top-grow"></div>
     <!-- Sıra: Ürün ara · Teklif listesi · Tema · Dil -->
     <div class="tools">
-      <HeaderTools client:load items={items} ui={ui} lang={lang} />
+      <HeaderTools client:load items={items} ui={ui} lang={lang} shop={shop} />
       <button type="button" class="icon-btn" data-theme-toggle aria-label={ui.theme_toggle} title={ui.theme_toggle}>
         <Icon name="sun" class="theme-sun" />
         <Icon name="moon" class="theme-moon" />

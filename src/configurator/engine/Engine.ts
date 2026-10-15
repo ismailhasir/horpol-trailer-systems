@@ -259,7 +259,7 @@ export class Engine {
   }
 
   focusCategory(cat: CategoryId) {
-    const map: Record<CategoryId, View | 'arm'> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm' };
+    const map: Record<CategoryId, View | 'arm'> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', extra: 'rear' };
     if (this.system) return;
     this.setView(map[cat]);
   }

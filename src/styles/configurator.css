@@ -460,7 +460,7 @@ html[lang='ar'] .cs-head h2 {
 }
 .cfg-summary dl div {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 118px minmax(0, 1fr);
   gap: 8px;
 }
 .cfg-summary dt {
@@ -476,8 +476,13 @@ html[lang='ar'] .cs-head h2 {
 }
 .cs-actions {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 8px;
+}
+.cs-actions .qty button,
+.cfg-bar .qty button {
+  height: 40px;
 }
 .cs-actions .btn {
   min-height: 42px;
@@ -790,4 +795,65 @@ html[lang='ar'] .cs-head h2 {
 }
 .dd-menu .dd-txt small {
   white-space: normal;
+}
+
+/* PDF indir: yazısız simge, üzerine gelince ipucu */
+.cfg-ic[data-tip] {
+  position: relative;
+}
+.cfg-ic[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  inset-block-end: calc(100% + 8px);
+  inset-inline-end: 0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.cfg-ic[data-tip]:hover::after,
+.cfg-ic[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: none;
+}
+.cfg-ic[data-tip]:hover {
+  color: var(--link);
+  background: var(--brand-soft);
+}
+.cfg-ic[disabled] {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+/* Teklif al penceresi: yalnızca bu yapılandırmanın özeti */
+.co-sum {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  background: var(--band);
+  font-size: 0.86rem;
+}
+.co-sum div {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 8px;
+}
+.co-sum dt {
+  color: var(--muted);
+}
+.co-sum dd {
+  margin: 0;
+  font-weight: 500;
+}
+.co-sum dd.mono {
+  font-size: 0.8rem;
 }

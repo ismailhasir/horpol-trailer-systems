@@ -1,6 +1,6 @@
 // 3D konfigüratör arayüzü (Preact). Motor (three.js) ayrı parçada, dinamik import ile yüklenir.
 // Durum tek bir Config nesnesidir: adres satırına yazılır (paylaşılabilir), özet ve sepet aynı nesneden üretilir.
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   CATEGORIES,
   DEFAULT_CONFIG,
@@ -19,7 +19,8 @@ import {
 } from '../configurator/data';
 import { categoryName, socketName, trailerDesc, trailerName, type CUi } from '../configurator/i18n';
 import { summaryRows } from '../configurator/summary';
-import { addSet, openCart, showToast } from '../lib/cart';
+import { showToast } from '../lib/cart';
+import ConfigOrder from './ConfigOrder';
 import { numberLocale, type Lang } from '../lib/labels';
 import type { Ui } from '../i18n/ui';
 import TrailerIcon from './TrailerIcon';
@@ -44,7 +45,7 @@ const IC = {
   wire: ['M4 7h6a4 4 0 0 1 4 4v2a4 4 0 0 0 4 4h2', 'M4 4v6', 'M20 14v6'],
   moon: ['M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7Z'],
   reset: ['M3 12a9 9 0 1 0 3-6.7', 'M3 4v5h5'],
-  link: ['M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1', 'M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1'],
+  download: ['M12 4v11', 'm7.5 11 4.5 4.5 4.5-4.5', 'M5 19.5h14'],
   cart: ['M3 4h2.4l2.1 10.2a1 1 0 0 0 1 .8h8.7a1 1 0 0 0 1-.76L20 8H6', 'M9.5 19.3h.01', 'M17 19.3h.01'],
   send: ['M4 12 20 4l-4 16-4-6-8-2Z', 'm12 14 8-10'],
   collapse: ['M4 14h6v6', 'M20 10h-6V4', 'm14 10 7-7', 'm3 21 7-7'],
@@ -90,6 +91,8 @@ function LampGlyph({ style }: { style: LampStyle }) {
       return body(<><rect x="10" y="5" width="20" height="10" rx="2" fill={h} /><rect x="12" y="6.6" width="16" height="6.8" rx="1.4" fill={w} /></>);
     case 'pos-round':
       return body(<><circle cx="20" cy="10" r="7" fill={h} /><circle cx="20" cy="10" r="5" fill={w} /></>);
+    case 'strip':
+      return body(<><rect x="5" y="7.5" width="30" height="5" rx="2.5" fill={h} /><rect x="7" y="8.8" width="26" height="2.4" rx="1.2" fill={r} /></>);
     case 'arm-dragon':
       return body(<><path d="M8 16 22 7" stroke={h} stroke-width="3" stroke-linecap="round" /><rect x="21" y="3" width="12" height="8" rx="1.5" fill={h} /><rect x="22" y="4.2" width="3.5" height="5.6" fill={w} /><rect x="26" y="4.2" width="3" height="5.6" fill={a} /><rect x="29.5" y="4.2" width="2.5" height="5.6" fill={r} /></>);
     case 'arm-classic':
@@ -97,7 +100,7 @@ function LampGlyph({ style }: { style: LampStyle }) {
   }
 }
 
-const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e' };
+const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e', extra: '#38bdf8' };
 
 export default function Configurator({ lang, t, ui }: Props) {
   const [cfg, setCfg] = useState<Config>(() => {
@@ -213,7 +216,20 @@ export default function Configurator({ lang, t, ui }: Props) {
   const trailerDef = TRAILERS.find((x) => x.id === cfg.trailer)!;
   const nf = useMemo(() => new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: 0, maximumFractionDigits: 2 }), [lang]);
   const lenLabel = (l: LengthId) => `${l === '13.6' ? new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: 2 }).format(13.6) : nf.format(Number(l))} ${t.length_unit}`;
-  const rows = summaryRows(cfg, t, lang);
+  /** aynı siparişten kaç set (tüm yapılandırma bu sayıyla çarpılır) */
+  const [orderQty, setOrderQty] = useState(1);
+  const rows = summaryRows(cfg, t, lang, orderQty);
+  const stepper = (
+    <div class="qty" role="group" aria-label={t.set_qty} title={t.set_qty}>
+      <button type="button" aria-label={ui.qty_dec} disabled={orderQty <= 1} onClick={() => setOrderQty((q) => Math.max(1, q - 1))}>
+        −
+      </button>
+      <output>{orderQty}</output>
+      <button type="button" aria-label={ui.qty_inc} disabled={orderQty >= 99} onClick={() => setOrderQty((q) => Math.min(99, q + 1))}>
+        +
+      </button>
+    </div>
+  );
 
   const chooseTrailer = (id: TrailerId) => {
     update((c) => ({ ...c, trailer: id }));
@@ -282,23 +298,26 @@ export default function Configurator({ lang, t, ui }: Props) {
   };
   const reset = () => {
     setCfg(structuredClone(DEFAULT_CONFIG));
+    setOrderQty(1);
     setView('overview');
     engineRef.current?.setView('overview');
   };
-  const addToList = () => {
-    addSet(toQuery(cfg));
-    showToast({ msg: t.added, action: { label: ui.cart_title, run: () => openCart() } });
-  };
-  const send = () => {
-    addSet(toQuery(cfg));
-    openCart('form');
-  };
-  const copyLink = async () => {
+  /** Konfigüratör siparişi ana sayfa sepetinden ayrıdır: kendi penceresi açılır (ADR-016) */
+  const [orderOpen, setOrderOpen] = useState(false);
+  const closeOrder = useCallback(() => setOrderOpen(false), []);
+  const send = () => setOrderOpen(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const downloadPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
     try {
-      await navigator.clipboard.writeText(location.href);
-      showToast({ msg: t.link_copied });
-    } catch {
-      showToast({ msg: location.href });
+      const { downloadSummaryPdf } = await import('../configurator/pdf');
+      await downloadSummaryPdf({ cfg, qty: orderQty, t, lang, url: location.href, siteName: ui.site_name });
+    } catch (e) {
+      console.error(e);
+      showToast({ msg: t.pdf_failed });
+    } finally {
+      setPdfBusy(false);
     }
   };
 
@@ -523,8 +542,8 @@ export default function Configurator({ lang, t, ui }: Props) {
         <div class="cfg-summary" aria-live="polite">
           <div class="cs-head">
             <h2>{t.summary_title}</h2>
-            <button type="button" class="cfg-ic sm" onClick={copyLink} title={t.copy_link} aria-label={t.copy_link}>
-              <Ico d={IC.link} size={16} />
+            <button type="button" class="cfg-ic sm" data-tip={t.pdf_download} onClick={downloadPdf} disabled={pdfBusy} aria-label={t.pdf_download}>
+              <Ico d={IC.download} size={17} />
             </button>
           </div>
           <dl>
@@ -536,11 +555,9 @@ export default function Configurator({ lang, t, ui }: Props) {
             ))}
           </dl>
           <div class="cs-actions">
+            {stepper}
             <button type="button" class="btn btn-primary" onClick={send}>
-              {t.send}
-            </button>
-            <button type="button" class="btn" onClick={addToList}>
-              {t.add_cart}
+              {t.get_quote}
             </button>
           </div>
         </div>
@@ -554,10 +571,12 @@ export default function Configurator({ lang, t, ui }: Props) {
             {socketName(t, cfg.socket)} · {lenLabel(cfg.length)}
           </span>
         </div>
+        {stepper}
         <button type="button" class="btn btn-primary" onClick={send}>
-          {t.send}
+          {t.get_quote}
         </button>
       </div>
+      <ConfigOrder open={orderOpen} onClose={closeOrder} cfg={cfg} qty={orderQty} t={t} ui={ui} lang={lang} />
     </div>
   );
 }

@@ -17,7 +17,7 @@ export type TrailerId =
 
 export type SocketId = '7x2' | '15' | '7x2+15';
 export type LengthId = '13.6' | '12' | '9';
-export type CategoryId = 'stop' | 'side' | 'plate' | 'front' | 'arm';
+export type CategoryId = 'stop' | 'side' | 'plate' | 'front' | 'arm' | 'extra';
 
 export interface TrailerDef {
   id: TrailerId;
@@ -58,7 +58,8 @@ export type LampStyle =
   | 'pos-rect'
   | 'pos-round'
   | 'arm-dragon'
-  | 'arm-classic';
+  | 'arm-classic'
+  | 'strip';
 
 export interface LampProduct {
   id: string;
@@ -139,6 +140,15 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'ldcc2776', code: 'LDCC 2776', style: 'arm-classic' },
     ],
   },
+  {
+    // Additional Lights: ÖRNEK kategori ve model (LD 233 dekoratif işaret lambası); gerçek ek lamba grupları sonra eklenecek
+    id: 'extra',
+    min: 0,
+    max: 4,
+    step: 2,
+    color: '#e0322d',
+    products: [{ id: 'ld233', code: 'LD 233', style: 'strip' }],
+  },
 ];
 
 export const categoryById = (id: CategoryId) => CATEGORIES.find((c) => c.id === id)!;
@@ -167,6 +177,7 @@ export const DEFAULT_CONFIG: Config = {
     plate: { product: 'ltd2834', qty: 2 },
     front: { product: 'ld364', qty: 2 },
     arm: { product: 'ld2994', qty: 2 },
+    extra: { product: 'ld233', qty: 0 },
   },
 };
 

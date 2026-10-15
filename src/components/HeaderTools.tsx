@@ -1,15 +1,14 @@
 // Üst çubuktaki etkileşimli parça: ürün arama, teklif listesi (düğme + çekmece), ürün ayrıntı penceresi ve bildirim.
 // Pencereler yerel <dialog> ile yapılır: odak kapanı, Esc ve arka plan tıklaması tarayıcıdan gelir.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { addToCart, removeFromCart, removeSet, restoreItem, restoreSet, setQty, setSetQty, showToast, useCart, useSets, type ToastDetail } from '../lib/cart';
+import { addToCart, removeFromCart, restoreItem, setMult, setQty, showToast, useCart, useMult, type ToastDetail } from '../lib/cart';
 import { fmt, type Ui } from '../i18n/ui';
-import { fromQuery } from '../configurator/data';
-import { useCUi, trailerName, socketName } from '../configurator/i18n';
-import { summaryRows } from '../configurator/summary';
 import type { DetailItem } from '../lib/format';
 import type { Lang } from '../lib/labels';
 
 interface Props {
+  /** false: konfigüratör sayfası. Ürün arama ve teklif listesi (sepet) gösterilmez, yalnızca bildirim çalışır. */
+  shop?: boolean;
   items: DetailItem[];
   ui: Ui;
   lang: Lang;
@@ -50,14 +49,13 @@ function useDialog(open: boolean, onClose: () => void) {
   return { ref, onBackdrop };
 }
 
-export default function HeaderTools({ items, ui, lang }: Props) {
+export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const cart = useCart();
   const lines = cart.map((c) => ({ ...c, p: byId.get(c.id) })).filter((l): l is typeof l & { p: DetailItem } => !!l.p);
-  const ct = useCUi(lang);
-  const sets = useSets().map((s) => ({ ...s, cfg: fromQuery(s.q) }));
-  const total = lines.reduce((a, l) => a + l.qty, 0) + sets.reduce((a, s) => a + s.qty, 0);
-  const itemCount = lines.length + sets.length;
+  const mult = useMult();
+  const total = lines.reduce((a, l) => a + l.qty, 0) * mult;
+  const itemCount = lines.length;
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -89,9 +87,8 @@ export default function HeaderTools({ items, ui, lang }: Props) {
       setPqty(1);
       setSearchOpen(false);
     };
-    const onCart = (e: Event) => {
-      const st = (e as CustomEvent<'list' | 'form'>).detail;
-      setStage(st === 'form' ? 'form' : 'list');
+    const onCart = () => {
+      setStage('list');
       setCartOpen(true);
     };
     const onSearch = () => {
@@ -191,6 +188,7 @@ export default function HeaderTools({ items, ui, lang }: Props) {
 
   return (
     <>
+      {shop && (<>
       <button type="button" class="search-btn" aria-label={ui.search_btn} onClick={() => window.dispatchEvent(new CustomEvent('hts:search'))}>
         <Svg d={I.search} />
         <span>{ui.search_btn}</span>
@@ -347,56 +345,29 @@ export default function HeaderTools({ items, ui, lang }: Props) {
             {stage === 'list' && itemCount > 0 && (
               <>
                 <div class="drawer-body">
-                  {sets.map((s) => (
-                    <div class="line set-line" key={s.id}>
-                      <div>
-                        <div class="line-name">{ct.set_name}</div>
-                        <div class="line-code">
-                          {trailerName(ct, s.cfg.trailer)} · {socketName(ct, s.cfg.socket)}
-                        </div>
-                        <dl class="set-sum">
-                          {summaryRows(s.cfg, ct, lang)
-                            .slice(2)
-                            .map((r) => (
-                              <div>
-                                <dt>{r.label}</dt>
-                                <dd class={r.mono ? 'mono' : ''}>{r.value}</dd>
-                              </div>
-                            ))}
-                        </dl>
-                      </div>
-                      <div class="qty">
-                        <button type="button" aria-label={ui.qty_dec} onClick={() => setSetQty(s.id, s.qty - 1)}>
-                          −
-                        </button>
-                        <output>{s.qty}</output>
-                        <button type="button" aria-label={ui.qty_inc} onClick={() => setSetQty(s.id, s.qty + 1)}>
-                          +
-                        </button>
-                      </div>
-                      <div class="set-actions">
-                        <a class="rm" href={`/${lang}/konfigurator/?${s.q}`}>
-                          {ct.edit}
-                        </a>
-                        <button
-                          type="button"
-                          class="rm"
-                          onClick={() => {
-                            const item = { id: s.id, q: s.q, qty: s.qty };
-                            removeSet(s.id);
-                            showToast({ msg: ui.removed, action: { label: ui.undo, run: () => restoreSet(item) } });
-                          }}
-                        >
-                          {ui.remove}
-                        </button>
-                      </div>
+                  <div class="mult">
+                    <div>
+                      <b>{ui.order_qty}</b>
+                      <small>{ui.order_qty_hint}</small>
                     </div>
-                  ))}
+                    <div class="qty" role="group" aria-label={ui.order_qty}>
+                      <button type="button" aria-label={ui.qty_dec} disabled={mult <= 1} onClick={() => setMult(mult - 1)}>
+                        −
+                      </button>
+                      <output>{mult}</output>
+                      <button type="button" aria-label={ui.qty_inc} disabled={mult >= 99} onClick={() => setMult(mult + 1)}>
+                        +
+                      </button>
+                    </div>
+                  </div>
                   {lines.map((l) => (
                     <div class="line" key={l.id}>
                       <div>
                         <div class="line-name">{l.p.name}</div>
-                        <div class="line-code mono ltr">{l.p.code}</div>
+                        <div class="line-code mono ltr">
+                          {l.p.code}
+                          {mult > 1 ? ` · ${l.qty} × ${mult} = ${l.qty * mult}` : ''}
+                        </div>
                       </div>
                       <div class="qty">
                         <button type="button" aria-label={ui.qty_dec} onClick={() => setQty(l.id, l.qty - 1)}>
@@ -425,11 +396,7 @@ export default function HeaderTools({ items, ui, lang }: Props) {
               <form class="contents-form" onSubmit={submit} noValidate style="display:contents">
                 <div class="drawer-body">
                   <p class="summary">
-                    {fmt(ui.items_count, { n: itemCount })}:{' '}
-                    {[
-                      ...sets.map((s) => `${ct.set_name} (${trailerName(ct, s.cfg.trailer)}) × ${s.qty}`),
-                      ...lines.map((l) => `${l.p.code} × ${l.qty}`),
-                    ].join(', ')}
+                    {fmt(ui.items_count, { n: itemCount })}: {lines.map((l) => `${l.p.code} × ${l.qty * mult}`).join(', ')}
                   </p>
                   <div class="order">
                     {field('company', ui.f_company, 'text', 'organization')}
@@ -473,6 +440,8 @@ export default function HeaderTools({ items, ui, lang }: Props) {
           </>
         )}
       </dialog>
+
+      </>)}
 
       {toast && (
         <div class="toast" popover="manual" ref={toastRef} role="status">

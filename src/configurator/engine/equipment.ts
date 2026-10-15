@@ -162,6 +162,11 @@ function lamp(style: LampStyle, mats: Mats): LampOut {
       out.glows.push({ p: new THREE.Vector3(0, -0.05, 0.02), c: 'plate', s: w * 2.6 });
       break;
     }
+    case 'strip': {
+      const d = housing(0.2, 0.034, 0.024, 0.012);
+      lensSeg(g, mats, out, 'red', 0.18, 0.02, 0, 0, d + 0.003, 0.008);
+      break;
+    }
     case 'arm-dragon':
     case 'arm-classic': {
       // lastik kol: gövde yanından dışa (+Z) uzanır, ucunda 3 yönlü lamba başı
@@ -229,7 +234,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const harness = new THREE.Group();
   group.add(harness);
   const glows: THREE.Sprite[] = [];
-  const lampsByCat = { stop: [], side: [], plate: [], front: [], arm: [] } as Record<CategoryId, THREE.Object3D[]>;
+  const lampsByCat = { stop: [], side: [], plate: [], front: [], arm: [], extra: [] } as Record<CategoryId, THREE.Object3D[]>;
 
   const mount = (cat: CategoryId, style: LampStyle, pos: THREE.Vector3, setup: (o: THREE.Group) => void) => {
     const out = lamp(style, mats);
@@ -327,6 +332,21 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         });
         const fromX = sp === a.armRear ? jx : fx;
         wires.push({ kind: 'marker', r: 0.008, pts: [V(fromX, hy, s * 0.15), V(sp.x, hy, s * (sp.z - 0.12)), V(sp.x, (hy + sp.y) / 2, s * (sp.z - 0.05)), V(sp.x, sp.y, s * (sp.z - 0.01))] });
+      }
+    }
+  }
+
+  // --- ek lambalar (Additional Lights) ---
+  const ex = c.lamps.extra;
+  if (ex.qty > 0) {
+    const st = productById('extra', ex.product).style;
+    const zs = ex.qty >= 4 ? [a.extra.z0, a.extra.z1] : [a.extra.z0];
+    for (const z of zs) {
+      for (const s of [1, -1]) {
+        mount('extra', st, V(a.extra.x, a.extra.y, s * z), (o) => {
+          o.rotation.y = Math.PI / 2;
+        });
+        wires.push({ kind: 'marker', r: 0.008, pts: [V(jx, hy, s * 0.2), V(-0.1, (hy + a.extra.y) / 2, s * (z - 0.05)), V(a.extra.x - 0.04, a.extra.y, s * z)] });
       }
     }
   }

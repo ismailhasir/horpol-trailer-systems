@@ -21,6 +21,8 @@ export interface Anchors {
   front: Pt;
   armRear: Pt;
   armFront: Pt;
+  /** ek lambalar: arka üst köşeler (kapalı gövdeli tipler) ya da tampon uçları; z0 dış, z1 iç sıra */
+  extra: { x: number; y: number; z0: number; z1: number };
   socket: { x: number; y: number; onWall: boolean };
   harness: { y: number; railZ: number; junctionX: number; frontX: number };
   center: THREE.Vector3;
@@ -586,6 +588,12 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     rear: { x: 0.0, lampY, lampZ: [W / 2 - 0.33, 0.48], plateY },
     side: { x0: -L + 1.0, x1: -0.6, z: W / 2 + 0.005, yAt: sideYAt },
     front: frontPos ?? { x: -L - 0.01, y: topY - 0.14, z: W / 2 - 0.12 },
+    extra: (() => {
+      const roofed = type === 'standart' || type === 'kapali' || type === 'frigo' || type === 'damper' || type === 'konteyner';
+      return roofed
+        ? { x: type === 'konteyner' ? -0.23 : type === 'damper' ? 0.0 : 0.05, y: topY - 0.14, z0: W / 2 - 0.13, z1: 0.72 }
+        : { x: 0.0, y: lampY, z0: W / 2 - 0.12, z1: 0.76 };
+    })(),
     armRear: { x: -0.2, y: armRearY, z: W / 2 },
     armFront: { x: -L + 0.25, y: armFrontY, z: W / 2 },
     socket: { x: onWall ? -L - 0.01 : -L - 0.03, y: socketY, onWall },

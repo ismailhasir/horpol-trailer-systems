@@ -78,7 +78,9 @@ const tr = {
 
   cart_empty: 'Listeniz boş. Bir ürün ekleyin ya da 3D konfigüratörde setinizi oluşturun.',
   cart_go: 'Ürünlere git',
-  cart_request: 'Teklif iste ({n} kalem)',
+  cart_request: 'Teklif al ({n} kalem)',
+  order_qty: 'Sipariş adedi',
+  order_qty_hint: 'Listedeki tüm ürünler bu adetle çarpılır.',
   form_title: 'Teklif bilgileri',
   f_company: 'Firma Adı',
   f_name: 'Yetkili Ad-Soyad',
@@ -103,11 +105,10 @@ const tr = {
 
   footer_about: 'Treyler üreticileri için Horpol aydınlatma ürünleri ve montaja hazır kablo tesisatları.',
   footer_contact: 'İletişim',
-  footer_hours: 'Hafta içi 09:00 – 18:00',
   footer_follow: 'Bizi takip edin',
   footer_privacy: 'Gizlilik ve KVKK',
   footer_rights: '© 2026 Horpol Trailer Systems. Tüm hakları saklıdır.',
-  footer_placeholder: 'Geçici bilgiler: iletişim ve adres örnektir.',
+  footer_placeholder: 'Geçici bilgiler: sosyal medya bağlantıları örnektir.',
 
   cfg_title: '3D konfigüratör yakında',
   cfg_text: 'Setinizi dorse üzerinde 3D olarak oluşturduğunuz konfigüratör bir sonraki aşamada bu sayfada açılacak.',
@@ -191,7 +192,9 @@ const en: Ui = {
 
   cart_empty: 'Your list is empty. Add a product or build your set in the 3D configurator.',
   cart_go: 'Go to products',
-  cart_request: 'Request a quote ({n} items)',
+  cart_request: 'Get a quote ({n} items)',
+  order_qty: 'Order quantity',
+  order_qty_hint: 'Every item in the list is multiplied by this number.',
   form_title: 'Quote details',
   f_company: 'Company name',
   f_name: 'Contact person (full name)',
@@ -216,11 +219,10 @@ const en: Ui = {
 
   footer_about: 'Horpol lighting products and ready-to-install wiring harnesses for trailer manufacturers.',
   footer_contact: 'Contact',
-  footer_hours: 'Weekdays 09:00 – 18:00',
   footer_follow: 'Follow us',
   footer_privacy: 'Privacy policy',
   footer_rights: '© 2026 Horpol Trailer Systems. All rights reserved.',
-  footer_placeholder: 'Placeholder details: contact and address are examples.',
+  footer_placeholder: 'Placeholder details: social media links are examples.',
 
   cfg_title: '3D configurator coming soon',
   cfg_text: 'The configurator, where you build your set on the trailer in 3D, will open on this page in the next stage.',
@@ -302,7 +304,9 @@ const ru: Ui = {
 
   cart_empty: 'Список пуст. Добавьте товар или соберите комплект в 3D-конфигураторе.',
   cart_go: 'К продукции',
-  cart_request: 'Запросить предложение (позиций: {n})',
+  cart_request: 'Получить предложение (позиций: {n})',
+  order_qty: 'Количество заказов',
+  order_qty_hint: 'Все позиции списка умножаются на это число.',
   form_title: 'Данные для предложения',
   f_company: 'Название компании',
   f_name: 'Контактное лицо (ФИО)',
@@ -327,11 +331,10 @@ const ru: Ui = {
 
   footer_about: 'Осветительные приборы Horpol и готовые к монтажу жгуты проводки для производителей прицепов.',
   footer_contact: 'Контакты',
-  footer_hours: 'Будни 09:00 – 18:00',
   footer_follow: 'Мы в соцсетях',
   footer_privacy: 'Политика конфиденциальности',
   footer_rights: '© 2026 Horpol Trailer Systems. Все права защищены.',
-  footer_placeholder: 'Временные данные: контакты и адрес приведены для примера.',
+  footer_placeholder: 'Временные данные: ссылки на соцсети приведены для примера.',
 
   cfg_title: '3D-конфигуратор скоро',
   cfg_text: 'Конфигуратор, в котором вы собираете комплект на прицепе в 3D, откроется на этой странице на следующем этапе.',
@@ -413,7 +416,9 @@ const ar: Ui = {
 
   cart_empty: 'القائمة فارغة. أضف منتجًا أو صمّم طقمك في المُهيّئ ثلاثي الأبعاد.',
   cart_go: 'انتقل إلى المنتجات',
-  cart_request: 'اطلب عرض سعر ({n} عناصر)',
+  cart_request: 'احصل على عرض سعر ({n} عناصر)',
+  order_qty: 'عدد الطلبات',
+  order_qty_hint: 'تُضرب جميع عناصر القائمة في هذا الرقم.',
   form_title: 'بيانات عرض السعر',
   f_company: 'اسم الشركة',
   f_name: 'الشخص المسؤول (الاسم الكامل)',
@@ -438,11 +443,10 @@ const ar: Ui = {
 
   footer_about: 'منتجات إضاءة Horpol وتمديدات كهربائية جاهزة للتركيب لمصنّعي المقطورات.',
   footer_contact: 'اتصل بنا',
-  footer_hours: 'أيام العمل 09:00 – 18:00',
   footer_follow: 'تابعنا',
   footer_privacy: 'سياسة الخصوصية',
   footer_rights: '© 2026 Horpol Trailer Systems. جميع الحقوق محفوظة.',
-  footer_placeholder: 'بيانات مؤقتة: معلومات الاتصال والعنوان أمثلة.',
+  footer_placeholder: 'بيانات مؤقتة: روابط وسائل التواصل أمثلة.',
 
   cfg_title: 'المُهيّئ ثلاثي الأبعاد قريبًا',
   cfg_text: 'سيُفتح المُهيّئ الذي تصمّم فيه طقمك على المقطورة بتقنية ثلاثية الأبعاد في هذه الصفحة في المرحلة التالية.',

@@ -34,7 +34,8 @@ interface Props {
 }
 const { lang, title, description, path, stickybar = false, app = false } = Astro.props;
 const ui = useUi(lang);
-const { details } = await loadCatalog(lang);
+// Uygulama modunda (konfigüratör) ürün listesi gerekmez: arama ve sepet yoktur.
+const { details } = app ? { details: [] } : await loadCatalog(lang);
 const fullTitle = title === ui.site_name ? title : `${title} | ${ui.site_name}`;
 // Ekranın üstünde görünen yazı tiplerini dile göre önceden yükle
 const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600] : [latin400, latin600];
@@ -64,7 +65,7 @@ const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600
   </head>
   <body class={app ? 'app' : undefined}>
     <a class="skip" href="#main">{ui.skip}</a>
-    <Header lang={lang} path={path} items={details} />
+    <Header lang={lang} path={path} items={details} shop={!app} />
     <main id="main" tabindex="-1">
       <slot />
     </main>
