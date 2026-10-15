@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { CATEGORIES, productById, type CategoryId, type Config, type LampStyle } from '../data';
 import type { LensColor, Mats } from './materials';
-import type { Anchors } from './trailer';
+import { profileAt, type Anchors } from './trailer';
 
 export interface EquipmentBuild {
   group: THREE.Group;
@@ -339,7 +339,26 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   };
 
   // --- şema düzeni (x: arka uç 0, öne doğru eksi; z: genişlik) ---
+  // Hatlar önce düz bir "tesisat düzlemi"nde (y = hy) kurulur, çizimden önce follow() ile tipin taban profiline oturtulur.
   const hy = a.harness.y;
+  const prof = a.harness.profile;
+  const hyAt = (x: number) => profileAt(prof, x);
+  const follow = (pts: THREE.Vector3[]) => {
+    const out: THREE.Vector3[] = [];
+    pts.forEach((p, i) => {
+      const q = pts[i - 1];
+      if (q && Math.abs(q.y - hy) < 1e-6 && Math.abs(p.y - hy) < 1e-6 && Math.abs(p.x - q.x) > 1e-6) {
+        const lo = Math.min(q.x, p.x);
+        const hi = Math.max(q.x, p.x);
+        const bx = prof.map((b) => b[0]).filter((x) => x > lo + 1e-6 && x < hi - 1e-6);
+        if (p.x < q.x) bx.reverse();
+        for (const x of bx) out.push(V(x, hy, q.z + ((p.z - q.z) * (x - q.x)) / (p.x - q.x)));
+      }
+      out.push(p.clone());
+    });
+    for (const v of out) if (Math.abs(v.y - hy) < 1e-6) v.y = hyAt(v.x);
+    return out;
+  };
   const W2 = a.W / 2;
   const xm = -2.2; // Horpol modülü: arka lambalara ~2 m
   const PORTS = [-0.135, -0.045, 0.045, 0.135]; // modül yan portları (önden arkaya): besleme, yan hat, arka hat, yedek
@@ -530,14 +549,15 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
 
   // --- Horpol kontrol modülü + port konnektörleri ---
   const mod = controlModule(mats);
-  mod.position.set(xm, hy, 0);
+  const my = hyAt(xm);
+  mod.position.set(xm, my, 0);
   harness.add(mod);
-  for (const s of [1, -1]) for (const px of PORTS) conns.push({ pos: V(xm + px, hy, s * (zPort + 0.03)), dir: V(0, 0, s) });
-  if (frontPort) conns.push({ pos: V(xm - 0.23, hy, 0), dir: V(-1, 0, 0) });
+  for (const s of [1, -1]) for (const px of PORTS) conns.push({ pos: V(xm + px, my, s * (zPort + 0.03)), dir: V(0, 0, s) });
+  if (frontPort) conns.push({ pos: V(xm - 0.23, my, 0), dir: V(-1, 0, 0) });
 
   // --- hatları çiz ---
   for (const w of wires) {
-    const pts = rounded(w.pts);
+    const pts = rounded(follow(w.pts));
     if (pts.length < 2) continue;
     const t = m(new THREE.TubeGeometry(new PolyCurve(pts), pts.length - 1, w.r * WIRE_SCALE, 10, false), mats.wire[w.kind], false);
     t.userData.kind = w.kind;

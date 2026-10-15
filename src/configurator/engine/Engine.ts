@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { lengthMeters, type CategoryId, type Config } from '../data';
 import { createMaterials, fadeTexture, setLensPower, type Mats } from './materials';
-import { buildTrailer, disposeGroup, type Anchors, type TrailerBuild } from './trailer';
+import { buildTrailer, disposeGroup, setGhost, type Anchors, type TrailerBuild } from './trailer';
 import { buildEquipment, disposeEquipment, setHarnessHighlight, type EquipmentBuild } from './equipment';
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
@@ -272,7 +272,7 @@ export class Engine {
   }
   private applySystem() {
     if (!this.trailer) return;
-    this.trailer.body.visible = !this.system;
+    setGhost(this.trailer, this.mats, this.system);
     this.trailer.outline.visible = this.system;
     if (this.equip) setHarnessHighlight(this.equip.harness, this.mats, this.system);
     this.shadowDirty = 3;

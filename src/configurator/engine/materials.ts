@@ -173,8 +173,8 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
     logoWhite: std({ map: logoWhite ?? undefined, transparent: true, alphaTest: 0.05, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
     lens,
     glow,
-    outline: new THREE.LineBasicMaterial({ color: '#7f9cc4', transparent: true, opacity: 0.55 }),
-    ghost: std({ color: '#c8d3e2', transparent: true, opacity: 0.12, depthWrite: false, roughness: 1 }),
+    outline: new THREE.LineBasicMaterial({ color: '#6f8fbd', transparent: true, opacity: 0.7 }),
+    ghost: std({ color: '#b9c6d8', transparent: true, opacity: 0.2, depthWrite: false, roughness: 1 }),
     connWhite: std({ color: '#d9dee6', roughness: 0.45, metalness: 0.05 }),
     sysFloor: std({ color: '#f3f6fa', roughness: 0.9, metalness: 0, transparent: true, opacity: 0.94 }),
     wire: {
