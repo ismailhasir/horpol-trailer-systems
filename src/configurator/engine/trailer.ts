@@ -35,7 +35,7 @@ export interface TrailerBuild {
   body: THREE.Group;
   /** sistem (tesisat) görünümünde açılan gövde çizgileri + zemin plakası */
   outline: THREE.Group;
-  /** tesisat görünümünde yarı saydam çizilen gövde/şasi parçaları (lastikler hariç) */
+  /** tesisat görünümünde yarı saydam çizilen gövde, şasi ve tekerlek parçaları */
   solids: THREE.Mesh[];
   anchors: Anchors;
 }
@@ -754,8 +754,8 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   for (const root of [body, chassisG]) {
     root.traverse((o) => {
       const mm = o as THREE.Mesh;
-      // dorsenin kendi lastikleri opak kalır (yerle bağ); yük (otomobiller) dahil diğer her şey yarı saydam olur
-      if (!mm.isMesh || (!o.userData.cargo && (mm.material === m.rubber || mm.material === m.tread))) return;
+      // lastikler ve yük (otomobiller) dahil her parça yarı saydam olur
+      if (!mm.isMesh) return;
       solids.push(mm);
       mm.userData.mat = mm.material;
       mm.userData.cast = mm.castShadow;
@@ -825,7 +825,7 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   return { group, body, outline: sys, solids, anchors };
 }
 
-/** Tesisat görünümü: gövde ve şasi yarı saydam (tipin silueti görünür, tesisat okunur); lastikler opak kalır. */
+/** Tesisat görünümü: gövde, şasi ve tekerlekler yarı saydam (tipin silueti görünür, tesisat okunur). */
 export function setGhost(t: TrailerBuild, mats: Mats, on: boolean) {
   for (const mm of t.solids) {
     mm.material = on ? mats.ghost : (mm.userData.mat as THREE.Material);
