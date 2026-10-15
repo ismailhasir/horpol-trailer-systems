@@ -342,12 +342,12 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const hy = a.harness.y;
   const W2 = a.W / 2;
   const xm = -2.2; // Horpol modülü: arka lambalara ~2 m
-  const PORTS = [-0.135, -0.045, 0.045, 0.135]; // modül yan portları (önden arkaya): besleme, yan hat, arka hat, plaka
+  const PORTS = [-0.135, -0.045, 0.045, 0.135]; // modül yan portları (önden arkaya): besleme, yan hat, arka hat, yedek
   const zPort = 0.15; // modül yan yüzü
   const tz = 0.85; // yan ana hat
   const zr = 0.62; // arka hat
   const xd = -0.55; // arka dağıtım (tarak) hattı
-  const zp = 0.3; // plaka hattı
+  const zp = 0.3; // plaka hattı (arka hattan ayrılıp içe iner)
 
   type Wire = { kind: WireKind; r: number; pts: THREE.Vector3[]; conn?: { d: number; fromEnd: boolean } };
   const wires: Wire[] = [];
@@ -375,7 +375,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     }
   }
 
-  // --- plaka lambaları (modülden doğrudan) ---
+  // --- plaka lambaları (arka hattın ikinci dönüşünden ayrılır; hat aşağıda arka hatlarla birlikte çizilir) ---
   const pl = c.lamps.plate;
   const plStyle = productById('plate', pl.product).style;
   const pzs = pl.qty === 1 ? [0] : [-0.17, 0.17];
@@ -384,9 +384,6 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     mount('plate', plStyle, V(0.01, a.rear.plateY + 0.085, z), (o) => {
       o.rotation.y = Math.PI / 2;
     });
-    const s = z < 0 ? -1 : 1;
-    const xp = xm + PORTS[3];
-    wires.push({ kind: 'plate', r: 0.009, conn: toLamp, pts: [V(xp, hy, s * zPort), V(xp, hy, s * zp), V(-0.12, hy, s * zp), V(-0.12, hy, z), V(-0.12, py, z), V(0, py, z)] });
   }
 
   // --- yan markerlar ---
@@ -499,7 +496,17 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   // --- arka hatlar: modülden arkaya, uçta tarak gibi dağılır ---
   for (const s of [1, -1]) {
     const ds = rearDrops.filter((d) => d.s === s);
-    if (!ds.length) continue;
+    const plates = pzs.filter((z) => (z < 0 ? -1 : 1) === s);
+    if (!ds.length && !plates.length) continue;
+    // plaka: kırmızı arka hattın ikinci 90° dönüşünden (tarağa vardığı nokta) içe doğru ayrılır
+    const xb = xd - 0.1;
+    for (const z of plates) {
+      wires.push({ kind: 'plate', r: 0.009, conn: toLamp, pts: [V(xb - BEND, hy, s * zr), V(xb, hy, s * zr), V(xb, hy, s * zp), V(-0.12, hy, s * zp), V(-0.12, hy, z), V(-0.12, py, z), V(0, py, z)] });
+    }
+    if (!ds.length) {
+      wires.push({ kind: 'rear', r: 0.013, pts: [V(xm + PORTS[2], hy, s * zPort), V(xm + PORTS[2], hy, s * zr), V(xd, hy, s * zr)] });
+      continue;
+    }
     const zs = ds.map((d) => d.z);
     const zmin = Math.min(...zs);
     const zmax = Math.max(...zs);
