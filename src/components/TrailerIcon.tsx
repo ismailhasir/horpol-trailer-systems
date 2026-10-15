@@ -75,6 +75,14 @@ const ICONS: Record<TrailerId, preact.JSX.Element> = {
       {std3}
     </>
   ),
+  silo: (
+    <>
+      <path d="M11 4.2h45a2.4 2.4 0 0 1 1.2 4.5L32.5 14.4 9.6 8.9A2.4 2.4 0 0 1 11 4.2z" />
+      <path d="M32.5 14.4v2.4M5.5 13h4v3.8" />
+      {base}
+      {std3}
+    </>
+  ),
   arac: (
     <>
       <path d="M6 9.8h50M6 15.2h52M8 9.8v5.4M20 9.8v5.4M32 9.8v5.4M44 9.8v5.4M6 4v11" />

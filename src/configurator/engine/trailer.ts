@@ -3,6 +3,7 @@
 // Gerçek GLB modeller geldiğinde bu dosya, model + adlandırılmış bağlantı noktası okuyan bir yükleyiciyle değişecek.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { TrailerId } from '../data';
 import type { Mats } from './materials';
 
@@ -77,16 +78,60 @@ function cyl(parent: THREE.Object3D, r: number, len: number, mat: THREE.Material
   parent.add(m);
   return m;
 }
-/** Aynı kutudan çok sayıda (InstancedMesh) */
+/** Aynı kutudan çok sayıda (geometri paylaşılır; sonunda malzemeye göre tek ağa birleştirilir) */
 function boxes(parent: THREE.Object3D, lx: number, ly: number, lz: number, mat: THREE.Material, pts: [number, number, number][]) {
   if (!pts.length) return;
-  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(lx, ly, lz), mat, pts.length);
-  const m4 = new THREE.Matrix4();
-  pts.forEach((p, i) => im.setMatrixAt(i, m4.makeTranslation(p[0], p[1], p[2])));
-  im.castShadow = true;
-  im.receiveShadow = true;
-  parent.add(im);
-  return im;
+  const geo = new THREE.BoxGeometry(lx, ly, lz);
+  for (const p of pts) {
+    const b = mesh(geo, mat);
+    b.position.set(p[0], p[1], p[2]);
+    b.userData.noEdge = true;
+    parent.add(b);
+  }
+}
+const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+const UP = V3(0, 1, 0);
+/** İki nokta arası boru/çubuk (korkuluk, merdiven, hortum) */
+function rod(parent: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, r: number, mat: THREE.Material, seg = 10) {
+  const d = b.clone().sub(a);
+  const m = mesh(new THREE.CylinderGeometry(r, r, d.length(), seg), mat);
+  m.position.copy(a).addScaledVector(d, 0.5);
+  m.quaternion.setFromUnitVectors(UP, d.normalize());
+  m.userData.noEdge = true;
+  parent.add(m);
+  return m;
+}
+/** Kırık çizgi boyunca boru; köşelerde küre (kesintisiz görünür) */
+function pipe(parent: THREE.Object3D, pts: THREE.Vector3[], r: number, mat: THREE.Material, seg = 10) {
+  for (let i = 1; i < pts.length; i++) rod(parent, pts[i - 1], pts[i], r, mat, seg);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const k = mesh(new THREE.SphereGeometry(r, seg, 6), mat);
+    k.position.copy(pts[i]);
+    k.userData.noEdge = true;
+    parent.add(k);
+  }
+}
+/** XY düzleminde çokgen levha, z'de ortalanmış kalınlık (kaide/destek sacları) */
+function slab(parent: THREE.Object3D, pts: [number, number][], depth: number, mat: THREE.Material, z: number) {
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))), { depth, bevelEnabled: false });
+  g.translate(0, 0, z - depth / 2);
+  const m = mesh(g, mat);
+  parent.add(m);
+  return m;
+}
+/** a-b doğrusu boyunca, `across` yönünde w genişlikte şerit (iki yüzlü malzemeyle) */
+function ribbon(parent: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, across: THREE.Vector3, w: number, mat: THREE.Material) {
+  const h = across.clone().setLength(w / 2);
+  const p = [a.clone().sub(h), a.clone().add(h), b.clone().sub(h), b.clone().add(h)];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p.flatMap((v) => [v.x, v.y, v.z]), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 0, 1, 1], 2));
+  g.setIndex([0, 2, 1, 1, 2, 3]);
+  g.computeVertexNormals();
+  const m = mesh(g, mat, false);
+  m.userData.noEdge = true;
+  parent.add(m);
+  return m;
 }
 const range = (a: number, b: number, step: number) => {
   const out: number[] = [];
@@ -146,16 +191,16 @@ function wheelKit(R: number): WheelKit {
   wheelCache.set(R, kit);
   return kit;
 }
-function wheel(m: Mats, R: number, side: 1 | -1) {
+function wheel(m: Mats, R: number, side: 1 | -1, hubMat: THREE.Material = m.chrome) {
   const k = wheelKit(R);
   const s = R / 0.53;
   const g = new THREE.Group();
-  g.add(mesh(k.tire, m.rubber));
+  g.add(mesh(k.tire, m.tire));
   g.add(mesh(k.rim, m.alu, false));
   const face = mesh(k.face, m.alu, false);
   face.position.z = 0.1 * s;
   g.add(face);
-  const hub = mesh(k.hub, m.chrome, false);
+  const hub = mesh(k.hub, hubMat, false);
   hub.position.z = 0.15 * s;
   g.add(hub);
   for (let i = 0; i < 10; i++) {
@@ -200,6 +245,18 @@ interface ChassisOpts {
   /** traversler: aralık ve genişlik (iskelet şasilerde seyrek ve dar) */
   crossStep?: number;
   crossW?: number;
+  /** yan ray malzemesi ve üstündeki reflektif kontur bandı (yoksa mavi şerit) */
+  railMat?: THREE.Material;
+  tape?: THREE.Material;
+  /** çamurluk: tek parça düz (tenteli/frigo), aks başına kavisli (damper/silobas), yok (tabla tekerleği örter) */
+  fender?: 'flat' | 'arch' | 'none';
+  hubMat?: THREE.Material;
+  /** arka lamba barı malzemesi (lowbed: gövde boyası) */
+  barMat?: THREE.Material;
+  /** kiriş ve travers boyası (silobas: beyaz) */
+  frameMat?: THREE.Material;
+  /** king pin plakasının yüksekliği (verilmezse ana kirişlerin altı) */
+  kingY?: number;
 }
 function chassis(g: THREE.Group, m: Mats, o: ChassisOpts) {
   const { L, deckY, R } = o;
@@ -208,25 +265,28 @@ function chassis(g: THREE.Group, m: Mats, o: ChassisOpts) {
   const beamY = deckY - 0.08 - beamH / 2;
   const from = o.beamFrom ?? -L + 0.25;
   // ana kirişler
-  for (const z of [-0.5, 0.5]) box(g, -0.15 - from, beamH, 0.1, m.chassis, (from - 0.15) / 2, beamY, z);
+  const fm = o.frameMat ?? m.chassis;
+  for (const z of [-0.5, 0.5]) box(g, -0.15 - from, beamH, 0.1, fm, (from - 0.15) / 2, beamY, z);
   // traversler
-  boxes(g, 0.06, 0.1, o.crossW ?? 2.2, m.chassis, range(from + 0.3, -0.4, o.crossStep ?? 0.55).map((x) => [x, deckY - 0.13, 0]));
-  // dış yan ray
+  boxes(g, 0.06, 0.1, o.crossW ?? 2.2, fm, range(from + 0.3, -0.4, o.crossStep ?? 0.55).map((x) => [x, deckY - 0.13, 0]));
+  // dış yan ray + kontur bandı (kesik sarı reflektif şerit) ya da marka şeridi
   if (o.rail) {
     for (const z of [-1, 1]) {
-      box(g, L - 0.04, 0.22, 0.05, m.alu, -L / 2, deckY - 0.12, z * (W / 2 - 0.025));
-      box(g, L - 0.06, 0.035, 0.006, m.stripe, -L / 2, deckY - 0.06, z * (W / 2 + 0.0005));
+      box(g, L - 0.04, 0.22, 0.05, o.railMat ?? m.alu, -L / 2, deckY - 0.12, z * (W / 2 - 0.025));
+      if (o.tape) boxes(g, 0.5, 0.035, 0.006, o.tape, range(-L + 0.4, -0.4, 0.78).map((x) => [x, deckY - 0.055, z * (W / 2 + 0.0005)]));
+      else box(g, L - 0.06, 0.035, 0.006, m.stripe, -L / 2, deckY - 0.06, z * (W / 2 + 0.0005));
     }
   }
-  // akslar, süspansiyon, tekerlekler, çamurluk
+  // akslar, hava körükleri, salıncak kolları, amortisörler, tekerlekler
   for (const x of o.axles) {
     cyl(g, 0.065, 2.05, m.darkMetal, 'z', x, R, 0);
     for (const z of [-0.52, 0.52]) {
       cyl(g, 0.13, 0.22, m.rubber, 'y', x - 0.35, R + 0.2, z, 18);
       box(g, 0.75, 0.08, 0.1, m.darkMetal, x - 0.15, R + 0.04, z);
+      rod(g, V3(x + 0.12, R + 0.02, z * 1.12), V3(x + 0.2, R + 0.34, z * 1.12), 0.03, m.darkMetal, 8);
     }
     for (const s of [1, -1] as const) {
-      const wh = wheel(m, R, s);
+      const wh = wheel(m, R, s, o.hubMat);
       wh.position.set(x, R, s * (W / 2 - 0.33));
       g.add(wh);
     }
@@ -235,21 +295,41 @@ function chassis(g: THREE.Group, m: Mats, o: ChassisOpts) {
     const xs = o.axles;
     const front = Math.min(...xs) - R - 0.2;
     const back = Math.max(...xs) + R + 0.2;
+    const fender = o.fender ?? 'flat';
     for (const z of [-1, 1]) {
-      box(g, back - front, 0.025, 0.62, m.plastic, (front + back) / 2, 2 * R + 0.09, z * (W / 2 - 0.33));
-      box(g, 0.02, 0.55, 0.6, m.rubber, back + 0.02, 2 * R - 0.2, z * (W / 2 - 0.33));
+      const zc = z * (W / 2 - 0.33);
+      if (fender === 'flat') {
+        box(g, back - front, 0.025, 0.62, m.plastic, (front + back) / 2, 2 * R + 0.09, zc);
+        box(g, back - front, 0.1, 0.02, m.plastic, (front + back) / 2, 2 * R + 0.04, zc + z * 0.3);
+      } else if (fender === 'arch') {
+        // aks başına kavisli çamurluk: üstü saran açık silindir kabuk
+        const geo = new THREE.CylinderGeometry(R + 0.07, R + 0.07, 0.5, 28, 1, true, Math.PI - 1.15, 2.3);
+        geo.rotateX(Math.PI / 2);
+        for (const x of xs) {
+          const f = mesh(geo, m.fender);
+          f.position.set(x, R, zc);
+          g.add(f);
+        }
+      }
+      // son aksın arkasında çamurluk paçası (alçak tablalarda tablanın altında kalır)
+      const top = Math.min(2 * R + 0.07, deckY - 0.38);
+      const bot = 2 * R - 0.475;
+      box(g, 0.02, top - bot, 0.6, m.rubber, back + 0.02, (top + bot) / 2, zc);
     }
   }
-  // iniş ayağı
+  // iniş ayağı (üst ucu tablanın altında kalır)
   for (const z of [-0.62, 0.62]) {
-    box(g, 0.14, fy - 0.55, 0.14, m.darkMetal, o.landingX, (fy + 0.45) / 2 + 0.1, z);
+    const h = fy - 0.72;
+    box(g, 0.14, h, 0.14, m.darkMetal, o.landingX, 0.6 + h / 2, z);
     box(g, 0.1, 0.5, 0.1, m.alu, o.landingX, 0.38, z);
     box(g, 0.32, 0.04, 0.3, m.darkMetal, o.landingX, 0.12, z);
   }
   box(g, 0.06, 0.06, 1.2, m.darkMetal, o.landingX, 0.75, 0);
-  // king pin plakası
-  box(g, 1.6, 0.05, 1.6, m.darkMetal, -L + 1.0, fy - 0.52, 0);
-  cyl(g, 0.045, 0.1, m.steel, 'y', -L + 1.2, fy - 0.6, 0, 16);
+  cyl(g, 0.05, 0.1, m.darkMetal, 'z', o.landingX, fy - 0.35, 0.72, 16);
+  // king pin plakası (şasinin altına oturur)
+  const ky = o.kingY ?? (o.frontDeckY !== undefined ? fy - 0.52 : beamY - beamH / 2 - 0.025);
+  box(g, 1.6, 0.05, 1.6, m.darkMetal, -L + 1.0, ky, 0);
+  cyl(g, 0.045, 0.1, m.steel, 'y', -L + 1.2, ky - 0.075, 0, 16);
   // yan koruma (alüminyum ray)
   if (o.sideGuard && o.axles.length) {
     const x0 = o.landingX + 0.45;
@@ -261,10 +341,11 @@ function chassis(g: THREE.Group, m: Mats, o: ChassisOpts) {
       }
     }
   }
-  // arka koruma tamponu + lamba barı + plaka tutucu
-  box(g, 0.12, 0.13, 2.36, m.darkMetal, -0.22, 0.52, 0, 0.01);
-  for (const z of [-0.55, 0.55]) box(g, 0.08, o.lampY - 0.52, 0.08, m.darkMetal, -0.24, (o.lampY + 0.52) / 2, z);
-  box(g, 0.1, 0.24, W - 0.06, m.chassis, -0.07, o.lampY, 0, 0.01);
+  // arka koruma tamponu (alüminyum boru, uç kapaklı) + taşıyıcılar + lamba barı + plaka tutucu
+  cyl(g, 0.055, 2.3, m.alu, 'z', -0.2, 0.5, 0, 24);
+  for (const z of [-1, 1]) cyl(g, 0.06, 0.04, m.plastic, 'z', -0.2, 0.5, z * 1.17, 24);
+  for (const z of [-0.55, 0.55]) box(g, 0.08, o.lampY - 0.5, 0.08, m.darkMetal, -0.24, (o.lampY + 0.5) / 2, z);
+  box(g, 0.1, 0.24, W - 0.06, o.barMat ?? m.chassis, -0.07, o.lampY, 0, 0.01);
   box(g, 0.04, 0.2, 0.62, m.chassis, -0.04, o.plateY, 0);
 }
 
@@ -313,7 +394,15 @@ function logos(g: THREE.Group, mat: THREE.Material, x: number, y: number, zHalf:
 }
 
 // ---------- arka kapılar ----------
-function rearDoors(g: THREE.Group, m: Mats, y0: number, H: number, mat: THREE.Material) {
+/** ECE R70 uzun araç plakası (dikey); `rotZ` ile yatay */
+function r70(g: THREE.Object3D, m: Mats, x: number, y: number, z: number, rotZ = 0) {
+  const p = mesh(new THREE.PlaneGeometry(0.2, 0.565), m.r70, false, false);
+  p.rotation.set(0, Math.PI / 2, rotZ);
+  p.position.set(x, y, z);
+  p.userData.noEdge = true;
+  g.add(p);
+}
+function rearDoors(g: THREE.Group, m: Mats, y0: number, H: number, mat: THREE.Material, frame: THREE.Material = m.alu) {
   const dw = (W - 0.12) / 2;
   for (const s of [-1, 1]) {
     box(g, 0.05, H - 0.1, dw - 0.02, mat, 0.005, y0 + H / 2, s * (dw / 2 + 0.01), 0.01);
@@ -322,39 +411,100 @@ function rearDoors(g: THREE.Group, m: Mats, y0: number, H: number, mat: THREE.Ma
       box(g, 0.05, 0.04, 0.06, m.darkMetal, 0.04, y0 + 0.25, s * zz);
       box(g, 0.05, 0.04, 0.06, m.darkMetal, 0.04, y0 + H - 0.25, s * zz);
     }
-    for (const yy of [0.35, H / 2, H - 0.35]) box(g, 0.05, 0.08, 0.14, m.darkMetal, 0.035, y0 + yy, s * (W / 2 - 0.1));
+    for (const yy of [0.35, H * 0.36, H * 0.64, H - 0.35]) box(g, 0.05, 0.08, 0.14, m.darkMetal, 0.035, y0 + yy, s * (W / 2 - 0.1));
     box(g, 0.07, 0.07, 0.12, m.darkMetal, 0.05, y0 + H * 0.45, s * 0.42);
+    // ECE R70 plakaları (kapı dış kenarlarında)
+    r70(g, m, 0.032, y0 + H * 0.42, s * 0.95);
   }
-  box(g, 0.08, H, 0.06, m.alu, 0.0, y0 + H / 2, W / 2 - 0.03);
-  box(g, 0.08, H, 0.06, m.alu, 0.0, y0 + H / 2, -W / 2 + 0.03);
-  box(g, 0.08, 0.12, W, m.alu, 0.0, y0 + H - 0.06, 0);
+  // kasa çerçevesi (dikmeler + üst kiriş) ve üzerinde kırmızı reflektif kontur
+  box(g, 0.08, H, 0.06, frame, 0.0, y0 + H / 2, W / 2 - 0.03);
+  box(g, 0.08, H, 0.06, frame, 0.0, y0 + H / 2, -W / 2 + 0.03);
+  box(g, 0.08, 0.12, W, frame, 0.0, y0 + H - 0.06, 0);
+  for (const s of [-1, 1]) box(g, 0.004, H - 0.3, 0.04, m.reflRed, 0.042, y0 + H / 2 - 0.05, s * (W / 2 - 0.03));
+  box(g, 0.004, 0.05, W - 0.1, m.reflRed, 0.042, y0 + H - 0.06, 0);
+  // kapı contası
+  box(g, 0.02, H - 0.08, 0.012, m.rubber, 0.03, y0 + H / 2, 0);
 }
 
 // ---------- perde (tente) ----------
+/** Yan tente (beyaz): kayış araları hafif şişkin (yastık) paneller, dikey gergi kayışları + tokalar, altta TIR gümrük halatı. */
 function curtain(g: THREE.Group, m: Mats, L: number, y0: number, H: number) {
-  const seg = Math.round(L * 14);
+  const pitch = 0.62;
+  const x0 = -L + 0.12;
+  const x1 = -0.12;
+  const len = x1 - x0;
+  const cx = (x0 + x1) / 2;
+  const seg = Math.round(len * 16);
+  const zc = W / 2 - 0.022;
   for (const s of [1, -1]) {
-    const geo = new THREE.PlaneGeometry(L - 0.16, H, seg, 1);
+    const geo = new THREE.PlaneGeometry(len, H, seg, 8);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      pos.setZ(i, 0.012 * Math.sin(x * 34) + 0.005 * Math.sin(x * 9.3));
+      const xw = cx + s * pos.getX(i);
+      const v = pos.getY(i) / H + 0.5;
+      const k = Math.sin((Math.PI * (xw - x0)) / pitch);
+      pos.setZ(i, 0.017 * k * k * Math.pow(Math.sin(Math.PI * v), 0.6) + 0.003 * Math.sin(xw * 23));
     }
     geo.computeVertexNormals();
     const p = mesh(geo, m.curtain);
-    p.position.set(-L / 2, y0 + H / 2, s * (W / 2 - 0.02));
+    p.position.set(cx, y0 + H / 2, s * zc);
     if (s < 0) p.rotation.y = Math.PI;
+    p.userData.noEdge = true;
     g.add(p);
-    // tokalar / gergi kayışları
-    boxes(
-      g,
-      0.04,
-      0.34,
-      0.014,
-      m.darkMetal,
-      range(-L + 0.5, -0.5, 0.62).map((x) => [x, y0 + 0.2, s * (W / 2 + 0.002)]),
-    );
+    // gergi kayışları ve alt tokaları
+    const xs = range(x0 + pitch, x1 - 0.2, pitch);
+    boxes(g, 0.045, H - 0.04, 0.008, m.strap, xs.map((x) => [x, y0 + H / 2, s * (zc + 0.006)]));
+    boxes(g, 0.065, 0.11, 0.025, m.darkMetal, xs.map((x) => [x, y0 + 0.17, s * (zc + 0.012)]));
+    // TIR halatı: kayışlar arasında zikzak
+    const zz = s * (zc + 0.02);
+    const pts: THREE.Vector3[] = [];
+    for (let x = x0 + pitch / 2, i = 0; x <= x1 - 0.1; x += pitch / 2, i++) pts.push(V3(x, y0 + (i % 2 ? 0.52 : 0.3), zz));
+    for (let i = 1; i < pts.length; i++) rod(g, pts[i - 1], pts[i], 0.006, m.steel, 6);
   }
+}
+
+/** Frigorifik soğutma ünitesi (ön duvara asılı): yuvarlatılmış gövde, ön menfez ızgarası, kondenser girişi, yan panjurlar, kontrol paneli. */
+function reefer(body: THREE.Group, m: Mats, L: number, topY: number) {
+  const u = new THREE.Group();
+  box(u, 0.5, 1.75, 2.15, m.paint, 0, 0, 0, 0.09);
+  box(u, 0.03, 0.95, 1.62, m.grille, -0.255, 0.22, 0, 0.01);
+  box(u, 0.035, 0.05, 1.7, m.alu, -0.255, 0.73, 0);
+  box(u, 0.03, 0.36, 1.86, m.plastic, -0.255, -0.6, 0, 0.03);
+  box(u, 0.02, 0.1, 0.32, m.plastic, -0.268, -0.28, 0.66, 0.01);
+  for (const s of [-1, 1]) boxes(u, 0.28, 0.02, 0.01, m.plastic, range(-0.45, 0.45, 0.075).map((y) => [-0.05, y, s * 1.076]));
+  u.position.set(-L - 0.26, topY - 1.05, 0);
+  body.add(u);
+}
+
+/** V tipi silobas kabuğu: x ekseni boyunca, üst çizgisi `top`'ta sabit, yarıçapı ra→rb doğrusal değişen kesik koni (analitik normal). */
+function siloCone(xa: number, xb: number, ra: number, rb: number, top: number, seg = 72) {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const dr = (rb - ra) / (xb - xa);
+  const n = new THREE.Vector3();
+  for (let j = 0; j <= 1; j++) {
+    const x = j ? xb : xa;
+    const r = j ? rb : ra;
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      pos.push(x, top - r + Math.cos(a) * r, Math.sin(a) * r);
+      n.set(-dr * (1 - Math.cos(a)), Math.cos(a), Math.sin(a)).normalize();
+      nor.push(n.x, n.y, n.z);
+      uv.push(i / seg, j);
+    }
+  }
+  for (let i = 0; i < seg; i++) {
+    const c = seg + 1 + i;
+    idx.push(i, i + 1, c, i + 1, c + 1, c);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
 }
 
 // ---------- gövde tipleri ----------
@@ -387,6 +537,16 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   const n = L >= 12 ? 3 : 2;
   let axles = Array.from({ length: n }, (_, i) => -1.75 - i * 1.31);
 
+  let railMat: THREE.Material | undefined;
+  let tape: THREE.Material | undefined = m.reflYellow;
+  let fender: ChassisOpts['fender'] = 'flat';
+  let hubMat: THREE.Material | undefined;
+  let barMat: THREE.Material | undefined;
+  let frameMat: THREE.Material | undefined;
+  let kingY: number | undefined;
+  let sideX0 = -L + 1.0;
+  let extraY: number | undefined;
+
   if (type === 'lowbed') {
     R = 0.4;
     deckY = 1.0;
@@ -398,14 +558,30 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     rail = false;
     onWall = false;
     topY = 2.0;
+    fender = 'none';
+    barMat = m.paint;
   }
-  if (type === 'tanker') {
-    deckY = 1.22;
+  if (type === 'tanker' || type === 'silo') {
+    deckY = type === 'silo' ? 1.25 : 1.22;
     lampY = 0.96;
     plateY = 0.7;
     topY = 3.45;
     onWall = false;
     rail = false;
+  }
+  if (type === 'tanker') {
+    kingY = deckY - 0.225;
+    sideGuard = false;
+    fender = 'arch';
+    frameMat = m.paint;
+    barMat = m.paint;
+  }
+  if (type === 'silo') {
+    sideGuard = false;
+    fender = 'arch';
+    frameMat = m.paint;
+    barMat = m.paint;
+    kingY = deckY - 0.265;
   }
   if (type === 'arac') {
     deckY = 0.95;
@@ -423,8 +599,16 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     crossStep = 1.45;
     crossW = 1.15;
   }
-  if (type === 'flatbed' || type === 'stepdeck' || type === 'konteyner') onWall = false;
-  if (type === 'damper') topY = 3.0;
+  if (type === 'flatbed' || type === 'stepdeck' || type === 'konteyner') {
+    onWall = false;
+    tape = undefined;
+  }
+  if (type === 'standart') railMat = m.paint;
+  if (type === 'damper') {
+    topY = 3.0;
+    railMat = m.chassis;
+    fender = 'arch';
+  }
 
   const H = topY - deckY;
   /** Tesisat görünümünde kavisli gövdelerin biçimi okunsun diye çizilen ek kesit çizgileri (kapalı çokgenler) */
@@ -432,14 +616,22 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
 
   // --- gövde ---
   if (type === 'standart') {
+    // Tenteli: ahşap taban, beyaz ön duvar ve köşe dikmeleri, beyaz üst yan profiller (altı gölgeli), gri yan tente
     box(body, L, 0.1, W - 0.02, m.deck, -L / 2, deckY - 0.05, 0);
-    box(body, 0.08, H, W, m.paint, -L + 0.04, deckY + H / 2, 0, 0.02);
-    box(body, L, 0.07, W + 0.02, m.alu, -L / 2, topY - 0.035, 0, 0.02);
-    box(body, L - 0.1, 0.03, W - 0.04, m.curtain, -L / 2, topY + 0.01, 0);
-    for (const z of [-1, 1]) box(body, L, 0.14, 0.05, m.alu, -L / 2, topY - 0.12, z * (W / 2 - 0.02));
-    curtain(body, m, L, deckY + 0.02, H - 0.2);
-    rearDoors(body, m, deckY, H - 0.07, m.paint);
-    logos(body, m.logo, -L / 2 + 0.6, deckY + H * 0.55, W / 2 - 0.005, 2.1);
+    box(body, 0.08, H, W - 0.04, m.paint, -L + 0.04, deckY + H / 2, 0, 0.02);
+    for (const z of [-1, 1]) box(body, 0.1, H, 0.08, m.paint, -L + 0.05, deckY + H / 2, z * (W / 2 - 0.04), 0.015);
+    box(body, L - 0.02, 0.05, W - 0.1, m.curtain, -L / 2, topY - 0.03, 0);
+    for (const z of [-1, 1]) {
+      box(body, L, 0.17, 0.07, m.paint, -L / 2, topY - 0.085, z * (W / 2 - 0.035), 0.012);
+      box(body, L - 0.06, 0.03, 0.05, m.plastic, -L / 2, topY - 0.185, z * (W / 2 - 0.04));
+    }
+    const cy0 = deckY - 0.06;
+    curtain(body, m, L, cy0, topY - 0.15 - cy0);
+    rearDoors(body, m, deckY, H - 0.07, m.paint, m.paint);
+    box(body, 0.06, 0.14, W - 0.02, m.chassis, -0.025, deckY - 0.06, 0);
+    logos(body, m.logo, -L / 2 + 0.6, deckY + H * 0.55, W / 2 + 0.002, 2.1);
+    // alet kutusu (iniş ayağı ile akslar arasında)
+    box(body, 0.9, 0.42, 0.45, m.plastic, landingX + 1.4, deckY - 0.62, W / 2 - 0.35, 0.03);
   } else if (type === 'kapali' || type === 'frigo') {
     const r = type === 'frigo' ? 0.07 : 0.025;
     box(body, L, H, W, m.paint, -L / 2, deckY + H / 2, 0, r);
@@ -447,16 +639,15 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
       boxes(body, 0.05, H - 0.1, W + 0.03, m.alu, range(-L + 0.6, -0.6, 1.2).map((x) => [x, deckY + H / 2, 0]));
       for (const y of [deckY + 0.06, topY - 0.06]) box(body, L + 0.01, 0.12, W + 0.03, m.alu, -L / 2, y, 0);
     } else {
-      for (const y of [deckY + 0.05]) box(body, L + 0.01, 0.1, W + 0.03, m.alu, -L / 2, y, 0);
-      // soğutma ünitesi
-      const u = new THREE.Group();
-      box(u, 0.5, 1.75, 2.15, m.paint, 0, 0, 0, 0.09);
-      box(u, 0.02, 1.2, 1.7, m.grille, -0.26, 0.05, 0);
-      box(u, 0.02, 0.18, 1.7, m.stripe, -0.26, -0.72, 0);
-      u.position.set(-L - 0.26, topY - 1.05, 0);
-      body.add(u);
+      // Frigorifik: yekpare yalıtımlı gövde, alt ve üst alüminyum köşe profilleri, önde soğutma ünitesi,
+      // şasi altında ünite yakıt deposu ve alet kutusu
+      box(body, L + 0.01, 0.1, W + 0.03, m.alu, -L / 2, deckY + 0.05, 0);
+      box(body, L - 0.12, 0.035, W + 0.012, m.alu, -L / 2, topY - 0.05, 0);
+      reefer(body, m, L, topY);
+      box(body, 0.7, 0.42, 0.5, m.alu, landingX + 0.9, deckY - 0.5, -(W / 2 - 0.4), 0.06);
+      box(body, 0.9, 0.45, 0.45, m.paint, landingX + 1.4, deckY - 0.62, W / 2 - 0.35, 0.03);
     }
-    rearDoors(body, m, deckY, H, m.paint);
+    rearDoors(body, m, deckY, H, m.paint, type === 'frigo' ? m.chassis : m.alu);
     logos(body, m.logo, -L / 2 + 0.6, deckY + H * 0.55, W / 2 + 0.024, 2.2);
     for (const z of [-1, 1]) box(body, L - 0.3, 0.06, 0.006, m.stripe, -L / 2, deckY + 0.25, z * (W / 2 + 0.017));
   } else if (type === 'flatbed' || type === 'stepdeck') {
@@ -501,40 +692,105 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
       ];
     }
   } else if (type === 'lowbed') {
+    // Yarı lowbed: korkuluklu yükseltilmiş ön boyun (stepne üstünde), kaymaz çıtalı iniş rampası, küçük tekerlekler üzerinde
+    // düz alçak ana tabla (kauçuk pedler, bağlama halkaları, yan cepler), arkada hidrolik pistonlu dik duran iki rampa.
+    const pm = m.paint;
     const neck = 3.0;
-    const wellStart = -L + neck + 0.6;
-    const wellEnd = -4.6;
-    const wellY = 0.62;
-    box(body, neck, 0.14, W, m.deck, -L + neck / 2, 1.45 - 0.07, 0);
-    box(body, neck, 0.4, 1.2, m.chassis, -L + neck / 2, 1.18, 0);
-    const n1 = box(body, 0.9, 0.14, W - 0.1, m.chassis, -L + neck + 0.3, 1.05, 0);
-    n1.rotation.z = -0.85;
-    box(body, wellEnd - wellStart, 0.12, W, m.deck, (wellStart + wellEnd) / 2, wellY, 0);
-    for (const z of [-1, 1]) box(body, wellEnd - wellStart, 0.32, 0.12, m.paintBlue, (wellStart + wellEnd) / 2, wellY - 0.16, z * (W / 2 - 0.06));
-    const n2 = box(body, 0.7, 0.14, W - 0.1, m.chassis, wellEnd + 0.2, 0.8, 0);
-    n2.rotation.z = 0.6;
-    box(body, -wellEnd, 0.12, W, m.deck, wellEnd / 2, deckY - 0.06, 0);
-    for (const z of [-1, 1]) box(body, -wellEnd, 0.22, 0.08, m.paintBlue, wellEnd / 2, deckY - 0.12, z * (W / 2 - 0.04));
-    for (const z of [-0.7, 0.7]) {
-      const ramp = box(body, 0.06, 2.0, 0.55, m.alu, 0.25, deckY + 0.85, z);
-      ramp.rotation.z = 0.32;
+    const nY = 1.55;
+    const slope = 0.75;
+    const xn = -L + neck;
+    const xs = xn + slope;
+    const sideBeam = (len: number, x: number, y: number) => {
+      for (const z of [-1, 1]) box(body, len, 0.32, 0.1, pm, x, y - 0.2, z * (W / 2 - 0.05));
+    };
+    // boyun
+    box(body, neck, 0.12, W, pm, -L + neck / 2, nY - 0.06, 0);
+    sideBeam(neck, -L + neck / 2, nY);
+    box(body, neck - 0.3, 0.42, 1.0, pm, -L + neck / 2 + 0.15, nY - 0.33, 0);
+    box(body, 0.08, 0.42, W - 0.06, pm, -L + 0.04, nY - 0.27, 0);
+    // ön tabla korkuluğu (yatay oluklu alçak duvar) ve stepne
+    const bh = 0.5;
+    box(body, 0.06, bh, W, pm, -L + 0.03, nY + bh / 2, 0);
+    for (const z of [-1, 1]) {
+      box(body, 1.6, bh, 0.05, pm, -L + 0.8, nY + bh / 2, z * (W / 2 - 0.025));
+      for (const y of [0.17, 0.34]) box(body, 1.5, 0.025, 0.012, m.chassis, -L + 0.82, nY + y, z * (W / 2 + 0.001));
     }
-    beamFrom = wellEnd + 0.4;
-    topY = deckY + 1.85;
-    frontPos = { x: -L + 0.02, y: 1.52, z: W / 2 - 0.06 };
-    armRearY = deckY + 0.3;
-    armFrontY = 1.75;
-    sideYAt = (x) => (x < -L + neck ? 1.3 : x < wellEnd ? wellY - 0.12 : deckY - 0.12);
-    socketY = 1.3;
-    harnessY = 0.6;
-    frontDeckY = 1.45;
+    for (const y of [0.17, 0.34]) box(body, 0.012, 0.025, W - 0.1, m.chassis, -L - 0.001, nY + y, 0);
+    const spare = wheel(m, R, 1);
+    spare.position.set(-L + 0.62, nY + R + 0.01, 0.15);
+    body.add(spare);
+    // boyun rampası (kaymaz çıtalı)
+    const ang = Math.atan2(nY - deckY, slope);
+    const sl = Math.hypot(nY - deckY, slope);
+    const rp = box(body, sl + 0.02, 0.12, W, pm, (xn + xs) / 2, (nY + deckY) / 2 - 0.06, 0);
+    rp.rotation.z = -ang;
+    for (const z of [-1, 1]) {
+      const sb = box(body, sl + 0.02, 0.32, 0.1, pm, (xn + xs) / 2, (nY + deckY) / 2 - 0.2, z * (W / 2 - 0.05));
+      sb.rotation.z = -ang;
+    }
+    for (let i = 0; i < 4; i++) {
+      const t = (i + 0.5) / 4;
+      for (const z of [-0.55, 0.55]) {
+        const bar = box(body, 0.05, 0.025, 0.85, m.plastic, xn + t * slope, nY - t * (nY - deckY) + 0.01, z);
+        bar.rotation.z = -ang;
+      }
+    }
+    // ana tabla
+    const dl = -xs;
+    box(body, dl, 0.12, W, pm, xs / 2, deckY - 0.06, 0);
+    sideBeam(dl, xs / 2, deckY);
+    boxes(body, 0.95, 0.012, 0.55, m.plastic, range(xs + 0.6, -0.6, 1.3).flatMap((x): [number, number, number][] => [[x, deckY + 0.006, 0.66], [x, deckY + 0.006, -0.66]]));
+    const ringGeo = new THREE.TorusGeometry(0.045, 0.009, 6, 16);
+    for (const x of range(xs + 0.5, -0.6, 1.1)) {
+      for (const z of [-1, 1]) {
+        const ring = mesh(ringGeo, m.darkMetal);
+        ring.position.set(x, deckY + 0.04, z * (W / 2 - 0.12));
+        ring.userData.noEdge = true;
+        body.add(ring);
+      }
+    }
+    for (const z of [-1, 1]) boxes(body, 0.1, 0.07, 0.06, pm, range(xs + 0.3, -0.3, 0.8).map((x) => [x, deckY - 0.045, z * (W / 2 + 0.03)]));
+    // arka rampalar: dik (hafif öne yatık), merdiven görünümlü; önlerinde hidrolik piston
+    const tilt = 0.1;
+    const rl = 2.5;
+    const rw = 0.6;
+    const hx = -0.08;
+    for (const zr of [-0.68, 0.68]) {
+      const rg = new THREE.Group();
+      for (const zz of [-1, 1]) box(rg, 0.12, rl, 0.07, pm, 0, rl / 2, zz * (rw / 2 - 0.035));
+      box(rg, 0.03, rl - 0.1, rw - 0.12, m.chassis, -0.02, rl / 2, 0);
+      for (let y = 0.16; y < rl - 0.1; y += 0.32) box(rg, 0.1, 0.07, rw - 0.1, pm, 0, y, 0);
+      box(rg, 0.12, 0.1, rw, pm, 0, rl - 0.05, 0);
+      const wp = mesh(new THREE.PlaneGeometry(0.26, 0.42), m.warn, false, false);
+      wp.rotation.y = Math.PI / 2;
+      wp.position.set(0.062, 0.42, Math.sign(zr) * (rw / 2 - 0.15));
+      rg.add(wp);
+      box(rg, 0.02, 0.1, 0.1, m.reflYellow, 0.065, rl - 0.25, Math.sign(zr) * (rw / 2 - 0.1));
+      rg.position.set(hx, deckY, zr);
+      rg.rotation.z = tilt;
+      body.add(rg);
+      const at = (lx: number, ly: number) => V3(hx + lx * Math.cos(tilt) - ly * Math.sin(tilt), deckY + lx * Math.sin(tilt) + ly * Math.cos(tilt), zr);
+      const base = V3(-0.95, deckY + 0.08, zr);
+      const tip = at(-0.1, 1.5);
+      const mid = base.clone().lerp(tip, 0.58);
+      rod(body, base, mid, 0.055, m.plastic, 14);
+      rod(body, mid, tip, 0.03, m.chrome, 12);
+      box(body, 0.14, 0.08, 0.14, m.darkMetal, base.x, deckY + 0.04, zr);
+    }
+    beamFrom = xs + 0.1;
+    topY = deckY + rl * Math.cos(tilt);
+    frontPos = { x: -L - 0.005, y: nY + bh - 0.08, z: W / 2 - 0.08 };
+    armRearY = deckY - 0.1;
+    armFrontY = nY + 0.3;
+    sideYAt = (x) => (x < xn ? nY - 0.12 : x < xs ? nY - 0.12 - ((x - xn) / slope) * (nY - deckY) : deckY - 0.12);
+    socketY = nY - 0.25;
+    harnessY = deckY - 0.1;
+    frontDeckY = nY;
     profile = [
-      [-L, 1.25],
-      [-L + neck, 1.25],
-      [wellStart, 0.6],
-      [wellEnd, 0.6],
-      [wellEnd + 0.6, deckY - 0.04],
-      [0, deckY - 0.04],
+      [-L, nY - 0.2],
+      [xn, nY - 0.2],
+      [xs + 0.1, deckY - 0.1],
+      [0, deckY - 0.1],
     ];
   } else if (type === 'damper') {
     // Yarım boru (half-pipe) çelik damper kasası: dikey yanlar, elips taban; önde teleskopik hidrolik piston ve
@@ -567,27 +823,29 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
       g.rotateY(Math.PI / 2);
       return g;
     };
-    const tub = mesh(along(shell, tl), m.paint);
+    const pm = m.paint;
+    const tub = mesh(along(shell, tl), pm);
     tub.position.set(x0, y0, 0);
     body.add(tub);
     const sp = solid.getPoints(16);
     for (const x of range(x0, x0 + tl, tl / 5)) sections.push(sp.map((p) => new THREE.Vector3(x, y0 + p.y, -p.x)));
-    const fw = mesh(along(solid, 0.06), m.paint);
+    const fw = mesh(along(solid, 0.06), pm);
     fw.position.set(x0, y0, 0);
     body.add(fw);
-    const tg = mesh(along(solid, 0.07), m.paint);
+    const tg = mesh(along(solid, 0.07), pm);
     tg.position.set(x0 + tl - 0.02, y0, 0);
     body.add(tg);
     for (const s of [-1, 1]) {
-      box(body, tl, 0.09, 0.1, m.stripe, x0 + tl / 2, y0 + Hb - 0.03, s * (wt - 0.02));
-      box(body, tl - 0.4, 0.07, 0.006, m.stripe, x0 + tl / 2, y0 + ey + 0.18, s * (wt + 0.003));
+      // üst kenar kutu profili ve yan kırım çizgisi
+      box(body, tl + 0.02, 0.14, 0.12, pm, x0 + tl / 2, y0 + Hb - 0.05, s * (wt + 0.01), 0.015);
+      box(body, tl - 0.3, 0.035, 0.014, pm, x0 + tl / 2, y0 + ey + 0.06, s * (wt + 0.005));
       box(body, 0.12, 0.12, 0.12, m.darkMetal, x0 + tl + 0.04, y0 + Hb - 0.06, s * (wt - 0.08));
       box(body, 0.08, Hb - 0.3, 0.04, m.darkMetal, x0 + tl + 0.07, y0 + Hb / 2 + 0.1, s * (wt - 0.25));
       // devirme alt çerçevesi
       box(body, tl, 0.16, 0.12, m.chassis, x0 + tl / 2, deckY + 0.02, s * 0.5);
     }
     // kabin siperliği
-    const canopy = box(body, 0.55, 0.05, W - 0.1, m.paint, x0 - 0.2, y0 + Hb + 0.05, 0);
+    const canopy = box(body, 0.55, 0.05, W - 0.1, pm, x0 - 0.2, y0 + Hb + 0.05, 0);
     canopy.rotation.z = 0.22;
     // arka devirme menteşesi
     box(body, 0.22, 0.22, 1.25, m.darkMetal, -0.3, deckY + 0.04, 0);
@@ -599,62 +857,270 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     cyl(body, 0.075, 0.55, m.chrome, 'y', px, deckY + 1.6, 0, 20);
     box(body, 0.2, 0.12, 0.34, m.darkMetal, px + 0.05, deckY + 1.9, 0);
     logos(body, m.logo, x0 + tl / 2, y0 + ey + (Hb - ey) / 2 + 0.05, wt, 0.62);
+    // arka kapak: yatay ve dikey takviyeler, kırmızı reflektif kontur, R70 plakaları, alt kilit kancaları
+    const xr = x0 + tl + 0.05;
+    for (const y of [y0 + ey + 0.12, y0 + Hb - 0.38]) box(body, 0.06, 0.1, 2 * wt - 0.12, pm, xr + 0.03, y, 0, 0.01);
+    for (const z of [-0.55, 0.55]) box(body, 0.06, Hb - 0.3, 0.1, pm, xr + 0.03, y0 + Hb / 2 + 0.05, z, 0.01);
+    box(body, 0.004, 0.05, 2 * wt - 0.16, m.reflRed, xr + 0.002, y0 + Hb - 0.16, 0);
+    for (const z of [-1, 1]) {
+      box(body, 0.004, Hb - ey - 0.3, 0.05, m.reflRed, xr + 0.002, y0 + ey + (Hb - ey) / 2 - 0.05, z * (wt - 0.08));
+      r70(body, m, xr + 0.065, y0 + ey - 0.12, z * 0.62, Math.PI / 2);
+      box(body, 0.1, 0.12, 0.08, m.darkMetal, xr + 0.02, y0 + 0.28, z * 0.3);
+    }
+    // ön duvar dikey takviyeleri
+    for (const z of [-0.65, 0.65]) box(body, 0.05, Hb - 0.2, 0.1, pm, x0 - 0.025, y0 + Hb / 2 + 0.08, z);
+    // ön merdiven (sürücü tarafı)
+    const zl = wt + 0.03;
+    const la = x0 + 0.05;
+    const lb = x0 + 0.4;
+    for (const x of [la, lb]) rod(body, V3(x, deckY - 0.3, zl), V3(x, y0 + Hb + 0.12, zl), 0.016, m.alu, 8);
+    for (let y = deckY - 0.18; y < y0 + Hb; y += 0.3) rod(body, V3(la, y, zl), V3(lb, y, zl), 0.013, m.alu, 8);
     topY = y0 + Hb;
     onWall = false;
     socketY = deckY - 0.12;
     frontPos = { x: x0 - 0.01, y: topY - 0.16, z: wt - 0.12 };
   } else if (type === 'tanker') {
-    // Kendinden taşıyıcı oval kesitli tank: uzun şasi kirişi yok; yalnızca ön (king pin) ve arka (yürüyen aksam) alt çerçeveleri.
-    const r = 1.0;
-    const sz = 1.22;
-    const tl = L - 0.9;
-    const cy = deckY + r;
-    const tank = mesh(new THREE.CylinderGeometry(r, r, tl, 64, 1, true), m.steel);
-    tank.rotation.z = Math.PI / 2;
-    tank.scale.z = sz;
-    tank.position.set(-L / 2, cy, 0);
-    body.add(tank);
-    for (const s of [-1, 1]) {
-      const cap = mesh(new THREE.SphereGeometry(r, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), m.steel);
-      cap.scale.set(1, 0.32, sz);
+    // Akaryakıt tankeri: üst çizgisi yatay, arkada tam çaplı silindir, önde öne doğru incelen konik bölüm (ön kafa daha küçük).
+    // Üstte trapez kesitli devrilme koruma kaportası; önde tankı taşıyan beşik (king pin çerçevesi), ortada şasisiz tank,
+    // arkada konsollarla tanka bağlı aks şasisi. Yanlarda siyah hortum boruları, alüminyum alet dolapları, arkada ADR işaretleri.
+    const sz = 1.08;
+    const yT = deckY + 2.05;
+    const r0 = 0.72;
+    const r1 = 1.0;
+    const xF = -L + 0.35;
+    const xR = -0.35;
+    const xJ = xF + (xR - xF) * 0.36;
+    const rAt = (x: number) => (x >= xJ ? r1 : r0 + ((r1 - r0) * (x - xF)) / (xJ - xF));
+    const cyAt = (x: number) => yT - rAt(x);
+    /** tank alt yüzeyi (z yanal konumda) */
+    const botAt = (x: number, z: number) => cyAt(x) - rAt(x) * Math.sqrt(Math.max(0, 1 - (z / (rAt(x) * sz)) ** 2));
+    for (const [xa, xb, ra, rb] of [
+      [xF, xJ, r0, r1],
+      [xJ, xR, r1, r1],
+    ]) {
+      const shell = mesh(siloCone(xa, xb, ra, rb, yT, 80), m.tankAlu);
+      shell.scale.z = sz;
+      body.add(shell);
+    }
+    for (const [x, r, s] of [
+      [xF, r0, 1],
+      [xR, r1, -1],
+    ] as const) {
+      const cap = mesh(new THREE.SphereGeometry(r, 56, 18, 0, Math.PI * 2, 0, Math.PI / 2), m.tankAlu);
+      cap.scale.set(1, 0.28, sz);
       cap.rotation.z = (s * Math.PI) / 2;
-      cap.position.set(-L / 2 - (s * tl) / 2, cy, 0);
+      cap.position.set(x, yT - r, 0);
       body.add(cap);
     }
-    for (const x of range(-L + 0.45, -0.45, (L - 0.9) / 5)) {
-      sections.push(Array.from({ length: 48 }, (_, i) => new THREE.Vector3(x, cy + Math.sin((i / 48) * Math.PI * 2) * r, Math.cos((i / 48) * Math.PI * 2) * r * sz)));
-    }
-    for (const x of range(-L + 1.2, -1.2, 2.3)) {
-      const ring = mesh(new THREE.TorusGeometry(r + 0.01, 0.025, 8, 64), m.chrome);
+    for (const x of [xF + 0.02, xJ, ...range(xJ + (xR - xJ) / 3, xR - 0.3, (xR - xJ) / 3), xR - 0.02]) {
+      const ring = mesh(new THREE.TorusGeometry(rAt(x) + 0.004, 0.008, 6, 72), m.tankAlu);
       ring.rotation.y = Math.PI / 2;
       ring.scale.x = sz;
-      ring.position.set(x, cy, 0);
+      ring.position.set(x, cyAt(x), 0);
+      ring.userData.noEdge = true;
       body.add(ring);
     }
-    // yürüme yolu, kapaklar, korkuluk
-    box(body, tl - 0.6, 0.04, 0.5, m.alu, -L / 2, cy + r + 0.02, 0);
-    for (const x of range(-L + 2, -1.5, 2.6)) cyl(body, 0.24, 0.12, m.steel, 'y', x, cy + r + 0.06, 0, 28);
-    for (const z of [-0.3, 0.3]) {
-      boxes(body, 0.03, 0.4, 0.03, m.alu, range(-L + 1, -1, 1.5).map((x) => [x, cy + r + 0.24, z]));
-      box(body, tl - 0.9, 0.03, 0.03, m.alu, -L / 2, cy + r + 0.44, z);
+    for (const x of range(xF + 0.05, xR - 0.05, (xR - xF - 0.1) / 6)) {
+      const r = rAt(x);
+      sections.push(Array.from({ length: 48 }, (_, i) => V3(x, cyAt(x) + Math.cos((i / 48) * Math.PI * 2) * r, Math.sin((i / 48) * Math.PI * 2) * r * sz)));
     }
-    // arka merdiven
-    for (const z of [-0.18, 0.18]) box(body, 0.04, r * 2, 0.04, m.alu, -0.06, cy, z);
-    boxes(body, 0.04, 0.03, 0.4, m.alu, range(cy - r + 0.2, cy + r, 0.3).map((y) => [-0.06, y, 0]));
-    for (const s of [-1, 1]) {
-      box(body, tl - 0.4, 0.05, 0.006, m.stripe, -L / 2, cy - 0.15, s * (r * sz + 0.012));
-      // hortum boruları (yan alt; yan markerlar bunun üstünde)
-      cyl(body, 0.08, L - 3.6, m.alu, 'x', -L / 2 - 0.4, deckY - 0.1, s * (W / 2 - 0.12), 16);
+    // üst kaporta: alttan dar, üstten geniş trapez; arka yüzünde kırmızı reflektörler, üstünde kapak muhafazaları
+    const fx0 = xF + 0.25;
+    const fx1 = xR + 0.05;
+    const fair = new THREE.Shape([new THREE.Vector2(-0.5, -0.36), new THREE.Vector2(0.5, -0.36), new THREE.Vector2(0.84, 0.28), new THREE.Vector2(-0.84, 0.28)]);
+    const fg = new THREE.ExtrudeGeometry(fair, { depth: fx1 - fx0, bevelEnabled: true, bevelSize: 0.015, bevelThickness: 0.015, bevelSegments: 1 });
+    fg.rotateY(Math.PI / 2);
+    const fm = mesh(fg, m.fairing);
+    fm.position.set(fx0, yT, 0);
+    body.add(fm);
+    for (const z of [-1, 1]) {
+      box(body, fx1 - fx0, 0.025, 0.01, m.darkMetal, (fx0 + fx1) / 2, yT + 0.2, z * 0.79);
+      cyl(body, 0.06, 0.02, m.reflRed, 'x', fx1 + 0.025, yT + 0.12, z * 0.66, 20);
     }
-    // ön alt çerçeve (king pin eyeri) ve arka yürüyen aksam çerçevesi
-    box(body, 2.4, 0.3, 1.2, m.chassis, -L + 1.4, deckY - 0.12, 0);
-    for (const x of [-L + 0.6, -L + 2.4]) box(body, 0.2, 0.3, 1.9, m.darkMetal, x, deckY + 0.02, 0);
-    beamFrom = Math.min(...axles) - R - 0.8;
-    topY = cy + r + 0.45;
-    frontPos = { x: -L + 0.06, y: deckY + 0.05, z: W / 2 - 0.12 };
-    armRearY = deckY + 0.6;
-    armFrontY = deckY + 0.6;
+    const comp = L >= 12 ? 4 : 3;
+    for (let i = 0; i < comp; i++) box(body, 0.32, 0.05, 0.42, m.alu, fx0 + 0.6 + ((fx1 - fx0 - 1.2) * i) / Math.max(1, comp - 1), yT + 0.31, 0, 0.015);
+    // ön beşik: taban çerçevesi, tankı alttan saran destek sacları ve dikmeler, uçlarında lamba olan ön kol
+    const bx0 = -L;
+    const bx1 = xF + 1.7;
+    box(body, bx1 - bx0, 0.16, 1.3, m.paint, (bx0 + bx1) / 2, deckY - 0.12, 0, 0.01);
+    for (const z of [-0.42, 0.42]) {
+      const xs = range(xF + 0.15, xF + 1.55, 0.233);
+      slab(body, [[xF + 0.15, deckY - 0.05], [xF + 1.55, deckY - 0.05], ...[...xs].reverse().map((x) => [x, botAt(x, z) + 0.03] as [number, number])], 0.1, m.paint, z);
+    }
+    for (const x of [xF + 0.35, xF + 1.35]) {
+      for (const z of [-1, 1]) {
+        const yt = cyAt(x) - rAt(x) * 0.45;
+        box(body, 0.14, yt - deckY + 0.05, 0.12, m.paint, x, (yt + deckY - 0.05) / 2, z * 0.74, 0.01);
+      }
+    }
+    box(body, 0.06, 0.06, W - 0.04, m.paint, -L + 0.3, deckY - 0.2, 0);
+    // aks şasisi konsolları (kirişten tanka) ve hortum borusu taşıyıcıları
+    landingX = xJ + 0.1;
+    beamFrom = landingX - 0.25;
+    const tubeY = deckY + 0.3;
+    const tx0 = beamFrom - 0.15;
+    const tx1 = -0.3;
+    for (const x of range(beamFrom + 0.25, -0.6, (-0.6 - beamFrom - 0.25) / Math.round((-0.6 - beamFrom) / 1.2))) {
+      for (const z of [-1, 1]) {
+        const yt = botAt(x, 0.5) + 0.04;
+        box(body, 0.14, yt - deckY + 0.08, 0.1, m.paint, x, (yt + deckY - 0.08) / 2, z * 0.5, 0.01);
+        box(body, 0.1, 0.1, W / 2 - 0.62, m.paint, x, tubeY - 0.16, z * (W / 2 / 2 + 0.24), 0.01);
+      }
+    }
+    for (const z of [-1, 1]) {
+      // hortum borusu (uç kapaklı, kelepçeli), altında yan marker rayı
+      cyl(body, 0.11, tx1 - tx0, m.plastic, 'x', (tx0 + tx1) / 2, tubeY, z * (W / 2 - 0.11), 28);
+      for (const x of [tx0 + 0.02, tx1 - 0.02]) cyl(body, 0.115, 0.04, m.darkMetal, 'x', x, tubeY, z * (W / 2 - 0.11), 28);
+      for (const x of range(tx0 + 1.0, tx1 - 0.5, (tx1 - tx0 - 1.5) / 3)) cyl(body, 0.114, 0.03, m.alu, 'x', x, tubeY, z * (W / 2 - 0.11), 28);
+      box(body, tx1 - tx0, 0.08, 0.04, m.paint, (tx0 + tx1) / 2, deckY + 0.1, z * (W / 2 - 0.02), 0.01);
+      // alet dolabı (iniş ayağı ile akslar arasında)
+      const d0 = landingX + 0.3;
+      const d1 = Math.min(...axles) - R - 0.3;
+      if (d1 - d0 > 0.6) {
+        box(body, d1 - d0, 0.62, 0.5, m.alu, (d0 + d1) / 2, deckY - 0.42, z * (W / 2 - 0.27), 0.02);
+        for (const f of [0.3, 0.7]) box(body, 0.1, 0.07, 0.02, m.plastic, d0 + (d1 - d0) * f, deckY - 0.3, z * (W / 2 - 0.015));
+      }
+    }
+    // yan ADR plakası ve tehlike etiketi (arkaya yakın, hortum borusunun üstünde)
+    const sign = (mat: THREE.Material, w: number, h: number, x: number, y: number, z: number, ry: number) => {
+      const p = mesh(new THREE.PlaneGeometry(w, h), mat, false, false);
+      p.rotation.y = ry;
+      p.position.set(x, y, z);
+      p.userData.noEdge = true;
+      body.add(p);
+    };
+    for (const z of [-1, 1]) {
+      sign(m.adr, 0.4, 0.3, -1.6, tubeY + 0.04, z * (W / 2 + 0.004), z > 0 ? 0 : Math.PI);
+      sign(m.hazard3, 0.36, 0.36, -0.75, tubeY + 0.3, z * (W / 2 - 0.1), z > 0 ? 0 : Math.PI);
+      rod(body, V3(-0.75, tubeY + 0.1, z * (W / 2 - 0.11)), V3(-0.75, tubeY + 0.16, z * (W / 2 - 0.11)), 0.015, m.darkMetal, 6);
+    }
+    // arka kiriş (uçlarında kırmızı reflektör paneller) ve üstünde BOŞ / ADR / tehlike levhaları
+    box(body, 0.12, 0.22, W - 0.02, m.paint, -0.07, deckY + 0.02, 0, 0.01);
+    for (const z of [-1, 1]) box(body, 0.004, 0.1, 0.5, m.reflRed, -0.008, deckY + 0.07, z * 0.95);
+    extraY = deckY - 0.03;
+    sign(m.emptySign, 0.38, 0.28, -0.05, deckY + 0.3, 0.85, Math.PI / 2);
+    sign(m.adr, 0.4, 0.3, -0.05, deckY + 0.3, 0.43, Math.PI / 2);
+    sign(m.hazard3, 0.4, 0.4, -0.05, deckY + 0.37, 0.02, Math.PI / 2);
+    box(body, 0.03, 0.18, 0.03, m.darkMetal, -0.07, deckY + 0.2, 0.02);
+    // arka merdiven (sağa ofset): tampondan kaportanın üstüne kıvrılır, altında tutamaklı basamak
+    const lz = -0.5;
+    for (const dz of [-0.18, 0.18]) pipe(body, [V3(-0.03, deckY + 0.14, lz + dz), V3(-0.03, yT + 0.25, lz + dz), V3(-0.4, yT + 0.5, lz + dz)], 0.02, m.alu, 8);
+    for (let y = deckY + 0.35; y < yT + 0.2; y += 0.3) rod(body, V3(-0.03, y, lz - 0.18), V3(-0.03, y, lz + 0.18), 0.015, m.alu, 8);
+    for (const dz of [-0.2, 0.2]) pipe(body, [V3(-0.03, deckY + 0.14, lz + dz), V3(0.1, deckY + 0.3, lz + dz), V3(0.1, deckY + 0.75, lz + dz), V3(-0.03, deckY + 0.85, lz + dz)], 0.016, m.alu, 8);
+    topY = yT + 0.3;
+    sideX0 = tx0 + 0.3;
+    sideYAt = () => deckY + 0.1;
+    frontPos = { x: -L + 0.265, y: deckY - 0.2, z: W / 2 - 0.1 };
+    armRearY = deckY + 0.1;
+    armFrontY = deckY - 0.2;
     socketY = deckY - 0.12;
+  } else if (type === 'silo') {
+    // V tipi silobas: üst çizgisi yatay, iki kesik koniden oluşan kendinden taşıyıcı tank; en alçak nokta (boşaltma ağzı)
+    // ortanın biraz önünde. Önde kompresörlü platform ve büyük destek sacları (king pin alt çerçevesi), arkada aks çerçevesi;
+    // tankın altından boşaltma borusu geçer. Ortada şasi yok; yan koruma rayı tanka bağlı dikmelerle taşınır.
+    const top = deckY + 2.5;
+    const xF = -L + 1.15;
+    const xR = -0.4;
+    const xV = xF + (xR - xF) * 0.46;
+    const rF = 0.72;
+    const rV = 1.2;
+    const rR = 0.86;
+    const rAt = (x: number) => (x <= xV ? rF + ((rV - rF) * (x - xF)) / (xV - xF) : rV + ((rR - rV) * (x - xV)) / (xR - xV));
+    const cyAt = (x: number) => top - rAt(x);
+    const botAt = (x: number, z: number) => cyAt(x) - Math.sqrt(Math.max(0, rAt(x) ** 2 - z * z));
+    body.add(mesh(siloCone(xF, xV, rF, rV, top), m.paint), mesh(siloCone(xV, xR, rV, rR, top), m.paint));
+    for (const [x, r, s] of [
+      [xF, rF, 1],
+      [xR, rR, -1],
+    ] as const) {
+      const cap = mesh(new THREE.SphereGeometry(r, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), m.paint);
+      cap.scale.set(1, 0.3, 1);
+      cap.rotation.z = (s * Math.PI) / 2;
+      cap.position.set(x, top - r, 0);
+      body.add(cap);
+    }
+    // kaynak dikişleri (çevresel), boşaltma konisi çizgisi ve turuncu yan şerit
+    const seams = [xF + 0.02, xF + (xV - xF) / 3, xF + ((xV - xF) * 2) / 3, xV, xV + (xR - xV) / 3, xV + ((xR - xV) * 2) / 3, xR - 0.02];
+    for (const x of seams) {
+      const ring = mesh(new THREE.TorusGeometry(rAt(x) + 0.004, 0.007, 6, 72), m.paint);
+      ring.rotation.y = Math.PI / 2;
+      ring.position.set(x, cyAt(x), 0);
+      ring.userData.noEdge = true;
+      body.add(ring);
+    }
+    for (const x of range(xF + 0.05, xR - 0.05, (xR - xF - 0.1) / 6)) {
+      const r = rAt(x);
+      sections.push(Array.from({ length: 48 }, (_, i) => V3(x, cyAt(x) + Math.cos((i / 48) * Math.PI * 2) * r, Math.sin((i / 48) * Math.PI * 2) * r)));
+    }
+    for (const s of [-1, 1]) {
+      const a = Math.PI / 2 + 0.22;
+      const on = (x: number) => V3(x, cyAt(x) + Math.cos(a) * (rAt(x) + 0.004), s * Math.sin(a) * (rAt(x) + 0.004));
+      const across = V3(0, -Math.sin(a), s * Math.cos(a));
+      ribbon(body, on(xF + 0.15), on(xV), across, 0.07, m.accent);
+      ribbon(body, on(xV), on(xR - 0.15), across, 0.07, m.accent);
+    }
+    // üst: dolum kapakları, kapak arası yürüme yolu, katlanmış korkuluk
+    const nm = L >= 12 ? 3 : 2;
+    const mh = Array.from({ length: nm }, (_, i) => xF + 1.4 + ((xR - 1.0 - (xF + 1.4)) * i) / Math.max(1, nm - 1));
+    for (const x of mh) {
+      cyl(body, 0.25, 0.14, m.paint, 'y', x, top + 0.04, 0, 32);
+      cyl(body, 0.275, 0.05, m.alu, 'y', x, top + 0.13, 0, 32);
+      for (const k of [0, 1, 2, 3]) box(body, 0.05, 0.08, 0.05, m.darkMetal, x + Math.cos((k * Math.PI) / 2 + 0.6) * 0.27, top + 0.11, Math.sin((k * Math.PI) / 2 + 0.6) * 0.27);
+    }
+    for (let i = 1; i < mh.length; i++) box(body, mh[i] - mh[i - 1] - 0.62, 0.03, 0.36, m.alu, (mh[i] + mh[i - 1]) / 2, top + 0.025, 0);
+    for (const z of [-0.5, 0.5]) {
+      const ps = range(xF + 0.6, xR - 0.3, (xR - 0.3 - xF - 0.6) / Math.round((xR - xF) / 1.6));
+      for (const x of ps) rod(body, V3(x, cyAt(x) + Math.sqrt(rAt(x) ** 2 - z * z) - 0.02, z), V3(x, top + 0.32, z), 0.016, m.alu, 8);
+      rod(body, V3(ps[0], top + 0.32, z), V3(ps[ps.length - 1], top + 0.32, z), 0.018, m.alu, 8);
+    }
+    // arka merdiven: dikey kısım + tank üstüne kıvrılan uç
+    const lz = 0.58;
+    for (const dz of [-0.18, 0.18]) pipe(body, [V3(-0.05, deckY + 0.2, lz + dz), V3(-0.05, top - 0.55, lz + dz), V3(-0.55, top + 0.2, lz + dz)], 0.02, m.alu, 8);
+    for (let y = deckY + 0.4; y < top - 0.55; y += 0.3) rod(body, V3(-0.05, y, lz - 0.18), V3(-0.05, y, lz + 0.18), 0.015, m.alu, 8);
+    // ön alt çerçeve: platform, ön kiriş, kirişler ve tankı taşıyan destek sacları
+    const xf1 = -L + 3.3;
+    for (const z of [-0.5, 0.5]) box(body, xf1 + L, 0.24, 0.12, m.paint, (-L + xf1) / 2, deckY - 0.12, z);
+    box(body, 0.1, 0.3, W - 0.06, m.paint, -L + 0.05, deckY - 0.15, 0);
+    box(body, xF - 0.25 + L, 0.06, W - 0.2, m.paint, (-L + xF - 0.25) / 2, deckY - 0.03, 0);
+    const saddle = (xa: number, xb: number, yb: number) => {
+      const xs = range(xa, xb, (xb - xa) / 6);
+      for (const z of [-0.5, 0.5]) slab(body, [[xa, yb], [xb, yb], ...xs.reverse().map((x) => [x, botAt(x, 0.5) + 0.03] as [number, number])], 0.08, m.paint, z);
+    };
+    saddle(xF + 0.05, xf1, deckY - 0.02);
+    // kompresör (kasnaklı), hava filtresi, kumanda dolabı
+    box(body, 0.55, 0.42, 0.62, m.darkMetal, -L + 0.45, deckY + 0.21, 0.22, 0.03);
+    cyl(body, 0.2, 0.06, m.alu, 'z', -L + 0.45, deckY + 0.3, 0.6, 28);
+    box(body, 0.46, 0.46, 0.04, m.paint, -L + 0.45, deckY + 0.3, 0.66, 0.02);
+    cyl(body, 0.13, 0.4, m.paintYellow, 'y', -L + 0.4, deckY + 0.22, -0.38, 24);
+    box(body, 0.25, 0.45, 0.35, m.alu, -L + 0.85, deckY + 0.24, -0.85, 0.02);
+    // arka alt çerçeve destek sacları
+    beamFrom = Math.min(...axles) - R - 0.9;
+    saddle(beamFrom + 0.1, xR - 0.05, deckY - 0.08);
+    // boşaltma: V ağzından inen boru + kelebek vana, kompresörden arkaya uzanan hat
+    const pz = 0.68;
+    const pv = deckY + 0.02;
+    pipe(body, [V3(-L + 0.75, deckY + 0.3, pz), V3(-L + 0.95, deckY + 0.3, pz), V3(xV, pv, pz), V3(xR - 0.3, deckY + 0.06, pz), V3(-0.1, deckY + 0.06, pz)], 0.05, m.alu, 12);
+    pipe(body, [V3(xV, botAt(xV, 0) + 0.02, 0), V3(xV, pv, 0), V3(xV, pv, pz)], 0.07, m.alu, 14);
+    box(body, 0.2, 0.08, 0.2, m.darkMetal, xV, (botAt(xV, 0) + pv) / 2, 0);
+    cyl(body, 0.075, 0.05, m.darkMetal, 'x', -0.08, deckY + 0.06, pz, 16);
+    // arka travers (ek lambalar bunun üstünde)
+    box(body, 0.06, 0.1, W - 0.06, m.paint, -0.05, lampY + 0.17, 0, 0.01);
+    // yangın tüpü dolabı (kırmızı)
+    box(body, 0.22, 0.5, 0.2, m.paintRed, -1.0, deckY + 0.55, 0.64, 0.02);
+    // yan koruma rayı (yan markerlar bunun üstünde) ve taşıyıcıları
+    for (const s of [-1, 1]) {
+      box(body, L - 0.3, 0.1, 0.05, m.paint, -L / 2 + 0.0, deckY - 0.12, s * (W / 2 - 0.025), 0.01);
+      for (const x of [-L + 1.0, xf1 - 0.2, beamFrom + 0.3, -0.5]) box(body, 0.06, 0.06, 0.7, m.paint, x, deckY - 0.12, s * 0.9);
+      for (const t of [0.33, 0.66]) {
+        const x = xf1 + (beamFrom - xf1) * t;
+        rod(body, V3(x, deckY - 0.08, s * 1.2), V3(x, botAt(x, 0.75) + 0.02, s * 0.75), 0.025, m.paint, 8);
+      }
+    }
+    topY = top + 0.4;
+    frontPos = { x: -L - 0.005, y: deckY - 0.12, z: W / 2 - 0.1 };
+    armRearY = deckY - 0.1;
+    armFrontY = deckY - 0.1;
+    socketY = deckY - 0.15;
   } else if (type === 'arac') {
     // Araç taşıyıcı: yükseltilmiş ön boyun, alçak alt kat, iki şeritli ray platformları, dikmeler + hidrolik pistonlar,
     // arkada katlanmış rampalar; yük olarak temsilî otomobiller.
@@ -737,7 +1203,7 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     socketY = deckY - 0.12;
   }
 
-  chassis(chassisG, m, { L, deckY, R, axles, landingX, sideGuard, rail, lampY, plateY, beamFrom, frontDeckY, crossStep, crossW });
+  chassis(chassisG, m, { L, deckY, R, axles, landingX, sideGuard, rail, lampY, plateY, beamFrom, frontDeckY, crossStep, crossW, railMat, tape, fender, hubMat, barMat, frameMat, kingY });
   plate(group, plateY);
 
   const prof: [number, number][] = profile ?? [
@@ -747,19 +1213,13 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
 
   // Tesisat görünümü: gövde gizlenmez, yarı saydam çizilir (setGhost); burada yalnızca gövde çizgileri ve
   // tesisatın okunacağı, tipin taban profilini izleyen açık renkli zemin şeridi kurulur.
-  const solids: THREE.Mesh[] = [];
   group.updateMatrixWorld(true);
   const edgePos: number[] = [];
   const tmp = new THREE.Vector3();
   for (const root of [body, chassisG]) {
     root.traverse((o) => {
       const mm = o as THREE.Mesh;
-      // lastikler ve yük (otomobiller) dahil her parça yarı saydam olur
-      if (!mm.isMesh) return;
-      solids.push(mm);
-      mm.userData.mat = mm.material;
-      mm.userData.cast = mm.castShadow;
-      if (o.userData.noEdge || o.userData.cargo || (o as THREE.InstancedMesh).isInstancedMesh) return;
+      if (!mm.isMesh || o.userData.noEdge || o.userData.cargo || (o as THREE.InstancedMesh).isInstancedMesh) return;
       const eg = new THREE.EdgesGeometry(mm.geometry, 35);
       const pa = eg.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < pa.count; i++) {
@@ -775,6 +1235,14 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
       edgePos.push(p.x, p.y, p.z, q.x, q.y, q.z);
     });
   }
+  // Kenarlar çıkarıldıktan sonra yüzlerce parça malzemeye göre birkaç ağa birleştirilir (çizim çağrısı ~10 kat azalır).
+  // Lastikler ve yük (otomobiller) dahil her parça tesisat görünümünde yarı saydam olur.
+  const solids = [...mergeByMaterial(body), ...mergeByMaterial(chassisG)];
+  for (const mm of solids) {
+    mm.userData.mat = mm.material;
+    mm.userData.cast = mm.castShadow;
+  }
+
   const edgeGeo = new THREE.BufferGeometry();
   edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edgePos, 3));
   const outline = new THREE.LineSegments(edgeGeo, m.outline);
@@ -807,13 +1275,14 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     W,
     topY,
     rear: { x: 0.0, lampY, lampZ: [W / 2 - 0.33, 0.48], plateY },
-    side: { x0: -L + 1.0, x1: -0.6, z: W / 2 + 0.005, yAt: sideYAt },
+    side: { x0: sideX0, x1: -0.6, z: W / 2 + 0.005, yAt: sideYAt },
     front: frontPos ?? { x: -L - 0.01, y: topY - 0.14, z: W / 2 - 0.12 },
     extra: (() => {
       const roofed = type === 'standart' || type === 'kapali' || type === 'frigo' || type === 'damper' || type === 'konteyner';
       return roofed
         ? { x: type === 'konteyner' ? -0.23 : type === 'damper' ? 0.0 : 0.05, y: topY - 0.14, z0: W / 2 - 0.13, z1: 0.72 }
-        : { x: 0.0, y: lampY, z0: W / 2 - 0.12, z1: 0.76 };
+        : // açık/tanklı tiplerde lamba barının üstünde (stop lambalarıyla çakışmaz)
+          { x: 0.0, y: extraY ?? lampY + 0.17, z0: W / 2 - 0.15, z1: 0.72 };
     })(),
     armRear: { x: -0.2, y: armRearY, z: W / 2 },
     armFront: { x: -L + 0.25, y: armFrontY, z: W / 2 },
@@ -823,6 +1292,49 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     size: new THREE.Vector3(L, topY, W),
   };
   return { group, body, outline: sys, solids, anchors };
+}
+
+/** Kökün altındaki düz ağları (malzeme + gölge ayarı aynı olanlar) tek geometride birleştirir; yeni ağları döndürür. */
+function mergeByMaterial(root: THREE.Object3D): THREE.Mesh[] {
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const buckets = new Map<string, { mat: THREE.Material; cast: boolean; receive: boolean; geos: THREE.BufferGeometry[] }>();
+  const done: THREE.Mesh[] = [];
+  const out: THREE.Mesh[] = [];
+  const mtx = new THREE.Matrix4();
+  root.traverse((o) => {
+    const mm = o as THREE.Mesh;
+    if (!mm.isMesh || (mm as THREE.InstancedMesh).isInstancedMesh || Array.isArray(mm.material)) return;
+    const mat = mm.material as THREE.Material;
+    const key = `${mat.uuid}|${+mm.castShadow}|${+mm.receiveShadow}`;
+    let b = buckets.get(key);
+    if (!b) buckets.set(key, (b = { mat, cast: mm.castShadow, receive: mm.receiveShadow, geos: [] }));
+    const g = mm.geometry.index ? mm.geometry.toNonIndexed() : mm.geometry.clone();
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    g.clearGroups();
+    g.applyMatrix4(mtx.multiplyMatrices(inv, mm.matrixWorld));
+    b.geos.push(g);
+    done.push(mm);
+  });
+  const used = new Set<THREE.BufferGeometry>();
+  for (const mm of done) {
+    mm.removeFromParent();
+    if (!isCachedWheelGeo(mm.geometry)) used.add(mm.geometry);
+  }
+  for (const g of used) g.dispose();
+  for (const b of buckets.values()) {
+    const g = mergeGeometries(b.geos, false);
+    for (const x of b.geos) x.dispose();
+    if (!g) continue;
+    const m = new THREE.Mesh(g, b.mat);
+    m.castShadow = b.cast;
+    m.receiveShadow = b.receive;
+    root.add(m);
+    out.push(m);
+  }
+  return out;
 }
 
 /** Tesisat görünümü: gövde, şasi ve tekerlekler yarı saydam (tipin silueti görünür, tesisat okunur). */

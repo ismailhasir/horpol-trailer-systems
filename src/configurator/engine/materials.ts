@@ -7,6 +7,11 @@ export type LensColor = 'red' | 'amber' | 'white' | 'redfog' | 'plate';
 export interface Mats {
   paint: THREE.MeshPhysicalMaterial;
   paintBlue: THREE.MeshPhysicalMaterial;
+  /** silobas hava filtresi sarısı, yangın dolabı kırmızısı */
+  paintYellow: THREE.MeshPhysicalMaterial;
+  paintRed: THREE.MeshPhysicalMaterial;
+  /** silobas şeridi */
+  accent: THREE.MeshStandardMaterial;
   stripe: THREE.MeshStandardMaterial;
   chassis: THREE.MeshStandardMaterial;
   darkMetal: THREE.MeshStandardMaterial;
@@ -14,9 +19,27 @@ export interface Mats {
   chrome: THREE.MeshStandardMaterial;
   steel: THREE.MeshStandardMaterial;
   rubber: THREE.MeshStandardMaterial;
+  /** lastik: diş kanalları bump haritasıyla */
+  tire: THREE.MeshStandardMaterial;
+  /** çamurluk (açık silindir kabuk, iki yüzlü) */
+  fender: THREE.MeshStandardMaterial;
   tread: THREE.MeshStandardMaterial;
   plastic: THREE.MeshStandardMaterial;
   curtain: THREE.MeshStandardMaterial;
+  strap: THREE.MeshStandardMaterial;
+  tankAlu: THREE.MeshStandardMaterial;
+  /** tanker üst kaportası: açık gümüş boya (düz yüzeyler metal gibi kararmasın) */
+  fairing: THREE.MeshPhysicalMaterial;
+  /** reflektif kontur bantları (ECE R48) */
+  reflRed: THREE.MeshStandardMaterial;
+  reflYellow: THREE.MeshStandardMaterial;
+  /** ECE R70 uzun araç plakası, ADR turuncu plaka, rampa uyarı plakası */
+  r70: THREE.MeshStandardMaterial;
+  adr: THREE.MeshStandardMaterial;
+  /** ADR sınıf 3 (yanıcı sıvı) tehlike etiketi, dönüş seferi "BOŞ" levhası */
+  hazard3: THREE.MeshStandardMaterial;
+  emptySign: THREE.MeshStandardMaterial;
+  warn: THREE.MeshStandardMaterial;
   deck: THREE.MeshStandardMaterial;
   grille: THREE.MeshStandardMaterial;
   containerBlue: THREE.MeshStandardMaterial;
@@ -122,6 +145,116 @@ function grilleTexture() {
   );
 }
 
+/** Lastik dişi: v (profil) boyunca boyuna kanallar, u (çevre) boyunca enine yarıklar. Beyaz yüksek, siyah kanal. */
+function treadTexture() {
+  const t = canvasTexture(
+    64,
+    256,
+    (ctx) => {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, 64, 256);
+      ctx.fillStyle = '#000';
+      // profil noktaları 0..10 (v=0..1); sırt 3..7 arası. Boyuna kanallar:
+      for (const v of [0.36, 0.45, 0.55, 0.64]) ctx.fillRect(0, v * 256 - 3, 64, 6);
+      // enine yarıklar (omuz blokları)
+      for (const [a, b] of [
+        [0.29, 0.355],
+        [0.645, 0.71],
+      ])
+        ctx.fillRect(28, a * 256, 6, (b - a) * 256);
+      ctx.fillStyle = '#444';
+      for (const [a, b] of [
+        [0.37, 0.44],
+        [0.46, 0.54],
+        [0.56, 0.63],
+      ])
+        ctx.fillRect(12, a * 256, 3, (b - a) * 256);
+    },
+    [56, 1],
+  );
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+/** ECE R70: sarı zemin, kırmızı (floresan) kenar */
+function r70Texture() {
+  return canvasTexture(128, 384, (ctx) => {
+    ctx.fillStyle = '#d8231a';
+    ctx.fillRect(0, 0, 128, 384);
+    ctx.fillStyle = '#f6c400';
+    ctx.fillRect(18, 18, 92, 348);
+  });
+}
+/** ADR turuncu plaka: üstte tehlike numarası, altta UN numarası (33 / 1203: benzin) */
+function adrTexture() {
+  return canvasTexture(256, 192, (ctx) => {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, 256, 192);
+    ctx.fillStyle = '#f27a00';
+    ctx.fillRect(8, 8, 240, 176);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(8, 92, 240, 8);
+    ctx.font = 'bold 72px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('33', 128, 52);
+    ctx.fillText('1203', 128, 142);
+  });
+}
+function hazard3Texture() {
+  return canvasTexture(256, 256, (ctx) => {
+    ctx.translate(128, 128);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#d21d19';
+    ctx.fillRect(-88, -88, 176, 176);
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(-80, -80, 160, 160);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // alev
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.moveTo(128, 46);
+    ctx.bezierCurveTo(150, 80, 166, 96, 156, 122);
+    ctx.bezierCurveTo(150, 138, 106, 138, 100, 122);
+    ctx.bezierCurveTo(94, 104, 112, 96, 114, 76);
+    ctx.bezierCurveTo(124, 88, 126, 96, 124, 104);
+    ctx.bezierCurveTo(134, 90, 134, 66, 128, 46);
+    ctx.fill();
+    ctx.fillRect(98, 132, 60, 8);
+    ctx.font = 'bold 34px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('3', 128, 212);
+  });
+}
+function emptySignTexture() {
+  return canvasTexture(256, 192, (ctx) => {
+    ctx.fillStyle = '#c9ccd0';
+    ctx.fillRect(0, 0, 256, 192);
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 84px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BOŞ', 128, 100);
+  });
+}
+/** Kırmızı-beyaz çapraz şeritli uyarı plakası */
+function warnTexture() {
+  return canvasTexture(128, 128, (ctx) => {
+    ctx.fillStyle = '#f3f3f3';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#d31f1a';
+    for (let i = -4; i < 6; i += 2) {
+      ctx.beginPath();
+      ctx.moveTo(i * 32, 128);
+      ctx.lineTo(i * 32 + 32, 128);
+      ctx.lineTo(i * 32 + 160, 0);
+      ctx.lineTo(i * 32 + 128, 0);
+      ctx.fill();
+    }
+  });
+}
+
 export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE.Texture | null): Mats {
   const std = (p: THREE.MeshStandardMaterialParameters) => new THREE.MeshStandardMaterial(p);
   const lens = {} as Mats['lens'];
@@ -153,6 +286,9 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
   return {
     paint: new THREE.MeshPhysicalMaterial({ color: '#f3f5f8', roughness: 0.38, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.25 }),
     paintBlue: new THREE.MeshPhysicalMaterial({ color: '#1c5198', roughness: 0.35, metalness: 0.15, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
+    paintYellow: new THREE.MeshPhysicalMaterial({ color: '#f0b90b', roughness: 0.4, metalness: 0.05, clearcoat: 0.5, clearcoatRoughness: 0.25 }),
+    paintRed: new THREE.MeshPhysicalMaterial({ color: '#c5161d', roughness: 0.38, metalness: 0.05, clearcoat: 0.55, clearcoatRoughness: 0.2 }),
+    accent: std({ color: '#f08a00', roughness: 0.45, metalness: 0.05, side: THREE.DoubleSide }),
     stripe: std({ color: '#1c5198', roughness: 0.4, metalness: 0.2 }),
     chassis: std({ color: '#262a30', roughness: 0.5, metalness: 0.55 }),
     darkMetal: std({ color: '#383d45', roughness: 0.42, metalness: 0.7 }),
@@ -160,9 +296,24 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
     chrome: std({ color: '#eef2f6', roughness: 0.08, metalness: 1 }),
     steel: std({ color: '#d5dbe2', roughness: 0.2, metalness: 1 }),
     rubber: std({ color: '#141518', roughness: 0.92, metalness: 0 }),
+    tire: (() => {
+      const tt = treadTexture();
+      return std({ color: '#17181b', roughness: 0.9, metalness: 0, bumpMap: tt, bumpScale: 2.5, roughnessMap: tt });
+    })(),
+    fender: std({ color: '#1a1c20', roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide }),
     tread: std({ color: '#0d0e10', roughness: 1, metalness: 0 }),
     plastic: std({ color: '#17191c', roughness: 0.55, metalness: 0.05 }),
     curtain: std({ color: '#eef1f5', roughness: 0.82, metalness: 0, side: THREE.DoubleSide }),
+    strap: std({ color: '#cfd4da', roughness: 0.7, metalness: 0 }),
+    tankAlu: std({ color: '#dce1e7', roughness: 0.2, metalness: 1 }),
+    fairing: new THREE.MeshPhysicalMaterial({ color: '#d6dbe1', roughness: 0.32, metalness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
+    reflRed: std({ color: '#c8141b', roughness: 0.3, metalness: 0.1, emissive: new THREE.Color('#5a0000'), emissiveIntensity: 0.25 }),
+    reflYellow: std({ color: '#f2b800', roughness: 0.3, metalness: 0.1, emissive: new THREE.Color('#4a3300'), emissiveIntensity: 0.25 }),
+    r70: std({ map: r70Texture(), roughness: 0.35, metalness: 0.05 }),
+    adr: std({ map: adrTexture(), roughness: 0.4, metalness: 0.1 }),
+    hazard3: std({ map: hazard3Texture(), roughness: 0.4, metalness: 0.05, alphaTest: 0.5, side: THREE.DoubleSide }),
+    emptySign: std({ map: emptySignTexture(), roughness: 0.4, metalness: 0.2 }),
+    warn: std({ map: warnTexture(), roughness: 0.4, metalness: 0.05 }),
     deck: std({ map: deckTexture(), roughness: 0.85, metalness: 0 }),
     grille: std({ map: grilleTexture(), roughness: 0.6, metalness: 0.3 }),
     containerBlue: std({ color: '#1c5198', roughness: 0.48, metalness: 0.35 }),

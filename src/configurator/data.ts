@@ -12,6 +12,7 @@ export type TrailerId =
   | 'lowbed'
   | 'damper'
   | 'tanker'
+  | 'silo'
   | 'arac'
   | 'konteyner';
 
@@ -23,20 +24,27 @@ export interface TrailerDef {
   id: TrailerId;
   /** izin verilen set uzunlukları */
   lengths: LengthId[];
+  /** listede gösterilmez (model kodda hazır, ileride açılabilir) */
+  hidden?: boolean;
 }
 
+// Sıra = konfigüratör listesindeki sıra: en çok istenen altı tip en üstte.
+// Silobas uzunlukları ÖRNEK (doğrulanmadı), satış ekibiyle kesinleşecek.
 export const TRAILERS: TrailerDef[] = [
   { id: 'standart', lengths: ['13.6', '12', '9'] },
-  { id: 'kapali', lengths: ['13.6', '12', '9'] },
   { id: 'frigo', lengths: ['13.6', '12'] },
-  { id: 'flatbed', lengths: ['13.6', '12', '9'] },
-  { id: 'stepdeck', lengths: ['13.6', '12'] },
   { id: 'lowbed', lengths: ['13.6', '12'] },
-  { id: 'damper', lengths: ['12', '9'] },
+  { id: 'silo', lengths: ['12', '9'] },
   { id: 'tanker', lengths: ['13.6', '12', '9'] },
-  { id: 'arac', lengths: ['13.6'] },
+  { id: 'damper', lengths: ['12', '9'] },
+  { id: 'kapali', lengths: ['13.6', '12', '9'], hidden: true },
+  { id: 'flatbed', lengths: ['13.6', '12', '9'], hidden: true },
+  { id: 'stepdeck', lengths: ['13.6', '12'], hidden: true },
+  { id: 'arac', lengths: ['13.6'], hidden: true },
   { id: 'konteyner', lengths: ['13.6', '12'] },
 ];
+/** Konfigüratör listesinde görünen tipler */
+export const TRAILER_LIST = TRAILERS.filter((t) => !t.hidden);
 
 export const SOCKETS: SocketId[] = ['7x2', '15', '7x2+15'];
 export const LENGTHS: LengthId[] = ['13.6', '12', '9'];
@@ -183,7 +191,7 @@ export const DEFAULT_CONFIG: Config = {
 
 /** Seçimleri kurallara uydurur (uzunluk dorse tipine uygun mu, adetler sınırda mı). */
 export function normalize(c: Config): Config {
-  const t = TRAILERS.find((x) => x.id === c.trailer) ?? TRAILERS[0];
+  const t = TRAILER_LIST.find((x) => x.id === c.trailer) ?? TRAILER_LIST[0];
   const length = t.lengths.includes(c.length) ? c.length : t.lengths[0];
   const socket = SOCKETS.includes(c.socket) ? c.socket : '7x2';
   const lamps = {} as Config['lamps'];

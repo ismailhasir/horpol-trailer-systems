@@ -6,7 +6,7 @@ import {
   DEFAULT_CONFIG,
   LENGTHS,
   SOCKETS,
-  TRAILERS,
+  TRAILER_LIST,
   fromQuery,
   normalize,
   productById,
@@ -213,7 +213,7 @@ export default function Configurator({ lang, t, ui }: Props) {
   }, [ddOpen]);
 
   const update = (fn: (c: Config) => Config) => setCfg((c) => normalize(fn(structuredClone(c))));
-  const trailerDef = TRAILERS.find((x) => x.id === cfg.trailer)!;
+  const trailerDef = TRAILER_LIST.find((x) => x.id === cfg.trailer)!;
   const nf = useMemo(() => new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: 0, maximumFractionDigits: 2 }), [lang]);
   const lenLabel = (l: LengthId) => `${l === '13.6' ? new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: 2 }).format(13.6) : nf.format(Number(l))} ${t.length_unit}`;
   /** aynı siparişten kaç set (tüm yapılandırma bu sayıyla çarpılır) */
@@ -238,7 +238,7 @@ export default function Configurator({ lang, t, ui }: Props) {
   const onDdKey = (e: KeyboardEvent) => {
     if (!ddOpen && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
-      setDdIdx(TRAILERS.findIndex((x) => x.id === cfg.trailer));
+      setDdIdx(TRAILER_LIST.findIndex((x) => x.id === cfg.trailer));
       setDdOpen(true);
       return;
     }
@@ -246,7 +246,7 @@ export default function Configurator({ lang, t, ui }: Props) {
     if (e.key === 'Escape') setDdOpen(false);
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setDdIdx((i) => Math.min(TRAILERS.length - 1, i + 1));
+      setDdIdx((i) => Math.min(TRAILER_LIST.length - 1, i + 1));
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -254,7 +254,7 @@ export default function Configurator({ lang, t, ui }: Props) {
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      chooseTrailer(TRAILERS[ddIdx].id);
+      chooseTrailer(TRAILER_LIST[ddIdx].id);
     }
   };
 
@@ -426,7 +426,7 @@ export default function Configurator({ lang, t, ui }: Props) {
               aria-expanded={ddOpen}
               aria-labelledby="dd-label"
               onClick={() => {
-                setDdIdx(TRAILERS.findIndex((x) => x.id === cfg.trailer));
+                setDdIdx(TRAILER_LIST.findIndex((x) => x.id === cfg.trailer));
                 setDdOpen(!ddOpen);
               }}
               onKeyDown={onDdKey}
@@ -440,7 +440,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             </button>
             {ddOpen && (
               <ul class="dd-menu" role="listbox" aria-labelledby="dd-label">
-                {TRAILERS.map((tr, i) => (
+                {TRAILER_LIST.map((tr, i) => (
                   <li
                     role="option"
                     aria-selected={tr.id === cfg.trailer}

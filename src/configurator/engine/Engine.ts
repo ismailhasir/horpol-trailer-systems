@@ -10,6 +10,8 @@ import { buildEquipment, disposeEquipment, setHarnessHighlight, type EquipmentBu
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
+/** Arayüz düğmeleri dışında motorun kendi kullandığı kamera pozları */
+type Pose = View | 'arm' | 'system' | 'extra';
 
 export interface EngineOptions {
   theme: Theme;
@@ -174,7 +176,7 @@ export class Engine {
   }
 
   // ---------- kamera ----------
-  private viewPose(v: View | 'arm' | 'system'): [THREE.Vector3, THREE.Vector3] {
+  private viewPose(v: Pose): [THREE.Vector3, THREE.Vector3] {
     const a = this.trailer!.anchors;
     const L = a.L;
     const cx = -L / 2;
@@ -184,6 +186,11 @@ export class Engine {
     switch (v) {
       case 'rear':
         return [V(6.6 * k, 2.2, 3.1 * k), V(-0.8, 1.3, 0)];
+      case 'extra': {
+        // ek lambalar tipine göre üst arka köşede ya da tamponda: arka görünüm yönünde, lambaların ortasına bakılır
+        const y = (a.extra.y + a.rear.lampY) / 2;
+        return [V(6.6 * k, y + 0.9, 3.1 * k), V(-0.5, y, 0)];
+      }
       case 'side':
         return [V(cx, 2.3, (L * 0.92 + 2.5) * k), V(cx, 1.5, 0)];
       case 'front':
@@ -203,7 +210,7 @@ export class Engine {
    * Dorsenin tamamının panellerin arasındaki boş alana sığdığı en kısa kamera uzaklığı.
    * Gövde kutusunun 8 köşesi ekrana yansıtılır, ikili arama ile boş alanın içine sığan uzaklık bulunur.
    */
-  private fitDistance(dir: THREE.Vector3, target: THREE.Vector3, margin = 0.05): number {
+  private fitDistance(dir: THREE.Vector3, target: THREE.Vector3, margin = 0.05, box?: THREE.Box3): number {
     const a = this.trailer!.anchors;
     const el = this.canvas.parentElement ?? this.canvas;
     const w = el.clientWidth || 1;
@@ -214,7 +221,8 @@ export class Engine {
     const yMax = 1 - (top / h) * 2 - margin;
     const yMin = 1 - ((h - bottom) / h) * 2 + margin;
     const corners: THREE.Vector3[] = [];
-    for (const x of [-a.L - 0.3, 0.35]) for (const y of [0, a.topY]) for (const z of [-a.W / 2 - 0.2, a.W / 2 + 0.2]) corners.push(new THREE.Vector3(x, y, z));
+    const b = box ?? new THREE.Box3(new THREE.Vector3(-a.L - 0.3, 0, -a.W / 2 - 0.2), new THREE.Vector3(0.35, a.topY, a.W / 2 + 0.2));
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) corners.push(new THREE.Vector3(x, y, z));
     const cam = this.camera.clone();
     cam.updateProjectionMatrix();
     const p = new THREE.Vector3();
@@ -235,7 +243,7 @@ export class Engine {
     return hi;
   }
 
-  setView(v: View | 'arm' | 'system', instant = false) {
+  setView(v: Pose, instant = false) {
     if (!this.trailer) return;
     this.lastView = v;
     this.userMoved = false;
@@ -246,6 +254,17 @@ export class Engine {
     if (f) {
       const dir = pos.clone().sub(target).normalize();
       pos.copy(target).addScaledVector(dir, this.fitDistance(dir, target) * f);
+    } else if (v === 'extra') {
+      // arka yüzün stop lambalarından ek lambalara kadar olan kısmı boş alana sığar
+      const a = this.trailer.anchors;
+      let lo = Math.min(a.rear.plateY, a.extra.y) - 0.35;
+      let hi = Math.max(a.rear.lampY, a.extra.y) + 0.35;
+      const pad = Math.max(0, 1.8 - (hi - lo)) / 2;
+      lo = Math.max(0, lo - pad);
+      hi += pad;
+      const dir = pos.clone().sub(target).normalize();
+      const area = new THREE.Box3(new THREE.Vector3(-1.2, lo, -a.W / 2 - 0.15), new THREE.Vector3(0.3, hi, a.W / 2 + 0.15));
+      pos.copy(target).addScaledVector(dir, this.fitDistance(dir, target, 0.08, area));
     }
     if (instant || this.opts.reducedMotion) {
       this.camera.position.copy(pos);
@@ -259,7 +278,7 @@ export class Engine {
   }
 
   focusCategory(cat: CategoryId) {
-    const map: Record<CategoryId, View | 'arm'> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', extra: 'rear' };
+    const map: Record<CategoryId, Pose> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', extra: 'extra' };
     if (this.system) return;
     this.setView(map[cat]);
   }
@@ -390,7 +409,7 @@ export class Engine {
     this.resize();
     if (!this.userMoved && this.trailer) this.setView(this.lastView, !animate);
   }
-  private lastView: View | 'arm' | 'system' = 'overview';
+  private lastView: Pose = 'overview';
   private userMoved = false;
   private freeAspect() {
     const el = this.canvas.parentElement ?? this.canvas;
