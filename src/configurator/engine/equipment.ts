@@ -218,16 +218,99 @@ function socket(mats: Mats, kind: '7' | '15', ccolor: THREE.Material) {
 }
 
 // ---------- tesisat ----------
+// Düzen broşür şemalarına göre (HOR-102/111/1001): merkezde Horpol kontrol modülü; öndeki soketlerden modüle besleme hatları,
+// modülden iki yana yan ana hatlar ve arkaya dağıtım hatları. Hatlar dik açılı, köşeler yuvarlatılmış; her lamba dalında
+// lambadan sabit mesafede siyah-beyaz konnektör. Ölçüler standart kuru yük dorsesine göre dengelendi (kablo uzunluğu bilgisi YOK).
 type WireKind = 'main' | 'side' | 'rear' | 'plate' | 'marker';
 /** Kablolar şemada okunabilsin diye gerçek ölçüden kalın çizilir */
 const WIRE_SCALE = 1.7;
-function tube(group: THREE.Group, pts: THREE.Vector3[], r: number, mat: THREE.Material) {
-  const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.1);
-  const t = m(new THREE.TubeGeometry(curve, Math.max(12, pts.length * 10), r * WIRE_SCALE, 10, false), mat, false);
-  group.add(t);
-  return t;
-}
+/** köşe yarıçapı */
+const BEND = 0.14;
+/** konnektörün lamba ucuna uzaklığı (hat boyunca) */
+const CONN_FROM_LAMP = 0.3;
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+
+/** Köşe noktalarından, köşeleri yuvarlatılmış nokta dizisi üretir. */
+function rounded(pts: THREE.Vector3[], r = BEND) {
+  const out: THREE.Vector3[] = [pts[0].clone()];
+  const n = pts.length;
+  for (let i = 1; i < n - 1; i++) {
+    const p = pts[i];
+    const da = pts[i - 1].clone().sub(p);
+    const db = pts[i + 1].clone().sub(p);
+    const la = da.length();
+    const lb = db.length();
+    if (la < 1e-6 || lb < 1e-6 || da.dot(db) / (la * lb) < -0.999) {
+      out.push(p.clone());
+      continue;
+    }
+    const k = Math.min(r, i === 1 ? la : la / 2, i === n - 2 ? lb : lb / 2);
+    const q = new THREE.QuadraticBezierCurve3(p.clone().addScaledVector(da, k / la), p.clone(), p.clone().addScaledVector(db, k / lb));
+    for (let j = 0; j <= 8; j++) out.push(q.getPoint(j / 8));
+  }
+  out.push(pts[n - 1].clone());
+  return out.filter((v, i) => i === 0 || v.distanceToSquared(out[i - 1]) > 1e-10);
+}
+
+/** Noktaları birebir izleyen eğri: düz kısımlar tek parça, köşeler sık (TubeGeometry'yi gereksiz bölmez). */
+class PolyCurve extends THREE.Curve<THREE.Vector3> {
+  private p: THREE.Vector3[];
+  constructor(p: THREE.Vector3[]) {
+    super();
+    this.p = p;
+  }
+  override getPoint(t: number, target = new THREE.Vector3()) {
+    const f = Math.min(Math.max(t, 0), 1) * (this.p.length - 1);
+    const i = Math.min(Math.floor(f), this.p.length - 2);
+    return target.copy(this.p[i]).lerp(this.p[i + 1], f - i);
+  }
+  override getPointAt(u: number, target?: THREE.Vector3) {
+    return this.getPoint(u, target);
+  }
+  override getTangentAt(u: number, target?: THREE.Vector3) {
+    return this.getTangent(u, target);
+  }
+}
+
+/** Hat boyunca baştan (ya da sondan) d mesafedeki nokta ve yön */
+function along(pts: THREE.Vector3[], d: number, fromEnd: boolean) {
+  const p = fromEnd ? [...pts].reverse() : pts;
+  let rest = d;
+  for (let i = 0; i < p.length - 1; i++) {
+    const seg = p[i].distanceTo(p[i + 1]);
+    if (seg >= rest || i === p.length - 2) {
+      return { pos: p[i].clone().lerp(p[i + 1], Math.min(1, rest / seg)), dir: p[i + 1].clone().sub(p[i]).normalize() };
+    }
+    rest -= seg;
+  }
+  return { pos: p[0].clone(), dir: V(1, 0, 0) };
+}
+function pathLength(pts: THREE.Vector3[]) {
+  let s = 0;
+  for (let i = 1; i < pts.length; i++) s += pts[i].distanceTo(pts[i - 1]);
+  return s;
+}
+
+/** Horpol kontrol modülü: siyah gövde, açık renk çerçeve ve bağlantı kulakları, üstte beyaz logo. Uzun kenarı dorse ekseninde. */
+function controlModule(mats: Mats) {
+  const g = new THREE.Group();
+  g.add(m(new THREE.BoxGeometry(0.4, 0.075, 0.3), mats.plastic));
+  const rim = m(new THREE.BoxGeometry(0.42, 0.045, 0.32), mats.connWhite);
+  rim.position.y = -0.018;
+  g.add(rim);
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const ear = m(new THREE.CylinderGeometry(0.024, 0.024, 0.02, 16), mats.connWhite);
+      ear.position.set(sx * 0.205, -0.02, sz * 0.155);
+      g.add(ear);
+    }
+  }
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.25, (0.25 * 528) / 720), mats.logoWhite);
+  logo.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+  logo.position.y = 0.0385;
+  g.add(logo);
+  return g;
+}
 
 export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuild {
   const group = new THREE.Group();
@@ -255,37 +338,55 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     }
   };
 
-  const wires: { kind: WireKind; pts: THREE.Vector3[]; r: number }[] = [];
+  // --- şema düzeni (x: arka uç 0, öne doğru eksi; z: genişlik) ---
   const hy = a.harness.y;
-  const jx = a.harness.junctionX;
-  const fx = a.harness.frontX;
-  const rz = a.harness.railZ;
+  const W2 = a.W / 2;
+  const xm = -2.2; // Horpol modülü: arka lambalara ~2 m
+  const PORTS = [-0.135, -0.045, 0.045, 0.135]; // modül yan portları (önden arkaya): besleme, yan hat, arka hat, plaka
+  const zPort = 0.15; // modül yan yüzü
+  const tz = 0.85; // yan ana hat
+  const zr = 0.62; // arka hat
+  const xd = -0.55; // arka dağıtım (tarak) hattı
+  const zp = 0.3; // plaka hattı
+
+  type Wire = { kind: WireKind; r: number; pts: THREE.Vector3[]; conn?: { d: number; fromEnd: boolean } };
+  const wires: Wire[] = [];
+  const toLamp = { d: CONN_FROM_LAMP, fromEnd: true };
+  const conns: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
+
+  // arka tarağa bağlanan lambalar (kuyruk: tarak üzerindeki dönüşten sonraki noktalar)
+  const rearDrops: { s: number; z: number; kind: WireKind; tail: THREE.Vector3[] }[] = [];
+  // yan ana hatta bağlanan lambalar (x: hattan ayrıldığı nokta)
+  const sideTaps: { x: number; kind: WireKind; tail: (s: number) => THREE.Vector3[] }[] = [];
 
   // --- arka (stop) lambaları ---
   const stop = c.lamps.stop;
   const stopStyle = productById('stop', stop.product).style;
   const pairs = stop.qty / 2;
+  const ly = a.rear.lampY;
   for (let p = 0; p < pairs; p++) {
     for (const s of [1, -1]) {
-      const z = s * a.rear.lampZ[p];
-      const pos = V(a.rear.x + 0.0, a.rear.lampY, z);
-      mount('stop', stopStyle, pos, (o) => {
+      const z = a.rear.lampZ[p];
+      mount('stop', stopStyle, V(a.rear.x, ly, s * z), (o) => {
         o.rotation.y = Math.PI / 2;
         if (s < 0) o.scale.x = -1;
       });
-      wires.push({ kind: 'rear', r: 0.011, pts: [V(jx, hy, s * 0.12), V(jx + 0.25, hy, z * 0.8), V(-0.12, a.rear.lampY + 0.02, z), V(-0.01, a.rear.lampY, z)] });
+      rearDrops.push({ s, z, kind: 'rear', tail: [V(-0.08, hy, s * z), V(-0.08, ly, s * z), V(-0.01, ly, s * z)] });
     }
   }
 
-  // --- plaka lambaları ---
+  // --- plaka lambaları (modülden doğrudan) ---
   const pl = c.lamps.plate;
   const plStyle = productById('plate', pl.product).style;
   const pzs = pl.qty === 1 ? [0] : [-0.17, 0.17];
+  const py = a.rear.plateY + 0.1;
   for (const z of pzs) {
     mount('plate', plStyle, V(0.01, a.rear.plateY + 0.085, z), (o) => {
       o.rotation.y = Math.PI / 2;
     });
-    wires.push({ kind: 'plate', r: 0.008, pts: [V(jx, hy, 0), V(jx + 0.2, hy - 0.05, z), V(-0.06, a.rear.plateY + 0.12, z), V(0.0, a.rear.plateY + 0.1, z)] });
+    const s = z < 0 ? -1 : 1;
+    const xp = xm + PORTS[3];
+    wires.push({ kind: 'plate', r: 0.009, conn: toLamp, pts: [V(xp, hy, s * zPort), V(xp, hy, s * zp), V(-0.12, hy, s * zp), V(-0.12, hy, z), V(-0.12, py, z), V(0, py, z)] });
   }
 
   // --- yan markerlar ---
@@ -300,27 +401,25 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       mount('side', sdStyle, V(x, y, s * a.side.z), (o) => {
         if (s < 0) o.scale.z = -1;
       });
-      wires.push({ kind: 'side', r: 0.007, pts: [V(x, hy, s * rz), V(x, hy, s * (a.W / 2 - 0.15)), V(x, y, s * (a.W / 2 - 0.02))] });
     }
-  }
-  if (per > 0) {
-    for (const s of [1, -1]) wires.push({ kind: 'side', r: 0.013, pts: [V(fx, hy, s * 0.08), V(fx + 0.3, hy, s * rz), V(jx, hy, s * rz), V(jx + 0.15, hy, s * 0.1)] });
+    sideTaps.push({ x, kind: 'side', tail: (s) => [V(x, hy, s * (W2 - 0.06)), V(x, y, s * (W2 - 0.06)), V(x, y, s * (W2 - 0.02))] });
   }
 
-  // --- ön pozisyon ---
+  // --- ön pozisyon (yan hattın ön ucu) ---
   const fr = c.lamps.front;
   if (fr.qty > 0) {
     const st = productById('front', fr.product).style;
+    const p = a.front;
     for (const s of [1, -1]) {
-      const p = a.front;
       mount('front', st, V(p.x, p.y, s * p.z), (o) => {
         o.rotation.y = -Math.PI / 2;
       });
-      wires.push({ kind: 'marker', r: 0.008, pts: [V(fx, hy, 0), V(fx - 0.15, hy + 0.1, s * (p.z - 0.1)), V(p.x + 0.06, (hy + p.y) / 2, s * (p.z - 0.05)), V(p.x + 0.04, p.y, s * p.z)] });
     }
+    const xt = p.x + 0.1;
+    sideTaps.push({ x: xt, kind: 'marker', tail: (s) => [V(xt, hy, s * p.z), V(xt, p.y, s * p.z), V(p.x + 0.03, p.y, s * p.z)] });
   }
 
-  // --- gabari (lastik kol) ---
+  // --- gabari (lastik kol): arkadakiler taraktan, öndekiler yan hattan ---
   const ar = c.lamps.arm;
   if (ar.qty > 0) {
     const st = productById('arm', ar.product).style;
@@ -330,54 +429,134 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         mount('arm', st, V(sp.x, sp.y, s * sp.z), (o) => {
           if (s < 0) o.scale.z = -1;
         });
-        const fromX = sp === a.armRear ? jx : fx;
-        wires.push({ kind: 'marker', r: 0.008, pts: [V(fromX, hy, s * 0.15), V(sp.x, hy, s * (sp.z - 0.12)), V(sp.x, (hy + sp.y) / 2, s * (sp.z - 0.05)), V(sp.x, sp.y, s * (sp.z - 0.01))] });
+      }
+      const za = W2 - 0.08;
+      if (sp === a.armRear) {
+        for (const s of [1, -1]) rearDrops.push({ s, z: za, kind: 'marker', tail: [V(sp.x, hy, s * za), V(sp.x, sp.y, s * za), V(sp.x, sp.y, s * (W2 - 0.01))] });
+      } else {
+        sideTaps.push({ x: sp.x, kind: 'marker', tail: (s) => [V(sp.x, hy, s * za), V(sp.x, sp.y, s * za), V(sp.x, sp.y, s * (W2 - 0.01))] });
       }
     }
   }
 
-  // --- ek lambalar (Additional Lights) ---
+  // --- ek lambalar (taraktan) ---
   const ex = c.lamps.extra;
   if (ex.qty > 0) {
     const st = productById('extra', ex.product).style;
     const zs = ex.qty >= 4 ? [a.extra.z0, a.extra.z1] : [a.extra.z0];
+    const xe = Math.min(-0.08, a.extra.x - 0.1);
     for (const z of zs) {
       for (const s of [1, -1]) {
         mount('extra', st, V(a.extra.x, a.extra.y, s * z), (o) => {
           o.rotation.y = Math.PI / 2;
         });
-        wires.push({ kind: 'marker', r: 0.008, pts: [V(jx, hy, s * 0.2), V(-0.1, (hy + a.extra.y) / 2, s * (z - 0.05)), V(a.extra.x - 0.04, a.extra.y, s * z)] });
+        rearDrops.push({ s, z, kind: 'marker', tail: [V(xe, hy, s * z), V(xe, a.extra.y, s * z), V(a.extra.x - 0.04, a.extra.y, s * z)] });
       }
     }
   }
 
-  // --- soketler + ana hat ---
+  // --- soketler + besleme hatları (soketten modüle) ---
   const kinds: ('7' | '15')[] = c.socket === '7x2' ? ['7', '7'] : c.socket === '15' ? ['15'] : ['7', '15', '7'];
   const spacing = 0.15;
+  const fx = a.harness.frontX;
+  let frontPort = false;
   kinds.forEach((k, i) => {
     const z = (i - (kinds.length - 1) / 2) * spacing;
-    const s = socket(mats, k, k === '15' ? mats.socketGrey : i === 0 ? mats.socket : mats.socketGrey);
-    s.rotation.y = -Math.PI / 2;
-    s.position.set(a.socket.x, a.socket.y, z);
-    s.traverse((o) => (o.userData.category = 'socket'));
-    group.add(s);
-    wires.push({ kind: 'main', r: 0.014, pts: [V(a.socket.x + 0.02, a.socket.y, z), V(a.socket.x + 0.18, a.socket.y - 0.05, z), V(fx - 0.1, hy, z * 0.4), V(fx, hy, 0)] });
+    const so = socket(mats, k, k === '15' ? mats.socketGrey : i === 0 ? mats.socket : mats.socketGrey);
+    so.rotation.y = -Math.PI / 2;
+    so.position.set(a.socket.x, a.socket.y, z);
+    so.traverse((o) => (o.userData.category = 'socket'));
+    group.add(so);
+    const pts = [V(a.socket.x + 0.02, a.socket.y, z), V(fx, a.socket.y, z), V(fx, hy, z)];
+    if (Math.abs(z) < 1e-3) {
+      pts.push(V(xm - 0.2, hy, 0));
+      frontPort = true;
+    } else {
+      const s = Math.sign(z);
+      pts.push(V(xm - 0.75, hy, z), V(xm - 0.75, hy, s * 0.36), V(xm + PORTS[0], hy, s * 0.36), V(xm + PORTS[0], hy, s * zPort));
+    }
+    wires.push({ kind: 'main', r: 0.014, pts, conn: { d: 0.25, fromEnd: false } });
   });
-  wires.push({ kind: 'main', r: 0.022, pts: [V(fx, hy, 0), V(fx + 0.6, hy, 0), V((fx + jx) / 2, hy, 0), V(jx - 0.4, hy, 0), V(jx, hy, 0)] });
 
-  // dağıtım kutusu
-  const jb = m(new THREE.BoxGeometry(0.3, 0.1, 0.24), mats.plastic);
-  jb.position.set(jx, hy, 0);
-  harness.add(jb);
+  // --- yan ana hatlar: modülden çıkıp öne/arkaya uzanır, lambalar yuvarlatılmış dallarla ayrılır ---
+  const xj = xm + PORTS[1];
+  if (sideTaps.length) {
+    for (const s of [1, -1]) {
+      const starts: number[] = [xj - BEND];
+      for (const tp of sideTaps) {
+        const dir = Math.sign(xj - tp.x) || 1;
+        const sx = tp.x + dir * Math.min(BEND, Math.abs(xj - tp.x) || BEND);
+        starts.push(sx);
+        wires.push({ kind: tp.kind, r: tp.kind === 'side' ? 0.008 : 0.009, conn: toLamp, pts: [V(sx, hy, s * tz), V(tp.x, hy, s * tz), ...tp.tail(s)] });
+      }
+      wires.push({ kind: 'side', r: 0.013, pts: [V(xj, hy, s * zPort), V(xj, hy, s * tz), V(xj - BEND, hy, s * tz)] });
+      const lo = Math.min(...starts);
+      const hi = Math.max(...starts);
+      if (hi - lo > 1e-3) wires.push({ kind: 'side', r: 0.013, pts: [V(lo, hy, s * tz), V(hi, hy, s * tz)] });
+    }
+  }
 
+  // --- arka hatlar: modülden arkaya, uçta tarak gibi dağılır ---
+  for (const s of [1, -1]) {
+    const ds = rearDrops.filter((d) => d.s === s);
+    if (!ds.length) continue;
+    const zs = ds.map((d) => d.z);
+    const zmin = Math.min(...zs);
+    const zmax = Math.max(...zs);
+    const bLo = zmin < zr ? zmin + Math.min(BEND, zr - zmin) : zr;
+    const bHi = zmax > zr ? zmax - Math.min(BEND, zmax - zr) : zr;
+    const xp = xm + PORTS[2];
+    const line = [V(xp, hy, s * zPort), V(xp, hy, s * zr), V(xd, hy, s * zr)];
+    // tarak, arka hattın bir ucundaysa hat köşeyle tarağa devam eder; ortadaysa T bağlantı
+    if (bHi - bLo > 1e-3) {
+      if (bLo >= zr - 1e-6) line.push(V(xd, hy, s * bHi));
+      else if (bHi <= zr + 1e-6) line.push(V(xd, hy, s * bLo));
+      else wires.push({ kind: 'rear', r: 0.013, pts: [V(xd, hy, s * bLo), V(xd, hy, s * bHi)] });
+    }
+    wires.push({ kind: 'rear', r: 0.013, pts: line, conn: { d: Math.abs(xd - xp) * 0.5, fromEnd: false } });
+    for (const d of ds) {
+      const dz = d.z - zr;
+      const start = Math.abs(dz) < 1e-3 ? V(xd - BEND, hy, s * d.z) : V(xd, hy, s * (d.z - Math.sign(dz) * Math.min(BEND, Math.abs(dz))));
+      wires.push({ kind: d.kind, r: 0.009, conn: toLamp, pts: [start, V(xd, hy, s * d.z), ...d.tail] });
+    }
+  }
+
+  // --- Horpol kontrol modülü + port konnektörleri ---
+  const mod = controlModule(mats);
+  mod.position.set(xm, hy, 0);
+  harness.add(mod);
+  for (const s of [1, -1]) for (const px of PORTS) conns.push({ pos: V(xm + px, hy, s * (zPort + 0.03)), dir: V(0, 0, s) });
+  if (frontPort) conns.push({ pos: V(xm - 0.23, hy, 0), dir: V(-1, 0, 0) });
+
+  // --- hatları çiz ---
   for (const w of wires) {
-    const t = tube(harness, w.pts, w.r, mats.wire[w.kind]);
+    const pts = rounded(w.pts);
+    if (pts.length < 2) continue;
+    const t = m(new THREE.TubeGeometry(new PolyCurve(pts), pts.length - 1, w.r * WIRE_SCALE, 10, false), mats.wire[w.kind], false);
     t.userData.kind = w.kind;
-    // uçlarda konnektör
-    const end = w.pts[w.pts.length - 1];
-    const cn = m(new THREE.CylinderGeometry(w.r * WIRE_SCALE * 1.8, w.r * WIRE_SCALE * 1.8, 0.05, 12), mats.plastic, false);
-    cn.position.copy(end);
-    harness.add(cn);
+    harness.add(t);
+    if (w.conn) {
+      const len = pathLength(pts);
+      const d = w.conn.d * 2 > len ? len / 2 : w.conn.d;
+      conns.push(along(pts, d, w.conn.fromEnd));
+    }
+  }
+
+  // --- konnektörler: siyah-beyaz iki parçalı fiş (örnekli çizim: sayıdan bağımsız 2 çizim çağrısı) ---
+  if (conns.length) {
+    const geo = new THREE.BoxGeometry(0.04, 0.062, 0.062);
+    const black = new THREE.InstancedMesh(geo, mats.plastic, conns.length);
+    const white = new THREE.InstancedMesh(geo, mats.connWhite, conns.length);
+    const q = new THREE.Quaternion();
+    const X = V(1, 0, 0);
+    const one = V(1, 1, 1);
+    const mtx = new THREE.Matrix4();
+    conns.forEach((cn, i) => {
+      q.setFromUnitVectors(X, cn.dir);
+      black.setMatrixAt(i, mtx.compose(cn.pos.clone().addScaledVector(cn.dir, -0.02), q, one));
+      white.setMatrixAt(i, mtx.compose(cn.pos.clone().addScaledVector(cn.dir, 0.02), q, one));
+    });
+    harness.add(black, white);
   }
 
   return { group, glows, harness, lampsByCat };

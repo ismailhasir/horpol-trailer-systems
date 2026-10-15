@@ -30,6 +30,8 @@ export interface Mats {
   outline: THREE.LineBasicMaterial;
   ghost: THREE.MeshStandardMaterial;
   sysFloor: THREE.MeshStandardMaterial;
+  /** konnektör ve modül çerçevesinin açık renk parçası */
+  connWhite: THREE.MeshStandardMaterial;
   wire: Record<'main' | 'side' | 'rear' | 'plate' | 'marker' | 'sheath', THREE.MeshStandardMaterial>;
 }
 
@@ -173,6 +175,7 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
     glow,
     outline: new THREE.LineBasicMaterial({ color: '#7f9cc4', transparent: true, opacity: 0.55 }),
     ghost: std({ color: '#c8d3e2', transparent: true, opacity: 0.12, depthWrite: false, roughness: 1 }),
+    connWhite: std({ color: '#d9dee6', roughness: 0.45, metalness: 0.05 }),
     sysFloor: std({ color: '#f3f6fa', roughness: 0.9, metalness: 0, transparent: true, opacity: 0.94 }),
     wire: {
       main: wire('#3b82f6', 0.35),
