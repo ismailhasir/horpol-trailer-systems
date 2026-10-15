@@ -1,21 +1,23 @@
 ---
-// Geçici sayfa: 3D konfigüratör sonraki aşamada burada açılacak (ADR-013: aynı sekmede, ayrı rota).
+// 3D konfigüratör (ADR-013: aynı sekmede, ayrı rota). Arayüz ve 3D motor yalnızca tarayıcıda çalışır (client:only);
+// three.js yalnızca bu sayfada, ayrı bir parça olarak indirilir.
+import '../../styles/configurator.css';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Configurator from '../../components/Configurator';
 import { LANGS, type Lang } from '../../lib/labels';
 import { useUi } from '../../i18n/ui';
+import { useCUi } from '../../configurator/i18n';
 
 export function getStaticPaths() {
   return LANGS.map((lang) => ({ params: { lang } }));
 }
 const lang = Astro.params.lang as Lang;
 const ui = useUi(lang);
+const t = useCUi(lang);
 ---
 
-<BaseLayout lang={lang} title={ui.cfg_title} path="/konfigurator/">
-  <div class="wrap cfg-page">
-    <p class="eyebrow">{ui.nav_configurator}</p>
-    <h1>{ui.cfg_title}</h1>
-    <p class="lead">{ui.cfg_text}</p>
-    <a class="btn btn-primary" href={`/${lang}/`}>{ui.cfg_back}</a>
-  </div>
+<BaseLayout lang={lang} title={t.title} description={ui.cfg_text} path="/konfigurator/" app>
+  <h1 class="sr-only">{t.title}</h1>
+  <Configurator client:only="preact" lang={lang} t={t} ui={ui} />
+  <noscript><p class="wrap" style="padding-block:40px">{t.webgl_fail}</p></noscript>
 </BaseLayout>

@@ -1,0 +1,32 @@
+// Sipariş özeti: ekran, teklif listesi ve gönderim aynı fonksiyonu kullanır (tek kaynak).
+import { CATEGORIES, productById, type Config } from './data';
+import { categoryName, socketName, summaryLabel, trailerName, type CUi } from './i18n';
+import { numberLocale, type Lang } from '../lib/labels';
+
+export interface SummaryRow {
+  label: string;
+  value: string;
+  mono?: boolean;
+}
+
+export function summaryRows(c: Config, t: CUi, lang: Lang): SummaryRow[] {
+  const nf = new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: c.length === '13.6' ? 2 : 0 });
+  const rows: SummaryRow[] = [
+    { label: t.sum_trailer, value: trailerName(t, c.trailer) },
+    { label: t.sum_socket, value: socketName(t, c.socket) },
+    { label: t.sum_length, value: `${nf.format(Number(c.length))} ${t.length_unit}` },
+  ];
+  for (const cat of CATEGORIES) {
+    const ch = c.lamps[cat.id];
+    if (!ch.qty) continue;
+    rows.push({ label: summaryLabel(t, cat.id), value: `${ch.qty} × ${productById(cat.id, ch.product).code}`, mono: true });
+  }
+  return rows;
+}
+
+/** Düz metin (e-posta / teklif formu için) */
+export function summaryText(c: Config, t: CUi, lang: Lang): string {
+  return [t.summary_title, ...summaryRows(c, t, lang).map((r) => `${r.label}: ${r.value}`)].join('\n');
+}
+
+export { categoryName };

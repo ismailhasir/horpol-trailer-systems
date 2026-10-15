@@ -1,9 +1,9 @@
 ---
 // Üst bölüm: kısa başlık, iki net yol (konfigüratör / ürünler) ve konfigüratör vitrini.
-// Vitrin görseli GEÇİCİDİR (eski konfigüratör önizlemesi); gerçek 3D render gelince değişecek.
+// Vitrin görseli: yeni 3D konfigüratörden alınmış ekran görüntüsü (1865x900, arayüzle birlikte, İngilizce metinler). Konfigüratör değişince yenilenmeli.
 import { Image } from 'astro:assets';
 import Icon from './Icon.astro';
-import heroImg from '../assets/hero-temp.jpg';
+import heroImg from '../assets/hero-config.png';
 import { useUi } from '../i18n/ui';
 import type { Lang } from '../lib/labels';
 
@@ -35,7 +35,7 @@ const home = `/${lang}/`;
       <Image
         src={heroImg}
         alt={ui.hero_alt}
-        widths={[480, 740]}
+        widths={[480, 800, 1200, 1600]}
         sizes="(max-width: 960px) 100vw, 600px"
         loading="eager"
         fetchpriority="high"

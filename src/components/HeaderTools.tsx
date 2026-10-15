@@ -1,8 +1,11 @@
 // Üst çubuktaki etkileşimli parça: ürün arama, teklif listesi (düğme + çekmece), ürün ayrıntı penceresi ve bildirim.
 // Pencereler yerel <dialog> ile yapılır: odak kapanı, Esc ve arka plan tıklaması tarayıcıdan gelir.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { addToCart, removeFromCart, restoreItem, setQty, showToast, useCart, type ToastDetail } from '../lib/cart';
+import { addToCart, removeFromCart, removeSet, restoreItem, restoreSet, setQty, setSetQty, showToast, useCart, useSets, type ToastDetail } from '../lib/cart';
 import { fmt, type Ui } from '../i18n/ui';
+import { fromQuery } from '../configurator/data';
+import { useCUi, trailerName, socketName } from '../configurator/i18n';
+import { summaryRows } from '../configurator/summary';
 import type { DetailItem } from '../lib/format';
 import type { Lang } from '../lib/labels';
 
@@ -51,7 +54,10 @@ export default function HeaderTools({ items, ui, lang }: Props) {
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const cart = useCart();
   const lines = cart.map((c) => ({ ...c, p: byId.get(c.id) })).filter((l): l is typeof l & { p: DetailItem } => !!l.p);
-  const total = lines.reduce((a, l) => a + l.qty, 0);
+  const ct = useCUi(lang);
+  const sets = useSets().map((s) => ({ ...s, cfg: fromQuery(s.q) }));
+  const total = lines.reduce((a, l) => a + l.qty, 0) + sets.reduce((a, s) => a + s.qty, 0);
+  const itemCount = lines.length + sets.length;
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -61,7 +67,7 @@ export default function HeaderTools({ items, ui, lang }: Props) {
   const [cartOpen, setCartOpen] = useState(false);
   const [stage, setStage] = useState<Stage>('list');
   const [toast, setToast] = useState<ToastDetail | null>(null);
-  const [form, setForm] = useState({ company: '', name: '', phone: '', email: '', note: '', ok: false });
+  const [form, setForm] = useState({ company: '', name: '', phone: '', email: '', tax: '', address: '', note: '', ok: false });
   const [error, setError] = useState('');
   const toastRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number>(0);
@@ -83,8 +89,9 @@ export default function HeaderTools({ items, ui, lang }: Props) {
       setPqty(1);
       setSearchOpen(false);
     };
-    const onCart = () => {
-      setStage('list');
+    const onCart = (e: Event) => {
+      const st = (e as CustomEvent<'list' | 'form'>).detail;
+      setStage(st === 'form' ? 'form' : 'list');
       setCartOpen(true);
     };
     const onSearch = () => {
@@ -141,7 +148,7 @@ export default function HeaderTools({ items, ui, lang }: Props) {
 
   const submit = (e: Event) => {
     e.preventDefault();
-    if (!form.company.trim() || !form.name.trim() || !form.phone.trim() || !form.email.trim()) {
+    if (!form.company.trim() || !form.name.trim() || !form.phone.trim() || !form.email.trim() || !form.tax.trim() || !form.address.trim()) {
       setError(ui.err_fields);
       return;
     }
@@ -168,7 +175,7 @@ export default function HeaderTools({ items, ui, lang }: Props) {
     }
   };
 
-  const field = (key: 'company' | 'name' | 'phone' | 'email', label: string, type = 'text', auto = '') => (
+  const field = (key: 'company' | 'name' | 'phone' | 'email' | 'tax', label: string, type = 'text', auto = '') => (
     <label>
       {label}
       <input
@@ -318,7 +325,7 @@ export default function HeaderTools({ items, ui, lang }: Props) {
               </>
             )}
 
-            {stage !== 'done' && lines.length === 0 && (
+            {stage !== 'done' && itemCount === 0 && (
               <>
                 <div class="drawer-body">
                   <div class="empty">{ui.cart_empty}</div>
@@ -337,9 +344,54 @@ export default function HeaderTools({ items, ui, lang }: Props) {
               </>
             )}
 
-            {stage === 'list' && lines.length > 0 && (
+            {stage === 'list' && itemCount > 0 && (
               <>
                 <div class="drawer-body">
+                  {sets.map((s) => (
+                    <div class="line set-line" key={s.id}>
+                      <div>
+                        <div class="line-name">{ct.set_name}</div>
+                        <div class="line-code">
+                          {trailerName(ct, s.cfg.trailer)} · {socketName(ct, s.cfg.socket)}
+                        </div>
+                        <dl class="set-sum">
+                          {summaryRows(s.cfg, ct, lang)
+                            .slice(2)
+                            .map((r) => (
+                              <div>
+                                <dt>{r.label}</dt>
+                                <dd class={r.mono ? 'mono' : ''}>{r.value}</dd>
+                              </div>
+                            ))}
+                        </dl>
+                      </div>
+                      <div class="qty">
+                        <button type="button" aria-label={ui.qty_dec} onClick={() => setSetQty(s.id, s.qty - 1)}>
+                          −
+                        </button>
+                        <output>{s.qty}</output>
+                        <button type="button" aria-label={ui.qty_inc} onClick={() => setSetQty(s.id, s.qty + 1)}>
+                          +
+                        </button>
+                      </div>
+                      <div class="set-actions">
+                        <a class="rm" href={`/${lang}/konfigurator/?${s.q}`}>
+                          {ct.edit}
+                        </a>
+                        <button
+                          type="button"
+                          class="rm"
+                          onClick={() => {
+                            const item = { id: s.id, q: s.q, qty: s.qty };
+                            removeSet(s.id);
+                            showToast({ msg: ui.removed, action: { label: ui.undo, run: () => restoreSet(item) } });
+                          }}
+                        >
+                          {ui.remove}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                   {lines.map((l) => (
                     <div class="line" key={l.id}>
                       <div>
@@ -363,17 +415,21 @@ export default function HeaderTools({ items, ui, lang }: Props) {
                 </div>
                 <div class="drawer-foot">
                   <button type="button" class="btn btn-primary" onClick={() => setStage('form')}>
-                    {fmt(ui.cart_request, { n: lines.length })}
+                    {fmt(ui.cart_request, { n: itemCount })}
                   </button>
                 </div>
               </>
             )}
 
-            {stage === 'form' && lines.length > 0 && (
+            {stage === 'form' && itemCount > 0 && (
               <form class="contents-form" onSubmit={submit} noValidate style="display:contents">
                 <div class="drawer-body">
                   <p class="summary">
-                    {fmt(ui.items_count, { n: lines.length })}: {lines.map((l) => `${l.p.code} × ${l.qty}`).join(', ')}
+                    {fmt(ui.items_count, { n: itemCount })}:{' '}
+                    {[
+                      ...sets.map((s) => `${ct.set_name} (${trailerName(ct, s.cfg.trailer)}) × ${s.qty}`),
+                      ...lines.map((l) => `${l.p.code} × ${l.qty}`),
+                    ].join(', ')}
                   </p>
                   <div class="order">
                     {field('company', ui.f_company, 'text', 'organization')}
@@ -382,6 +438,11 @@ export default function HeaderTools({ items, ui, lang }: Props) {
                       {field('phone', ui.f_phone, 'tel', 'tel')}
                     </div>
                     {field('email', ui.f_email, 'email', 'email')}
+                    {field('tax', ui.f_tax, 'text', 'off')}
+                    <label>
+                      {ui.f_address}
+                      <textarea class="input" rows={2} autocomplete="street-address" required value={form.address} onInput={(e) => setForm((f) => ({ ...f, address: (e.target as HTMLTextAreaElement).value }))} />
+                    </label>
                     <label>
                       <span>
                         {ui.f_note} <span class="opt">({ui.f_optional})</span>

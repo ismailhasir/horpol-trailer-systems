@@ -72,9 +72,77 @@ export function useCart(): CartItem[] {
   return items;
 }
 
+// --- Konfigüratör setleri (ADR-013): yapılandırma adres satırı biçiminde saklanır ---
+export interface CartSet {
+  id: string;
+  /** yapılandırma (toQuery çıktısı) */
+  q: string;
+  qty: number;
+}
+const SKEY = 'horpol.sets.v1';
+let setMemory: CartSet[] | null = null;
+
+export function readSets(): CartSet[] {
+  if (setMemory) return setMemory;
+  try {
+    const v = localStorage.getItem(SKEY);
+    const parsed = v ? (JSON.parse(v) as CartSet[]) : [];
+    return Array.isArray(parsed) ? parsed.filter((s) => s && typeof s.q === 'string' && s.qty > 0) : [];
+  } catch {
+    return [];
+  }
+}
+function writeSets(items: CartSet[]) {
+  try {
+    localStorage.setItem(SKEY, JSON.stringify(items));
+    setMemory = null;
+  } catch {
+    setMemory = items;
+  }
+  window.dispatchEvent(new CustomEvent('cart:change'));
+}
+/** Aynı yapılandırma zaten listedeyse adedini artırır. Set kimliğini döndürür. */
+export function addSet(q: string, qty = 1): string {
+  const items = readSets().map((s) => ({ ...s }));
+  const found = items.find((s) => s.q === q);
+  if (found) {
+    found.qty = Math.min(MAX, found.qty + qty);
+    writeSets(items);
+    return found.id;
+  }
+  const id = `set-${Date.now().toString(36)}`;
+  items.push({ id, q, qty });
+  writeSets(items);
+  return id;
+}
+export function setSetQty(id: string, qty: number) {
+  writeSets(readSets().map((s) => (s.id === id ? { ...s, qty: Math.max(1, Math.min(MAX, Math.floor(qty) || 1)) } : s)));
+}
+export function removeSet(id: string) {
+  writeSets(readSets().filter((s) => s.id !== id));
+}
+export function restoreSet(item: CartSet) {
+  writeSets([...readSets().filter((s) => s.id !== item.id), item]);
+}
+export function useSets(): CartSet[] {
+  const [items, setItems] = useState<CartSet[]>([]);
+  useEffect(() => {
+    const sync = () => setItems(readSets());
+    sync();
+    window.addEventListener('cart:change', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('cart:change', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+  return items;
+}
+
 /** Sayfadaki adalar arası haberleşme (ürün penceresi, sepet çekmecesi, bildirim). */
 export const openProduct = (id: string) => window.dispatchEvent(new CustomEvent('hts:product', { detail: id }));
-export const openCart = () => window.dispatchEvent(new CustomEvent('hts:cart'));
+/** stage 'form': çekmece doğrudan teklif formuyla açılır */
+export const openCart = (stage: 'list' | 'form' = 'list') => window.dispatchEvent(new CustomEvent('hts:cart', { detail: stage }));
 export const openSearch = () => window.dispatchEvent(new CustomEvent('hts:search'));
 export interface ToastDetail {
   msg: string;

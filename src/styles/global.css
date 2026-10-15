@@ -583,9 +583,9 @@ html[lang='ar'] body {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 1865 / 900;
   object-fit: cover;
-  background: #c9ccd1;
+  background: #10151d;
 }
 .hero-card figcaption,
 .hero-card .cap {
@@ -1256,6 +1256,40 @@ dialog.drawer[open] {
 .line .rm:hover {
   color: var(--danger);
 }
+a.rm {
+  font-size: 0.88rem;
+  color: var(--muted);
+  text-decoration: underline;
+  padding: 2px 0;
+}
+a.rm:hover {
+  color: var(--link);
+}
+.set-sum {
+  display: grid;
+  gap: 1px;
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+}
+.set-sum div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+}
+.set-sum dt {
+  color: var(--faint);
+}
+.set-sum dd {
+  margin: 0;
+}
+.set-sum dd.mono {
+  font-size: 0.76rem;
+}
+.set-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 18px;
+}
 .order {
   display: grid;
   gap: 12px;
@@ -1470,9 +1504,6 @@ dialog.drawer[open] {
 @media (min-width: 961px) {
   .hero {
     padding-block: 32px 36px;
-  }
-  .hero-card img {
-    aspect-ratio: 16 / 10;
   }
   .how {
     padding-block: 24px 28px;

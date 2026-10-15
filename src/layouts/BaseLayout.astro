@@ -29,8 +29,10 @@ interface Props {
   path: string;
   /** Mobilde alt sabit çubuk gösterilsin mi. */
   stickybar?: boolean;
+  /** Uygulama modu (konfigüratör): alt bilgi yok, içerik ekranı doldurur. */
+  app?: boolean;
 }
-const { lang, title, description, path, stickybar = false } = Astro.props;
+const { lang, title, description, path, stickybar = false, app = false } = Astro.props;
 const ui = useUi(lang);
 const { details } = await loadCatalog(lang);
 const fullTitle = title === ui.site_name ? title : `${title} | ${ui.site_name}`;
@@ -60,13 +62,13 @@ const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600
       })();
     </script>
   </head>
-  <body>
+  <body class={app ? 'app' : undefined}>
     <a class="skip" href="#main">{ui.skip}</a>
     <Header lang={lang} path={path} items={details} />
     <main id="main" tabindex="-1">
       <slot />
     </main>
-    <Footer lang={lang} />
+    {!app && <Footer lang={lang} />}
     {
       stickybar && (
         <div class="stickybar">
