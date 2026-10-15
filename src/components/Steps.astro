@@ -1,0 +1,32 @@
+---
+// "Nasıl çalışır?" şeridi. Sıra gerçek bir süreçtir, bu yüzden numaralıdır.
+import { useUi } from '../i18n/ui';
+import type { Lang } from '../lib/labels';
+
+interface Props {
+  lang: Lang;
+}
+const ui = useUi(Astro.props.lang);
+const steps = [
+  { t: ui.how_1_t, d: ui.how_1_d },
+  { t: ui.how_2_t, d: ui.how_2_d },
+  { t: ui.how_3_t, d: ui.how_3_d },
+];
+---
+
+<section class="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <h2 id="how-title" class="sr-only">{ui.how_title}</h2>
+    <ol class="steps">
+      {
+        steps.map((s, i) => (
+          <li>
+            <span class="step-n">{i + 1}</span>
+            <h3>{s.t}</h3>
+            <p>{s.d}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>

@@ -1,0 +1,19 @@
+{
+  "name": "horpol-trailer-systems",
+  "type": "module",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/preact": "^6.0.6",
+    "@fontsource/ibm-plex-mono": "^5.2.5",
+    "@fontsource/ibm-plex-sans": "^5.2.5",
+    "@fontsource/ibm-plex-sans-arabic": "^5.2.5",
+    "astro": "^7.3.8",
+    "preact": "^10.29.8"
+  }
+}

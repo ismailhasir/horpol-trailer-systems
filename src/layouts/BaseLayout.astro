@@ -1,0 +1,121 @@
+---
+import '../styles/global.css';
+// Yazı tipleri kendi sunucumuzda. "400.css" gibi dosyalar alt küme başına unicode-range içerir:
+// tarayıcı yalnızca sayfada kullanılan alt kümeyi (latin / kiril / arapça) indirir.
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/500.css';
+import '@fontsource/ibm-plex-sans/600.css';
+import '@fontsource/ibm-plex-sans-arabic/400.css';
+import '@fontsource/ibm-plex-sans-arabic/500.css';
+import '@fontsource/ibm-plex-sans-arabic/600.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import latin400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2?url';
+import latin600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2?url';
+import cyr400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-cyrillic-400-normal.woff2?url';
+import cyr600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-cyrillic-600-normal.woff2?url';
+import ar400 from '@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-400-normal.woff2?url';
+import ar600 from '@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-600-normal.woff2?url';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { LANGS, isRtl, type Lang } from '../lib/labels';
+import { useUi } from '../i18n/ui';
+import { loadCatalog } from '../lib/catalog';
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description?: string;
+  /** Dil önekinden sonraki yol, örn. "/" ya da "/konfigurator/". Dil değiştirme bağlantıları için. */
+  path: string;
+  /** Mobilde alt sabit çubuk gösterilsin mi. */
+  stickybar?: boolean;
+}
+const { lang, title, description, path, stickybar = false } = Astro.props;
+const ui = useUi(lang);
+const { details } = await loadCatalog(lang);
+const fullTitle = title === ui.site_name ? title : `${title} | ${ui.site_name}`;
+// Ekranın üstünde görünen yazı tiplerini dile göre önceden yükle
+const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600] : [latin400, latin600];
+---
+
+<!doctype html>
+<html lang={lang} dir={isRtl(lang) ? 'rtl' : 'ltr'}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    {description && <meta name="description" content={description} />}
+    <link rel="icon" type="image/png" href="/brand/logo-blue.png" />
+    {preload.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
+    {LANGS.map((l) => <link rel="alternate" hreflang={l} href={`/${l}${path}`} />)}
+    <!-- Tema: kayıtlı seçim yoksa sistem tercihi. Titremeyi önlemek için render'dan önce çalışır. -->
+    <script is:inline>
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('theme');
+        } catch (e) {}
+        if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">{ui.skip}</a>
+    <Header lang={lang} path={path} items={details} />
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+    {
+      stickybar && (
+        <div class="stickybar">
+          <a class="btn" href={`/${lang}/konfigurator/`}>{ui.nav_configurator}</a>
+          <a class="btn btn-primary" href="#urunler">{ui.nav_products}</a>
+        </div>
+      )
+    }
+    <script>
+      // Açık/koyu tema anahtarı
+      document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const root = document.documentElement;
+          const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+          root.dataset.theme = next;
+          try {
+            localStorage.setItem('theme', next);
+          } catch (e) {}
+        });
+      });
+
+      // Mobil menü
+      const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
+      const mnav = document.getElementById('mnav');
+      menuBtn?.addEventListener('click', () => {
+        const open = mnav?.classList.toggle('open') ?? false;
+        menuBtn.setAttribute('aria-expanded', String(open));
+      });
+      mnav?.addEventListener('click', () => {
+        mnav.classList.remove('open');
+        menuBtn?.setAttribute('aria-expanded', 'false');
+      });
+
+      // Dil menüsü: dışarı tıklayınca veya Escape ile kapanır
+      const dropdowns = document.querySelectorAll<HTMLDetailsElement>('[data-dropdown]');
+      document.addEventListener('click', (e) => {
+        dropdowns.forEach((d) => {
+          if (d.open && !d.contains(e.target as Node)) d.open = false;
+        });
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        dropdowns.forEach((d) => {
+          if (d.open) {
+            d.open = false;
+            d.querySelector('summary')?.focus();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+---
+import Icon from './Icon.astro';
+import LangSwitcher from './LangSwitcher.astro';
+import HeaderTools from './HeaderTools';
+import { useUi } from '../i18n/ui';
+import type { Lang } from '../lib/labels';
+import type { DetailItem } from '../lib/format';
+
+interface Props {
+  lang: Lang;
+  path: string;
+  items: DetailItem[];
+}
+const { lang, path, items } = Astro.props;
+const ui = useUi(lang);
+const home = `/${lang}/`;
+const links = [
+  { href: `${home}#urunler`, label: ui.nav_products },
+  { href: `${home}#set-nedir`, label: ui.nav_about },
+  { href: `${home}konfigurator/`, label: ui.nav_configurator },
+  { href: `${home}#iletisim`, label: ui.nav_contact },
+];
+---
+
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href={home} aria-label={ui.site_name}>
+      <img class="logo-light" src="/brand/logo-blue.png" alt="" width="720" height="528" />
+      <img class="logo-dark" src="/brand/logo-white.png" alt="" width="720" height="528" />
+    </a>
+    <nav class="nav" aria-label={ui.nav_main}>
+      {links.map((l) => <a href={l.href}>{l.label}</a>)}
+    </nav>
+    <div class="top-grow"></div>
+    <!-- Sıra: Ürün ara · Teklif listesi · Tema · Dil -->
+    <div class="tools">
+      <HeaderTools client:load items={items} ui={ui} lang={lang} />
+      <button type="button" class="icon-btn" data-theme-toggle aria-label={ui.theme_toggle} title={ui.theme_toggle}>
+        <Icon name="sun" class="theme-sun" />
+        <Icon name="moon" class="theme-moon" />
+      </button>
+      <LangSwitcher lang={lang} path={path} />
+      <button type="button" class="icon-btn menu-btn" data-menu-btn aria-label={ui.menu} aria-expanded="false" aria-controls="mnav">
+        <Icon name="menu" />
+      </button>
+    </div>
+  </div>
+  <nav class="mnav" id="mnav" aria-label={ui.nav_main}>
+    {links.map((l) => <a href={l.href}>{l.label}</a>)}
+  </nav>
+</header>

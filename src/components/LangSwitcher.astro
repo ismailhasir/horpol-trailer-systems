@@ -1,0 +1,32 @@
+---
+// Dil menüsü. Kapalıyken yalnızca seçili dilin bayrağı görünür, açılınca "bayrak + dil adı" listelenir.
+import Flag from './Flag.astro';
+import { LANGS, LANG_NAMES, type Lang } from '../lib/labels';
+import { useUi } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  /** Dil önekinden sonraki yol, örn. "/" ya da "/konfigurator/". */
+  path: string;
+}
+const { lang, path } = Astro.props;
+const ui = useUi(lang);
+---
+
+<details class="lang-dd" data-dropdown>
+  <summary aria-label={`${ui.lang_switch}: ${LANG_NAMES[lang]}`} title={LANG_NAMES[lang]}>
+    <Flag lang={lang} />
+  </summary>
+  <ul class="lang-menu">
+    {
+      LANGS.map((l) => (
+        <li>
+          <a href={`/${l}${path}`} hreflang={l} lang={l} aria-current={l === lang ? 'true' : undefined}>
+            <Flag lang={l} />
+            <span>{LANG_NAMES[l]}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</details>

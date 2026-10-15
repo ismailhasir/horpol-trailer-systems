@@ -1,0 +1,50 @@
+---
+// Üst bölüm: kısa başlık, iki net yol (konfigüratör / ürünler) ve konfigüratör vitrini.
+// Vitrin görseli GEÇİCİDİR (eski konfigüratör önizlemesi); gerçek 3D render gelince değişecek.
+import { Image } from 'astro:assets';
+import Icon from './Icon.astro';
+import heroImg from '../assets/hero-temp.jpg';
+import { useUi } from '../i18n/ui';
+import type { Lang } from '../lib/labels';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const ui = useUi(lang);
+const home = `/${lang}/`;
+---
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow">{ui.hero_eyebrow}</p>
+      <h1>{ui.hero_title}</h1>
+      <p class="lead">{ui.hero_lead}</p>
+      <div class="cta">
+        <a class="btn btn-primary" href={`${home}konfigurator/`}>{ui.hero_cta1} <Icon name="arrow" size={18} /></a>
+        <a class="btn" href="#urunler">{ui.hero_cta2}</a>
+      </div>
+      <ul class="facts">
+        <li><Icon name="check" size={16} />{ui.hero_f1}</li>
+        <li><Icon name="check" size={16} />{ui.hero_f2}</li>
+        <li><Icon name="check" size={16} />{ui.hero_f3}</li>
+      </ul>
+    </div>
+    <a class="hero-card" href={`${home}konfigurator/`}>
+      <Image
+        src={heroImg}
+        alt={ui.hero_alt}
+        widths={[480, 740]}
+        sizes="(max-width: 960px) 100vw, 600px"
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+      />
+      <div class="cap">
+        <span class="cap-label">{ui.hero_cap}</span>
+        <span class="cap-go">{ui.hero_open} <Icon name="arrow" size={16} /></span>
+      </div>
+    </a>
+  </div>
+</section>

@@ -1,0 +1,52 @@
+---
+// Basit SVG bayraklar (Windows'ta emoji bayraklar harf olarak göründüğü için emoji kullanılmadı).
+// Bayrak bir ülkeyi temsil eder, dili değil: Arapça için kullanılan bayrağın seçimi bir tasarım kararıdır.
+import type { Lang } from '../lib/labels';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+---
+
+<svg class="flag" viewBox="0 0 24 16" width="24" height="16" aria-hidden="true" focusable="false">
+  {
+    lang === 'tr' && (
+      <>
+        <rect width="24" height="16" fill="#E30A17" />
+        <circle cx="9" cy="8" r="4" fill="#fff" />
+        <circle cx="10.3" cy="8" r="3.2" fill="#E30A17" />
+        <path d="M13.6 6.4l.55 1.5 1.6.05-1.27.98.45 1.55-1.33-.92-1.33.92.45-1.55-1.27-.98 1.6-.05z" fill="#fff" />
+      </>
+    )
+  }
+  {
+    lang === 'en' && (
+      <>
+        <rect width="24" height="16" fill="#012169" />
+        <path d="M0 0L24 16M24 0L0 16" stroke="#fff" stroke-width="3.2" />
+        <path d="M0 0L24 16M24 0L0 16" stroke="#C8102E" stroke-width="1.2" />
+        <path d="M12 0V16M0 8H24" stroke="#fff" stroke-width="5" />
+        <path d="M12 0V16M0 8H24" stroke="#C8102E" stroke-width="3" />
+      </>
+    )
+  }
+  {
+    lang === 'ru' && (
+      <>
+        <rect width="24" height="5.34" fill="#fff" />
+        <rect y="5.33" width="24" height="5.34" fill="#0039A6" />
+        <rect y="10.66" width="24" height="5.34" fill="#D52B1E" />
+      </>
+    )
+  }
+  {
+    lang === 'ar' && (
+      <>
+        <rect width="24" height="16" fill="#006C35" />
+        <path d="M5 5.8h14M6.5 7.6h11M8 9.4h8" stroke="#fff" stroke-width="1" stroke-linecap="round" />
+        <path d="M6 12.4h12" stroke="#fff" stroke-width="1" stroke-linecap="round" />
+      </>
+    )
+  }
+</svg>

@@ -1,0 +1,21 @@
+---
+// Geçici sayfa: 3D konfigüratör sonraki aşamada burada açılacak (ADR-013: aynı sekmede, ayrı rota).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { LANGS, type Lang } from '../../lib/labels';
+import { useUi } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return LANGS.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Lang;
+const ui = useUi(lang);
+---
+
+<BaseLayout lang={lang} title={ui.cfg_title} path="/konfigurator/">
+  <div class="wrap cfg-page">
+    <p class="eyebrow">{ui.nav_configurator}</p>
+    <h1>{ui.cfg_title}</h1>
+    <p class="lead">{ui.cfg_text}</p>
+    <a class="btn btn-primary" href={`/${lang}/`}>{ui.cfg_back}</a>
+  </div>
+</BaseLayout>

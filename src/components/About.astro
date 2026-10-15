@@ -1,0 +1,36 @@
+---
+import { useUi } from '../i18n/ui';
+import type { Lang } from '../lib/labels';
+
+interface Props {
+  lang: Lang;
+}
+const ui = useUi(Astro.props.lang);
+const points = [
+  { t: ui.about_1_t, d: ui.about_1_d },
+  { t: ui.about_2_t, d: ui.about_2_d },
+  { t: ui.about_3_t, d: ui.about_3_d },
+];
+---
+
+<section class="block about" id="set-nedir">
+  <div class="wrap about-grid">
+    <div class="about-head">
+      <p class="eyebrow">{ui.about_eyebrow}</p>
+      <h2>{ui.about_title}</h2>
+    </div>
+    <div>
+      <p class="about-text">{ui.about_text}</p>
+      <ul class="trio">
+        {
+          points.map((p) => (
+            <li>
+              <h3>{p.t}</h3>
+              <p>{p.d}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</section>
