@@ -36,9 +36,10 @@ export const DAMPER = {
   front: { x: XF - 0.005, y: 1.31, z: 1.12 },
   armFront: { x: XF + 0.3, y: 1.45, z: W2 },
   armRear: { x: -0.15, y: 1.22, z: W2 },
-  side: { x0: XF + 3.15, x1: -0.6, y: 1.3 },
-  /** ek lambalar: arka köşe dikmelerinin üstünde, üst profilin altında */
-  extra: { x: BX1 + 0.01, y: YT + 0.02, z0: W2 - 0.1, z1: W2 - 0.32 },
+  /** yan markerlar şasinin tüm boyunca (boyun dahil); braketler hava tankının ve iniş ayağının üstünden geçer */
+  side: { x0: XF + 0.6, x1: -0.55, y: 1.36 },
+  /** ek lambalar: kasada değil, şasinin arka kapanış traversinin arkaya bakan yüzünde */
+  extra: { x: -0.04, y: 1.32, z0: 0.42, z1: 0.18 },
 };
 
 /** Kasa kesiti (z, y): betikteki contour() ile aynı (dik duvar → yuvarlatılmış pah → taban) */

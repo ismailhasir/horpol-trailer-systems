@@ -370,15 +370,19 @@ for s in (-1, 1):
     prism_xy('hinge_bracket', [(XR - 0.36, TOP), (XR - 0.02, TOP), (XR - 0.02, TOP + 0.09), (XR - 0.13, TOP + 0.13), (XR - 0.24, TOP + 0.09)], s * 0.3 - 0.025, s * 0.3 + 0.025, P, 0.004)
 cylinder('hinge_pin', 0.04, (XR - 0.13, TOP + 0.07, -0.4), (XR - 0.13, TOP + 0.07, 0.4), M['chrome'], 24)
 LAMP_Y = 1.12
-box('lamp_bar', (0.1, 0.13, W - 0.06), (-0.06, LAMP_Y, 0), P, 0.006)
+# arka lamba braketleri (dış köşelerde; ortası plaka için boş)
 for s in (-1, 1):
-    box('lamp_bar_hanger', (0.08, DEEP_BOT - LAMP_Y + 0.12, 0.08), (-0.1, (DEEP_BOT + LAMP_Y) / 2, s * 0.6), P, 0.004)
+    box('lamp_bracket', (0.08, 0.17, 0.86), (-0.06, LAMP_Y, s * 0.82), P, 0.008)
+    box('lamp_bracket_lip', (0.1, 0.03, 0.86), (-0.05, LAMP_Y - 0.1, s * 0.82), P, 0.004)
+    box('lamp_hanger', (0.07, DEEP_BOT - LAMP_Y + 0.1, 0.07), (-0.1, (DEEP_BOT + LAMP_Y) / 2 + 0.05, s * 0.55), P, 0.004)
 box('plate_holder', (0.035, 0.17, 0.58), (-0.04, 0.88, 0), P, 0.004)
+box('plate_surround', (0.02, 0.26, 0.74), (-0.055, 0.9, 0), M['alu'], 0.006)
 beam('plate_hanger', (-0.05, 0.96, 0), (-0.08, LAMP_Y - 0.05, 0), 0.04, 0.12, P)
-box('bumper', (0.1, 0.12, 2.36), (0.02, 0.5, 0), M['alu'], 0.012)
+box('bumper', (0.11, 0.15, 2.38), (0.0, 0.56, 0), P, 0.012)
+box('bumper_edge', (0.112, 0.022, 2.38), (0.0, 0.477, 0), M['alu'], 0.004)
 for s in (-1, 1):
-    beam('bumper_arm', (0.0, 0.54, s * 0.62), (-0.42, DEEP_BOT + 0.01, s * 0.62), 0.07, 0.06, P)
-    cylinder('bumper_cap', 0.07, (0.02, 0.5, s * 1.17), (0.02, 0.5, s * 1.19), M['rubber'], 20)
+    box('bumper_post', (0.08, DEEP_BOT - 0.6, 0.09), (-0.05, (DEEP_BOT + 0.6) / 2, s * 0.55), P, 0.006)
+    box('bumper_end', (0.115, 0.155, 0.02), (0.0, 0.56, s * 1.2), M['rubber'], 0.004)
 
 # ================= birleştirme (şasi tek ağ, çok malzeme) =================
 def select_only(objs, active=None):
@@ -502,6 +506,7 @@ MB = {
     'red': material('ReflRed', '#d0121c', 0.3, 0.05),
     'yellow': material('ReflYellow', '#f4b400', 0.3, 0.05),
     'plate': material('LogoPlate', '#fbfbfb', 0.35, 0.05),
+    'skirt': material('SideSkirt', '#3c4047', 0.48, 0.35, 0.3),
 }
 BODY = []
 BP = MB['paint']
@@ -580,6 +585,32 @@ x = BX0 + 0.5
 while x < BX1 - 0.4:
     box('floor_cross', (0.08, 0.06, 1.25), (x, Y0 - 0.03, 0), MB['dark'], 0.006, BODY)
     x += 0.95
+# yan koruma sacı: kasanın alt kenarı boyunca (ön akstan kasa sonuna), üstü düz, dış yüzü dik, altı içe eğimli;
+# alt kenarı yan marker ve gabari lambalarının üstünde kalır
+SK_TOP = Y0 + 0.36
+SK_X0 = AXLES[-1] - 1.3
+SK_X1 = BX1 - 0.22
+
+
+def half_width_outer(y):
+    left = outer[: len(outer) // 2]
+    for (z0, y0_), (z1, y1) in zip(left, left[1:]):
+        if min(y0_, y1) <= y <= max(y0_, y1) and y0_ != y1:
+            return -(z0 + (z1 - z0) * (y - y0_) / (y1 - y0_))
+    return HW
+
+
+zt = half_width_outer(SK_TOP) - 0.02
+for s in (-1, 1):
+    prof = [(zt, SK_TOP), (HW + 0.035, SK_TOP), (HW + 0.035, SK_TOP - 0.15), (HW - 0.01, SK_TOP - 0.2), (0.68, Y0 - 0.05)]
+    if s < 0:
+        prof = [(-z, y) for z, y in reversed(prof)]
+    prism_zy('side_skirt', prof, SK_X0, SK_X1, MB['skirt'], 0.006, BODY)
+    x = SK_X0 + 0.25
+    while x < SK_X1 - 0.1:
+        cylinder('skirt_bolt', 0.011, (x, SK_TOP - 0.05, s * (HW + 0.035)), (x, SK_TOP - 0.05, s * (HW + 0.045)), MB['dark'], 10, 0.0, None, BODY)
+        x += 0.55
+
 # arka kapak: arka çerçevenin üstüne binen dolu panel (açıklığı tamamen kapatır), kesiti izleyen çevre profili,
 # genişliği bulunduğu yüksekliğe göre hesaplanan yatay takviyeler, ECE 70 reflektörleri, logo levhası, menteşe, kilitler, taşma dudağı
 GX = BX1  # kapağın iç yüzü (çerçevenin arka yüzü)
