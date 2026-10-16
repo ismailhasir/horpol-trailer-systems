@@ -26,6 +26,7 @@ const I = {
   search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z', 'm20 20-3.8-3.8'],
   cart: ['M3 4h2.4l2.1 10.2a1 1 0 0 0 1 .8h8.7a1 1 0 0 0 1-.76L20 8H6', 'M9.5 19.3h.01', 'M17 19.3h.01'],
   close: ['M6 6l12 12', 'M18 6 6 18'],
+  download: ['M12 4v11', 'm7.5 11 4.5 4.5 4.5-4.5', 'M5 19.5h14'],
 };
 
 function useDialog(open: boolean, onClose: () => void) {
@@ -56,6 +57,20 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
   const mult = useMult();
   const total = lines.reduce((a, l) => a + l.qty, 0) * mult;
   const itemCount = lines.length;
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const downloadPdf = async () => {
+    if (pdfBusy || !lines.length) return;
+    setPdfBusy(true);
+    try {
+      const { downloadCartPdf } = await import('../lib/cart-pdf');
+      await downloadCartPdf({ lines: lines.map((l) => ({ code: l.p.code, name: l.p.name, qty: l.qty })), mult, ui, lang });
+    } catch (e) {
+      console.error(e);
+      showToast({ msg: ui.pdf_failed });
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -302,9 +317,16 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
           <>
             <div class="drawer-head">
               <h2 id="cart-title">{stage === 'form' ? ui.form_title : stage === 'done' ? ui.done_title : ui.cart_title}</h2>
-              <button type="button" class="icon-btn" aria-label={ui.close} onClick={closeCart}>
-                <Svg d={I.close} />
-              </button>
+              <div class="head-actions">
+                {stage !== 'done' && itemCount > 0 && (
+                  <button type="button" class="icon-btn" data-tip={ui.pdf_download} aria-label={ui.pdf_download} onClick={downloadPdf} disabled={pdfBusy}>
+                    <Svg d={I.download} />
+                  </button>
+                )}
+                <button type="button" class="icon-btn" aria-label={ui.close} onClick={closeCart}>
+                  <Svg d={I.close} />
+                </button>
+              </div>
             </div>
 
             {stage === 'done' && (

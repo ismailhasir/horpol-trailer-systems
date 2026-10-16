@@ -1212,6 +1212,39 @@ dialog.drawer[open] {
   padding: 16px 20px;
   border-bottom: 1px solid var(--line);
 }
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* yazısız simge düğmesi: üzerine gelince ipucu (aşağıda açılır, çekmecenin dışına taşmaz) */
+.icon-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  z-index: 2;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.icon-btn[data-tip]:hover::after,
+.icon-btn[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: none;
+}
+.icon-btn[disabled] {
+  opacity: 0.5;
+  cursor: progress;
+}
 .drawer-head h2 {
   font-size: 1.15rem;
 }

@@ -6,6 +6,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { lengthMeters, type CategoryId, type Config } from '../data';
 import { createMaterials, fadeTexture, setLensPower, type Mats } from './materials';
 import { buildTrailer, disposeGroup, setGhost, type Anchors, type TrailerBuild } from './trailer';
+import { DAMPER_BODY_GLB, DAMPER_GLB } from './damper';
+import { loadedModel, loadModel } from './models';
 import { buildEquipment, disposeEquipment, setHarnessHighlight, type EquipmentBuild } from './equipment';
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
@@ -141,8 +143,18 @@ export class Engine {
   }
 
   // ---------- yapılandırma ----------
-  setConfig(c: Config) {
+  setConfig(c: Config, keepView = false) {
     if (this.disposed || !this.mats) return;
+    // damper: Blender şasisi ilk seçimde indirilir; gelene kadar kodla çizilen yedek görünür, gelince yerine geçer
+    if (c.trailer === 'damper' && !(loadedModel(DAMPER_GLB) && loadedModel(DAMPER_BODY_GLB))) {
+      Promise.all([loadModel(DAMPER_GLB), loadModel(DAMPER_BODY_GLB)])
+        .then(() => {
+          if (this.disposed || this.cfg?.trailer !== 'damper') return;
+          this.key = '';
+          this.setConfig(this.cfg, true);
+        })
+        .catch((e) => console.error(e));
+    }
     const k = `${c.trailer}|${c.length}`;
     const firstBuild = !this.trailer;
     if (k !== this.key) {
@@ -155,7 +167,7 @@ export class Engine {
       this.key = k;
       this.fitShadow(this.trailer.anchors);
       this.applySystem();
-      if (!firstBuild) this.setView(this.system ? 'top' : 'overview');
+      if (!firstBuild && !keepView) this.setView(this.system ? 'top' : 'overview');
     }
     if (this.equip) {
       this.scene.remove(this.equip.group);
@@ -309,6 +321,7 @@ export class Engine {
     setLensPower(this.mats, this.lights);
     Object.values(this.mats.lens).forEach((mm) => (mm.needsUpdate = true));
     this.equip?.glows.forEach((g) => (g.visible = this.lights));
+    this.equip?.pools.forEach((p) => (p.visible = this.lights));
     const hasStop = (this.cfg?.lamps.stop.qty ?? 0) > 0;
     this.rearGlow.forEach((p) => (p.intensity = this.lights && hasStop ? 2.2 : 0));
   }
@@ -326,9 +339,13 @@ export class Engine {
     this.scene.background = bg;
     this.scene.fog = new THREE.Fog(bg, 34, 70);
     (this.floor.material as THREE.MeshStandardMaterial).color.set(night ? th.floorNight : th.floor);
-    this.scene.environmentIntensity = night ? 0.14 : 0.75;
-    this.hemi.intensity = night ? 0.08 : 0.42;
-    this.sun.intensity = night ? 0.18 : 2.7;
+    // gece: ay ışığı (soğuk, zayıf) + yerden yansıyan dolgu; dorsenin alt yarısı karanlıkta kaybolmasın
+    this.scene.environmentIntensity = night ? 0.3 : 0.75;
+    this.hemi.color.set(night ? '#9db2dc' : '#ffffff');
+    this.hemi.groundColor.set(night ? '#4a5568' : '#7d8794');
+    this.hemi.intensity = night ? 0.5 : 0.42;
+    this.sun.color.set(night ? '#c3d0f5' : '#ffffff');
+    this.sun.intensity = night ? 0.55 : 2.7;
     this.renderer.toneMappingExposure = night ? 1.15 : 1.0;
     this.shadowDirty = 3;
   }

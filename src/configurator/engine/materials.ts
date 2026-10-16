@@ -14,6 +14,10 @@ export interface Mats {
   accent: THREE.MeshStandardMaterial;
   stripe: THREE.MeshStandardMaterial;
   chassis: THREE.MeshStandardMaterial;
+  /** parlak siyah boyalı şasi (KTL + boya) */
+  chassisBlack: THREE.MeshPhysicalMaterial;
+  /** tanker üst kaportası: saten gri alüminyum */
+  fairingGrey: THREE.MeshPhysicalMaterial;
   darkMetal: THREE.MeshStandardMaterial;
   alu: THREE.MeshStandardMaterial;
   chrome: THREE.MeshStandardMaterial;
@@ -80,6 +84,22 @@ function canvasTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2
     t.repeat.set(...repeat);
   }
   return t;
+}
+
+/** Koruge boru halkaları: u yönünde tekrarlayan açık sırt / koyu oluk (renk ve kabartma için) */
+function ribTexture() {
+  return canvasTexture(
+    64,
+    4,
+    (ctx) => {
+      for (let x = 0; x < 64; x++) {
+        const v = Math.round(255 * (0.88 + 0.12 * Math.cos((x / 64) * Math.PI * 2)));
+        ctx.fillStyle = `rgb(${v},${v},${v})`;
+        ctx.fillRect(x, 0, 1, 4);
+      }
+    },
+    [1, 1],
+  );
 }
 
 export function glowTexture() {
@@ -280,8 +300,10 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
       opacity: 0.9,
     });
   });
+  // kablo: oluklu koruge boru görünümü (doku boyunca halkalar); renk okunsun diye hafif ışıma
+  const rib = ribTexture();
   const wire = (color: string, e = 0.25) =>
-    std({ color, roughness: 0.35, metalness: 0.05, emissive: new THREE.Color(color), emissiveIntensity: e * 1.6 });
+    std({ color, map: rib, bumpMap: rib, bumpScale: 1.2, roughness: 0.5, metalness: 0.05, emissive: new THREE.Color(color), emissiveIntensity: e * 0.75 });
 
   return {
     paint: new THREE.MeshPhysicalMaterial({ color: '#f3f5f8', roughness: 0.38, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.25 }),
@@ -291,6 +313,8 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
     accent: std({ color: '#f08a00', roughness: 0.45, metalness: 0.05, side: THREE.DoubleSide }),
     stripe: std({ color: '#1c5198', roughness: 0.4, metalness: 0.2 }),
     chassis: std({ color: '#262a30', roughness: 0.5, metalness: 0.55 }),
+    fairingGrey: new THREE.MeshPhysicalMaterial({ color: '#9ea5ae', roughness: 0.38, metalness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.3, side: THREE.DoubleSide }),
+    chassisBlack: new THREE.MeshPhysicalMaterial({ color: '#111215', roughness: 0.42, metalness: 0.25, clearcoat: 0.55, clearcoatRoughness: 0.3 }),
     darkMetal: std({ color: '#383d45', roughness: 0.42, metalness: 0.7 }),
     alu: std({ color: '#c3c9d1', roughness: 0.3, metalness: 0.9 }),
     chrome: std({ color: '#eef2f6', roughness: 0.08, metalness: 1 }),
@@ -334,7 +358,7 @@ export function createMaterials(logoBlue: THREE.Texture | null, logoWhite: THREE
       rear: wire('#ef4444', 0.3),
       plate: wire('#e5e7eb', 0.15),
       marker: wire('#22c55e', 0.3),
-      sheath: std({ color: '#1b1d20', roughness: 0.6, metalness: 0.1 }),
+      sheath: std({ color: '#1b1d20', map: rib, bumpMap: rib, bumpScale: 1.2, roughness: 0.6, metalness: 0.1 }),
     },
   };
 }

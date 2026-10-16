@@ -8,6 +8,8 @@ import { profileAt, type Anchors } from './trailer';
 export interface EquipmentBuild {
   group: THREE.Group;
   glows: THREE.Sprite[];
+  /** ışıklar açıkken lambaların zemine düşen hafif renkli ışığı */
+  pools: THREE.Mesh[];
   harness: THREE.Group;
   lampsByCat: Record<CategoryId, THREE.Object3D[]>;
 }
@@ -217,6 +219,20 @@ function socket(mats: Mats, kind: '7' | '15', ccolor: THREE.Material) {
   return g;
 }
 
+// ---------- zemine yansıyan ışık ----------
+const POOL_SIZE: Record<CategoryId, number> = { stop: 2.2, extra: 1.5, plate: 0.9, side: 1.1, front: 1.6, arm: 0.9 };
+const POOL_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+const poolMats = new Map<string, THREE.MeshBasicMaterial>();
+function poolMaterial(mats: Mats, c: LensColor) {
+  let m = poolMats.get(c);
+  if (!m) {
+    const g = mats.glow[c];
+    m = new THREE.MeshBasicMaterial({ map: g.map, color: g.color, transparent: true, opacity: 0.26, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    poolMats.set(c, m);
+  }
+  return m;
+}
+
 // ---------- tesisat ----------
 // Düzen broşür şemalarına göre (HOR-102/111/1001): merkezde Horpol kontrol modülü; öndeki soketlerden modüle besleme hatları,
 // modülden iki yana yan ana hatlar ve arkaya dağıtım hatları. Hatlar dik açılı, köşeler yuvarlatılmış; her lamba dalında
@@ -226,6 +242,9 @@ type WireKind = 'main' | 'side' | 'rear' | 'plate' | 'marker';
 const WIRE_SCALE = 1.7;
 /** köşe yarıçapı */
 const BEND = 0.14;
+/** koruge halkası sıklığı (metre başına) ve kelepçe aralığı */
+const RIBS_PER_M = 75;
+const CLIP_STEP = 0.5;
 /** konnektörün lamba ucuna uzaklığı (hat boyunca) */
 const CONN_FROM_LAMP = 0.3;
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -317,6 +336,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const harness = new THREE.Group();
   group.add(harness);
   const glows: THREE.Sprite[] = [];
+  const pools: THREE.Mesh[] = [];
   const lampsByCat = { stop: [], side: [], plate: [], front: [], arm: [], extra: [] } as Record<CategoryId, THREE.Object3D[]>;
 
   const mount = (cat: CategoryId, style: LampStyle, pos: THREE.Vector3, setup: (o: THREE.Group) => void) => {
@@ -335,6 +355,19 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       sp.renderOrder = 10;
       group.add(sp);
       glows.push(sp);
+    }
+    // zemine yansıma: lambanın baktığı yöne kaydırılmış, yumuşak kenarlı renkli ışık halkası
+    const g0 = out.glows[0];
+    if (g0) {
+      const dir = new THREE.Vector3(0, 0, 1).transformDirection(out.obj.matrixWorld);
+      const size = POOL_SIZE[cat];
+      const pool = new THREE.Mesh(POOL_GEO, poolMaterial(mats, g0.c));
+      pool.scale.set(size, size, 1);
+      pool.position.set(pos.x + dir.x * size * 0.42, 0.012, pos.z + dir.z * size * 0.42);
+      pool.visible = false;
+      pool.renderOrder = 9;
+      group.add(pool);
+      pools.push(pool);
     }
   };
 
@@ -363,8 +396,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const xm = -2.2; // Horpol modülü: arka lambalara ~2 m
   const PORTS = [-0.135, -0.045, 0.045, 0.135]; // modül yan portları (önden arkaya): besleme, yan hat, arka hat, yedek
   const zPort = 0.15; // modül yan yüzü
-  const tz = 0.85; // yan ana hat
-  const zr = 0.62; // arka hat
+  const tz = a.harness.trunkZ ?? 0.85; // yan ana hat
+  const zr = a.harness.rearZ ?? 0.62; // arka hat
   const xd = -0.55; // arka dağıtım (tarak) hattı
   const zp = 0.3; // plaka hattı (arka hattan ayrılıp içe iner)
 
@@ -372,6 +405,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const wires: Wire[] = [];
   const toLamp = { d: CONN_FROM_LAMP, fromEnd: true };
   const conns: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
+  const clips: { pos: THREE.Vector3; dir: THREE.Vector3; r: number }[] = [];
 
   // arka tarağa bağlanan lambalar (kuyruk: tarak üzerindeki dönüşten sonraki noktalar)
   const rearDrops: { s: number; z: number; kind: WireKind; tail: THREE.Vector3[] }[] = [];
@@ -417,6 +451,17 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       mount('side', sdStyle, V(x, y, s * a.side.z), (o) => {
         if (s < 0) o.scale.z = -1;
       });
+    }
+    if (a.side.brackets) {
+      // marker braketi: kirişten dışa uzanan kol + lamba tablası (gövdede yan ray olmayan şasiler)
+      for (const s of [1, -1]) {
+        const arm = m(new THREE.BoxGeometry(0.05, 0.05, W2 - 0.52), mats.chassis);
+        arm.position.set(x, y + 0.03, s * (0.52 + (W2 - 0.52) / 2));
+        group.add(arm);
+        const pad = m(new THREE.BoxGeometry(0.16, 0.09, 0.01), mats.chassis);
+        pad.position.set(x, y, s * (W2 - 0.005));
+        group.add(pad);
+      }
     }
     sideTaps.push({ x, kind: 'side', tail: (s) => [V(x, hy, s * (W2 - 0.06)), V(x, y, s * (W2 - 0.06)), V(x, y, s * (W2 - 0.02))] });
   }
@@ -559,14 +604,41 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   for (const w of wires) {
     const pts = rounded(follow(w.pts));
     if (pts.length < 2) continue;
-    const t = m(new THREE.TubeGeometry(new PolyCurve(pts), pts.length - 1, w.r * WIRE_SCALE, 10, false), mats.wire[w.kind], false);
+    const tg = new THREE.TubeGeometry(new PolyCurve(pts), pts.length - 1, w.r * WIRE_SCALE, 10, false);
+    // UV'nin u'su gerçek uzunluğa göre: halkalar her hatta aynı sıklıkta
+    const uv = tg.attributes.uv as THREE.BufferAttribute;
+    let acc = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (i > 0) acc += pts[i].distanceTo(pts[i - 1]);
+      for (let j = 0; j <= 10; j++) uv.setX(i * 11 + j, acc * RIBS_PER_M);
+    }
+    uv.needsUpdate = true;
+    const t = m(tg, mats.wire[w.kind], false);
     t.userData.kind = w.kind;
     harness.add(t);
+    // ana hatlarda (kalın) kelepçeler
+    if (w.r >= 0.012) {
+      for (let d = 0.35; d < acc - 0.3; d += CLIP_STEP) clips.push({ ...along(pts, d, false), r: w.r * WIRE_SCALE });
+    }
     if (w.conn) {
       const len = pathLength(pts);
       const d = w.conn.d * 2 > len ? len / 2 : w.conn.d;
       conns.push(along(pts, d, w.conn.fromEnd));
     }
+  }
+
+  // --- kelepçeler: kablo çevresinde siyah bant (örnekli çizim) ---
+  if (clips.length) {
+    const geo = new THREE.CylinderGeometry(1, 1, 0.024, 14, 1, true);
+    const cm = new THREE.InstancedMesh(geo, mats.plastic, clips.length);
+    const q = new THREE.Quaternion();
+    const Y = V(0, 1, 0);
+    const mtx = new THREE.Matrix4();
+    clips.forEach((c, i) => {
+      q.setFromUnitVectors(Y, c.dir);
+      cm.setMatrixAt(i, mtx.compose(c.pos, q, V(c.r * 1.3, 1, c.r * 1.3)));
+    });
+    harness.add(cm);
   }
 
   // --- konnektörler: siyah-beyaz iki parçalı fiş (örnekli çizim: sayıdan bağımsız 2 çizim çağrısı) ---
@@ -586,7 +658,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     harness.add(black, white);
   }
 
-  return { group, glows, harness, lampsByCat };
+  return { group, glows, pools, harness, lampsByCat };
 }
 
 export function setHarnessHighlight(h: THREE.Group, mats: Mats, on: boolean) {

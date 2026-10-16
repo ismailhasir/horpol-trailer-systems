@@ -32,7 +32,7 @@ export interface TrailerDef {
 // Silobas uzunlukları ÖRNEK (doğrulanmadı), satış ekibiyle kesinleşecek.
 export const TRAILERS: TrailerDef[] = [
   { id: 'standart', lengths: ['13.6', '12', '9'] },
-  { id: 'frigo', lengths: ['13.6', '12'] },
+  { id: 'frigo', lengths: ['13.6', '12'], hidden: true },
   { id: 'lowbed', lengths: ['13.6', '12'] },
   { id: 'silo', lengths: ['12', '9'] },
   { id: 'tanker', lengths: ['13.6', '12', '9'] },
@@ -41,7 +41,7 @@ export const TRAILERS: TrailerDef[] = [
   { id: 'flatbed', lengths: ['13.6', '12', '9'], hidden: true },
   { id: 'stepdeck', lengths: ['13.6', '12'], hidden: true },
   { id: 'arac', lengths: ['13.6'], hidden: true },
-  { id: 'konteyner', lengths: ['13.6', '12'] },
+  { id: 'konteyner', lengths: ['13.6', '12'], hidden: true },
 ];
 /** Konfigüratör listesinde görünen tipler */
 export const TRAILER_LIST = TRAILERS.filter((t) => !t.hidden);
