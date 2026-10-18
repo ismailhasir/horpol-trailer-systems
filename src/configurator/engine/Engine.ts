@@ -3,10 +3,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { lengthMeters, type CategoryId, type Config } from '../data';
+import { lengthMeters, type CategoryId, type Config, type TrailerId } from '../data';
 import { createMaterials, fadeTexture, setLensPower, type Mats } from './materials';
-import { buildTrailer, disposeGroup, setGhost, type Anchors, type TrailerBuild } from './trailer';
-import { DAMPER_BODY_GLB, DAMPER_GLB } from './damper';
+import { buildTrailer, disposeGroup, modelUrls, setGhost, type Anchors, type TrailerBuild } from './trailer';
 import { loadedModel, loadModel } from './models';
 import { buildEquipment, disposeEquipment, setHarnessHighlight, type EquipmentBuild } from './equipment';
 
@@ -142,14 +141,30 @@ export class Engine {
     this.resize();
   }
 
+  /**
+   * Tipin Blender modelini (varsa) indirir. İlk görüntüden önce beklenir: kodla çizilen yedek modelin kısa süre görünüp
+   * yerini gerçeğine bırakması önlenir. Süre dolarsa ya da indirme başarısız olursa yedekle devam edilir.
+   */
+  preload(type: TrailerId, timeout = 8000): Promise<void> {
+    const urls = modelUrls(type);
+    if (!urls) return Promise.resolve();
+    const all = Promise.all(urls.map(loadModel)).then(
+      () => undefined,
+      (e) => console.error(e),
+    );
+    return Promise.race([all, new Promise<void>((r) => setTimeout(r, timeout))]);
+  }
+
   // ---------- yapılandırma ----------
   setConfig(c: Config, keepView = false) {
     if (this.disposed || !this.mats) return;
-    // damper: Blender şasisi ilk seçimde indirilir; gelene kadar kodla çizilen yedek görünür, gelince yerine geçer
-    if (c.trailer === 'damper' && !(loadedModel(DAMPER_GLB) && loadedModel(DAMPER_BODY_GLB))) {
-      Promise.all([loadModel(DAMPER_GLB), loadModel(DAMPER_BODY_GLB)])
+    // Blender modelli tipler (standart, damper): model ilk seçimde indirilir; gelene kadar kodla çizilen yedek görünür,
+    // gelince yerine geçer
+    const urls = modelUrls(c.trailer);
+    if (urls && !urls.every((u) => loadedModel(u))) {
+      Promise.all(urls.map(loadModel))
         .then(() => {
-          if (this.disposed || this.cfg?.trailer !== 'damper') return;
+          if (this.disposed || this.cfg?.trailer !== c.trailer) return;
           this.key = '';
           this.setConfig(this.cfg, true);
         })

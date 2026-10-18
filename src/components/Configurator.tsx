@@ -142,7 +142,9 @@ export default function Configurator({ lang, t, ui }: Props) {
             eng.focusCategory(c);
           },
         });
+        const model = eng.preload(cfgRef.current.trailer);
         await eng.init();
+        await model;
         if (!alive) {
           eng.dispose();
           return;

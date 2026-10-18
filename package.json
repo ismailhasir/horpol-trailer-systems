@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "models:pack": "node tools/blender/pack.mjs"
   },
   "dependencies": {
     "@astrojs/preact": "^6.0.6",
@@ -17,5 +18,8 @@
     "astro": "^7.3.8",
     "preact": "^10.29.8",
     "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "gltfpack": "^1.2.0"
   }
 }

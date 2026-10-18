@@ -5,3 +5,5 @@ dist/
 .claude/
 .vscode/
 Thumbs.db
+tools/blender/out/
+__pycache__/

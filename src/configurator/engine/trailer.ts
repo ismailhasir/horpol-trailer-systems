@@ -8,8 +8,16 @@ import type { TrailerId } from '../data';
 import type { Mats } from './materials';
 import { buildTanker, tankerLength, type TankerBuild } from './tanker';
 import { DAMPER, DAMPER_BODY_GLB, DAMPER_GLB, damperSections } from './damper';
+import { STANDART, STANDART_BODY_GLB, STANDART_GLB, standartContact, standartSections } from './standart';
 import { loadedModel } from './models';
-import { box, boxes, cyl, isCachedWheelGeo, mesh, pipe, range, ribbon, rod, slab, UP, V3, wheel, wheelCache } from './geo';
+import { box, boxes, cyl, isShared, markShared, mesh, pipe, range, ribbon, rod, slab, V3, wheel } from './geo';
+
+/** Blender'da modellenen tipler: [şasi + tekerlekler, kasa]. Yüklenene kadar kodla çizilen yedek görünür. */
+const MODELS: Partial<Record<TrailerId, [string, string]>> = {
+  damper: [DAMPER_GLB, DAMPER_BODY_GLB],
+  standart: [STANDART_GLB, STANDART_BODY_GLB],
+};
+export const modelUrls = (type: TrailerId) => MODELS[type] ?? null;
 
 export interface Pt {
   x: number;
@@ -21,7 +29,8 @@ export interface Anchors {
   L: number;
   W: number;
   topY: number;
-  rear: { x: number; lampY: number; lampZ: [number, number]; plateY: number };
+  /** dropX: arka lambalara ve plakaya inen kablo dallarının x'i (verilmezse x - 0.08) */
+  rear: { x: number; lampY: number; lampZ: [number, number]; plateY: number; dropX?: number };
   /** brackets: markerlar şasiye kendi braketleriyle bağlanır (gövdede yan duvar/ray yok) */
   side: { x0: number; x1: number; z: number; yAt: (x: number) => number; brackets?: boolean };
   front: Pt;
@@ -225,10 +234,13 @@ function plateTexture() {
   plateTex.anisotropy = 8;
   return plateTex;
 }
-function plate(g: THREE.Group, y: number) {
-  const p = mesh(new THREE.PlaneGeometry(0.52, 0.11), new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.35, metalness: 0.1 }), false);
+let plateMat: THREE.MeshStandardMaterial | null = null;
+const PLATE_GEO = markShared(new THREE.PlaneGeometry(0.52, 0.11));
+function plate(g: THREE.Group, y: number, x = -0.015) {
+  plateMat ??= new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.35, metalness: 0.1 });
+  const p = mesh(PLATE_GEO, plateMat, false);
   p.rotation.y = Math.PI / 2;
-  p.position.set(-0.015, y, 0);
+  p.position.set(x, y, 0);
   g.add(p);
 }
 
@@ -274,43 +286,6 @@ function rearDoors(g: THREE.Group, m: Mats, y0: number, H: number, mat: THREE.Ma
   box(g, 0.004, 0.05, W - 0.1, m.reflRed, 0.042, y0 + H - 0.06, 0);
   // kapı contası
   box(g, 0.02, H - 0.08, 0.012, m.rubber, 0.03, y0 + H / 2, 0);
-}
-
-// ---------- perde (tente) ----------
-/** Yan tente (beyaz): kayış araları hafif şişkin (yastık) paneller, dikey gergi kayışları + tokalar, altta TIR gümrük halatı. */
-function curtain(g: THREE.Group, m: Mats, L: number, y0: number, H: number) {
-  const pitch = 0.62;
-  const x0 = -L + 0.12;
-  const x1 = -0.12;
-  const len = x1 - x0;
-  const cx = (x0 + x1) / 2;
-  const seg = Math.round(len * 16);
-  const zc = W / 2 - 0.022;
-  for (const s of [1, -1]) {
-    const geo = new THREE.PlaneGeometry(len, H, seg, 8);
-    const pos = geo.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < pos.count; i++) {
-      const xw = cx + s * pos.getX(i);
-      const v = pos.getY(i) / H + 0.5;
-      const k = Math.sin((Math.PI * (xw - x0)) / pitch);
-      pos.setZ(i, 0.017 * k * k * Math.pow(Math.sin(Math.PI * v), 0.6) + 0.003 * Math.sin(xw * 23));
-    }
-    geo.computeVertexNormals();
-    const p = mesh(geo, m.curtain);
-    p.position.set(cx, y0 + H / 2, s * zc);
-    if (s < 0) p.rotation.y = Math.PI;
-    p.userData.noEdge = true;
-    g.add(p);
-    // gergi kayışları ve alt tokaları
-    const xs = range(x0 + pitch, x1 - 0.2, pitch);
-    boxes(g, 0.045, H - 0.04, 0.008, m.strap, xs.map((x) => [x, y0 + H / 2, s * (zc + 0.006)]));
-    boxes(g, 0.065, 0.11, 0.025, m.darkMetal, xs.map((x) => [x, y0 + 0.17, s * (zc + 0.012)]));
-    // TIR halatı: kayışlar arasında zikzak
-    const zz = s * (zc + 0.02);
-    const pts: THREE.Vector3[] = [];
-    for (let x = x0 + pitch / 2, i = 0; x <= x1 - 0.1; x += pitch / 2, i++) pts.push(V3(x, y0 + (i % 2 ? 0.52 : 0.3), zz));
-    for (let i = 1; i < pts.length; i++) rod(g, pts[i - 1], pts[i], 0.006, m.steel, 6);
-  }
 }
 
 /** Frigorifik soğutma ünitesi (ön duvara asılı): yuvarlatılmış gövde, ön menfez ızgarası, kondenser girişi, yan panjurlar, kontrol paneli. */
@@ -365,6 +340,12 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   const damperRig = type === 'damper' ? loadedModel(DAMPER_GLB) : null;
   const damperBody = damperRig ? loadedModel(DAMPER_BODY_GLB) : null;
   if (damperRig) L = DAMPER.L;
+  // standart (kapalı kasa): Blender modeli tek boyda (13,7 m; set uzunluğundan bağımsız). Yüklenene kadar ya da
+  // yüklenemezse aynı biçimde kodla çizilen kapalı kasa görünür.
+  const stdRig = type === 'standart' ? loadedModel(STANDART_GLB) : null;
+  const stdBody = stdRig ? loadedModel(STANDART_BODY_GLB) : null;
+  if (type === 'standart' && !stdBody) type = 'kapali';
+  if (stdBody) L = STANDART.L;
   const group = new THREE.Group();
   const body = new THREE.Group();
   const chassisG = new THREE.Group();
@@ -459,7 +440,6 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     onWall = false;
     tape = undefined;
   }
-  if (type === 'standart') railMat = m.paint;
   if (type === 'damper') {
     topY = 3.0;
     railMat = m.chassis;
@@ -481,23 +461,11 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   let tanker: TankerBuild | null = null;
 
   // --- gövde ---
-  if (type === 'standart') {
-    // Tenteli: ahşap taban, beyaz ön duvar ve köşe dikmeleri, beyaz üst yan profiller (altı gölgeli), gri yan tente
-    box(body, L, 0.1, W - 0.02, m.deck, -L / 2, deckY - 0.05, 0);
-    box(body, 0.08, H, W - 0.04, m.paint, -L + 0.04, deckY + H / 2, 0, 0.02);
-    for (const z of [-1, 1]) box(body, 0.1, H, 0.08, m.paint, -L + 0.05, deckY + H / 2, z * (W / 2 - 0.04), 0.015);
-    box(body, L - 0.02, 0.05, W - 0.1, m.curtain, -L / 2, topY - 0.03, 0);
-    for (const z of [-1, 1]) {
-      box(body, L, 0.17, 0.07, m.paint, -L / 2, topY - 0.085, z * (W / 2 - 0.035), 0.012);
-      box(body, L - 0.06, 0.03, 0.05, m.plastic, -L / 2, topY - 0.185, z * (W / 2 - 0.04));
-    }
-    const cy0 = deckY - 0.06;
-    curtain(body, m, L, cy0, topY - 0.15 - cy0);
-    rearDoors(body, m, deckY, H - 0.07, m.paint, m.paint);
-    box(body, 0.06, 0.14, W - 0.02, m.chassis, -0.025, deckY - 0.06, 0);
-    logos(body, m.logo, -L / 2 + 0.6, deckY + H * 0.55, W / 2 + 0.002, 2.1);
-    // alet kutusu (iniş ayağı ile akslar arasında)
-    box(body, 0.9, 0.42, 0.45, m.plastic, landingX + 1.4, deckY - 0.62, W / 2 - 0.35, 0.03);
+  if (type === 'standart' && stdBody) {
+    // Blender kasası (yan paneller, profiller, oluklu ön panel, arka çerçeve ve kapılar, logolar); tesisatta gizlenir
+    for (const mm of mergedFromModel(stdBody)) body.add(mm);
+    topY = STANDART.topY;
+    sections.push(...standartSections());
   } else if (type === 'kapali' || type === 'frigo') {
     const r = type === 'frigo' ? 0.07 : 0.025;
     box(body, L, H, W, m.paint, -L / 2, deckY + H / 2, 0, r);
@@ -660,7 +628,7 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
     ];
   } else if (type === 'damper' && damperBody) {
     // Blender kasası (siperlik, merdiven, arka kapak, logolar dahil)
-    body.add(damperBody.clone());
+    for (const mm of mergedFromModel(damperBody)) body.add(mm);
     topY = DAMPER.bodyTop;
     onWall = false;
     sections.push(...damperSections());
@@ -953,11 +921,18 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   }
 
   if (damperRig) socketY = DAMPER.socket.y;
+  const S = stdBody ? STANDART : null;
+  if (S) {
+    lampY = S.rear.lampY;
+    plateY = S.rear.plateY;
+    harnessY = S.harness.y;
+  }
   /** gerçek şasi: tesisat görünümünde gövde gizlenir, şasi kendi malzemesiyle görünür, zemin şeridi yok */
-  const real = !!tanker || !!damperRig;
-  if (damperRig) chassisG.add(damperRig.clone());
+  const real = !!tanker || !!damperRig || !!S;
+  if (damperRig) for (const mm of mergedFromModel(damperRig)) chassisG.add(mm);
+  else if (S && stdRig) for (const mm of mergedFromModel(stdRig)) chassisG.add(mm);
   else if (!tanker) chassis(chassisG, m, { L, deckY, R, axles, landingX, sideGuard, rail, lampY, plateY, beamFrom, frontDeckY, crossStep, crossW, railMat, tape, fender, hubMat, barMat, frameMat, kingY });
-  plate(group, plateY);
+  plate(group, plateY, S ? S.rear.x + 0.006 : -0.015);
 
   const prof: [number, number][] = profile ?? [
     [-L, harnessY],
@@ -1026,8 +1001,24 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   if (!real) sys.add(sysFloor);
   sys.visible = false;
   group.add(sys);
+  // pişirilmiş zemin temas gölgesi (birleştirmeye ve yarı saydamlığa girmez)
+  if (S) group.add(standartContact());
 
-  const anchors: Anchors = {
+  const anchors: Anchors = S ? {
+    L,
+    W,
+    topY,
+    rear: { x: S.rear.x, lampY: S.rear.lampY, lampZ: [S.rear.lampZ[0], S.rear.lampZ[1]], plateY: S.rear.plateY, dropX: S.rear.dropX },
+    side: { x0: S.side.x0, x1: S.side.x1, z: S.side.z, yAt: () => S.side.y },
+    front: S.front,
+    extra: S.extra,
+    armRear: S.armRear,
+    armFront: S.armFront,
+    socket: { x: S.socket.x, y: S.socket.y, onWall: true },
+    harness: { y: S.harness.y, railZ: 0.4, junctionX: -0.65, frontX: S.harness.frontX, profile: prof, trunkZ: S.harness.trunkZ, rearZ: S.harness.rearZ },
+    center: new THREE.Vector3(-L / 2, topY / 2, 0),
+    size: new THREE.Vector3(L, topY, W),
+  } : {
     L,
     W,
     topY,
@@ -1057,7 +1048,11 @@ export function buildTrailer(type: TrailerId, L: number, m: Mats): TrailerBuild 
   return { group, body, outline: sys, solids, realChassis: real, anchors };
 }
 
-/** Kökün altındaki düz ağları (malzeme + gölge ayarı aynı olanlar) tek geometride birleştirir; yeni ağları döndürür. */
+/**
+ * Kökün altındaki düz ağları (malzeme + gölge ayarı aynı olanlar) tek geometride birleştirir; yeni ağları döndürür.
+ * Kovadaki geometrilerin hepsi indeksliyse indeksli birleşir (köşe verisi şişmez). Önceden birleştirilmiş
+ * (userData.merged) ve örnekli ağlar olduğu gibi kalır; paylaşılan geometriler dispose edilmez.
+ */
 function mergeByMaterial(root: THREE.Object3D): THREE.Mesh[] {
   root.updateMatrixWorld(true);
   const inv = root.matrixWorld.clone().invert();
@@ -1067,12 +1062,12 @@ function mergeByMaterial(root: THREE.Object3D): THREE.Mesh[] {
   const mtx = new THREE.Matrix4();
   root.traverse((o) => {
     const mm = o as THREE.Mesh;
-    if (!mm.isMesh || (mm as THREE.InstancedMesh).isInstancedMesh || Array.isArray(mm.material)) return;
+    if (!mm.isMesh || o.userData.merged || (mm as THREE.InstancedMesh).isInstancedMesh || Array.isArray(mm.material)) return;
     const mat = mm.material as THREE.Material;
     const key = `${mat.uuid}|${+mm.castShadow}|${+mm.receiveShadow}`;
     let b = buckets.get(key);
     if (!b) buckets.set(key, (b = { mat, cast: mm.castShadow, receive: mm.receiveShadow, geos: [] }));
-    const g = mm.geometry.index ? mm.geometry.toNonIndexed() : mm.geometry.clone();
+    const g = mm.geometry.clone();
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
     if (!g.attributes.normal) g.computeVertexNormals();
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
@@ -1084,13 +1079,25 @@ function mergeByMaterial(root: THREE.Object3D): THREE.Mesh[] {
   const used = new Set<THREE.BufferGeometry>();
   for (const mm of done) {
     mm.removeFromParent();
-    if (!isCachedWheelGeo(mm.geometry)) used.add(mm.geometry);
+    if (!isShared(mm.geometry)) used.add(mm.geometry);
   }
   for (const g of used) g.dispose();
   for (const b of buckets.values()) {
-    const g = mergeGeometries(b.geos, false);
-    for (const x of b.geos) x.dispose();
-    if (!g) continue;
+    const indexed = b.geos.every((g) => g.index);
+    const list = indexed
+      ? b.geos
+      : b.geos.map((g) => {
+          if (!g.index) return g;
+          const n = g.toNonIndexed();
+          g.dispose();
+          return n;
+        });
+    const g = mergeGeometries(list, false);
+    for (const x of list) x.dispose();
+    if (!g) {
+      if (import.meta.env.DEV) console.warn('mergeByMaterial: birleştirilemedi', b.mat.name);
+      continue;
+    }
     const m = new THREE.Mesh(g, b.mat);
     m.castShadow = b.cast;
     m.receiveShadow = b.receive;
@@ -1098,6 +1105,63 @@ function mergeByMaterial(root: THREE.Object3D): THREE.Mesh[] {
     out.push(m);
   }
   return out;
+}
+
+interface MergedPart {
+  geo: THREE.BufferGeometry;
+  mat: THREE.Material;
+  cast: boolean;
+  receive: boolean;
+  /** varsa örnekli çizim: model köküne göre örnek matrisleri */
+  inst?: THREE.Matrix4[];
+}
+const mergedCache = new WeakMap<THREE.Object3D, MergedPart[]>();
+
+/**
+ * Yüklenmiş GLB modeli: ilk çağrıda malzemeye göre birleştirilir, aynı geometriyi paylaşan tekrarlı parçalar (tekerlekler)
+ * örnekli çizime çevrilir; sonuç önbellekte (paylaşılan) kalır. Sonraki kurulumlarda yalnız yeni Mesh nesneleri üretilir:
+ * yeniden birleştirme, GPU'ya yeniden yükleme ve önbellekteki geometrinin dispose edilmesi yok.
+ */
+function mergedFromModel(model: THREE.Object3D): THREE.Mesh[] {
+  let parts = mergedCache.get(model);
+  if (!parts) {
+    parts = [];
+    const root = model.clone();
+    root.updateMatrixWorld(true);
+    const inv = root.matrixWorld.clone().invert();
+    const byGeo = new Map<string, THREE.Mesh[]>();
+    root.traverse((o) => {
+      const mm = o as THREE.Mesh;
+      if (!mm.isMesh || Array.isArray(mm.material)) return;
+      const k = `${mm.geometry.uuid}|${(mm.material as THREE.Material).uuid}`;
+      const list = byGeo.get(k);
+      if (list) list.push(mm);
+      else byGeo.set(k, [mm]);
+    });
+    for (const list of byGeo.values()) {
+      if (list.length < 2) continue;
+      const m0 = list[0];
+      parts.push({ geo: m0.geometry, mat: m0.material as THREE.Material, cast: m0.castShadow, receive: m0.receiveShadow, inst: list.map((mm) => new THREE.Matrix4().multiplyMatrices(inv, mm.matrixWorld)) });
+      for (const mm of list) mm.removeFromParent();
+    }
+    for (const mm of mergeByMaterial(root)) {
+      parts.push({ geo: markShared(mm.geometry), mat: mm.material as THREE.Material, cast: mm.castShadow, receive: mm.receiveShadow });
+    }
+    mergedCache.set(model, parts);
+  }
+  return parts.map((p) => {
+    let m: THREE.Mesh;
+    if (p.inst) {
+      const im = new THREE.InstancedMesh(p.geo, p.mat, p.inst.length);
+      p.inst.forEach((mx, i) => im.setMatrixAt(i, mx));
+      im.computeBoundingSphere();
+      m = im;
+    } else m = new THREE.Mesh(p.geo, p.mat);
+    m.castShadow = p.cast;
+    m.receiveShadow = p.receive;
+    m.userData.merged = true;
+    return m;
+  });
 }
 
 /** Tesisat görünümü: gövde, şasi ve tekerlekler yarı saydam (tipin silueti görünür, tesisat okunur). */
@@ -1115,6 +1179,7 @@ export function setGhost(t: TrailerBuild, mats: Mats, on: boolean) {
 export function disposeGroup(g: THREE.Object3D) {
   g.traverse((o) => {
     const mm = o as THREE.Mesh;
-    if (mm.geometry && !isCachedWheelGeo(mm.geometry)) mm.geometry.dispose();
+    if (mm.geometry && !isShared(mm.geometry)) mm.geometry.dispose();
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
   });
 }

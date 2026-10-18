@@ -14,7 +14,7 @@ const ICONS: Record<TrailerId, preact.JSX.Element> = {
   standart: (
     <>
       <rect x="6" y="4" width="52" height="12" rx="1" />
-      <path d="M19 6v8M30 6v8M41 6v8" stroke-dasharray="1.6 1.6" />
+      <path d="M52 6v8" />
       {base}
       {std3}
     </>

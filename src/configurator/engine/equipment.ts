@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CATEGORIES, productById, type CategoryId, type Config, type LampStyle } from '../data';
 import type { LensColor, Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
+import { isShared, markShared } from './geo';
 
 export interface EquipmentBuild {
   group: THREE.Group;
@@ -41,7 +42,7 @@ function ext(key: string, shape: () => THREE.Shape, depth: number, bevel = 0.004
   const k = `${key}|${depth}|${bevel}`;
   let g = geoCache.get(k);
   if (!g) {
-    g = new THREE.ExtrudeGeometry(shape(), { depth, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 24 });
+    g = markShared(new THREE.ExtrudeGeometry(shape(), { depth, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 24 }));
     geoCache.set(k, g);
   }
   return g;
@@ -221,7 +222,7 @@ function socket(mats: Mats, kind: '7' | '15', ccolor: THREE.Material) {
 
 // ---------- zemine yansıyan ışık ----------
 const POOL_SIZE: Record<CategoryId, number> = { stop: 2.2, extra: 1.5, plate: 0.9, side: 1.1, front: 1.6, arm: 0.9 };
-const POOL_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+const POOL_GEO = markShared(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2));
 const poolMats = new Map<string, THREE.MeshBasicMaterial>();
 function poolMaterial(mats: Mats, c: LensColor) {
   let m = poolMats.get(c);
@@ -417,14 +418,16 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const stopStyle = productById('stop', stop.product).style;
   const pairs = stop.qty / 2;
   const ly = a.rear.lampY;
+  const rx = a.rear.x;
+  const drop = a.rear.dropX ?? rx - 0.08;
   for (let p = 0; p < pairs; p++) {
     for (const s of [1, -1]) {
       const z = a.rear.lampZ[p];
-      mount('stop', stopStyle, V(a.rear.x, ly, s * z), (o) => {
+      mount('stop', stopStyle, V(rx, ly, s * z), (o) => {
         o.rotation.y = Math.PI / 2;
         if (s < 0) o.scale.x = -1;
       });
-      rearDrops.push({ s, z, kind: 'rear', tail: [V(-0.08, hy, s * z), V(-0.08, ly, s * z), V(-0.01, ly, s * z)] });
+      rearDrops.push({ s, z, kind: 'rear', tail: [V(drop, hy, s * z), V(drop, ly, s * z), V(rx - 0.01, ly, s * z)] });
     }
   }
 
@@ -434,7 +437,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const pzs = pl.qty === 1 ? [0] : [-0.17, 0.17];
   const py = a.rear.plateY + 0.1;
   for (const z of pzs) {
-    mount('plate', plStyle, V(0.01, a.rear.plateY + 0.085, z), (o) => {
+    mount('plate', plStyle, V(rx + 0.01, a.rear.plateY + 0.085, z), (o) => {
       o.rotation.y = Math.PI / 2;
     });
   }
@@ -564,8 +567,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     if (!ds.length && !plates.length) continue;
     // plaka: kırmızı arka hattın ikinci 90° dönüşünden (tarağa vardığı nokta) içe doğru ayrılır
     const xb = xd - 0.1;
+    const pdrop = a.rear.dropX ?? rx - 0.12;
     for (const z of plates) {
-      wires.push({ kind: 'plate', r: 0.009, conn: toLamp, pts: [V(xb - BEND, hy, s * zr), V(xb, hy, s * zr), V(xb, hy, s * zp), V(-0.12, hy, s * zp), V(-0.12, hy, z), V(-0.12, py, z), V(0, py, z)] });
+      wires.push({ kind: 'plate', r: 0.009, conn: toLamp, pts: [V(xb - BEND, hy, s * zr), V(xb, hy, s * zr), V(xb, hy, s * zp), V(pdrop, hy, s * zp), V(pdrop, hy, z), V(pdrop, py, z), V(rx, py, z)] });
     }
     if (!ds.length) {
       wires.push({ kind: 'rear', r: 0.013, pts: [V(xm + PORTS[2], hy, s * zPort), V(xm + PORTS[2], hy, s * zr), V(xd, hy, s * zr)] });
@@ -670,10 +674,12 @@ export function setHarnessHighlight(h: THREE.Group, mats: Mats, on: boolean) {
 }
 
 export function disposeEquipment(g: THREE.Object3D) {
-  const cached = new Set(geoCache.values());
   g.traverse((o) => {
+    // three.js'te tüm Sprite'lar tek geometriyi paylaşır
+    if ((o as THREE.Sprite).isSprite) return;
     const mm = o as THREE.Mesh;
-    if (mm.geometry && !cached.has(mm.geometry)) mm.geometry.dispose();
+    if (mm.geometry && !isShared(mm.geometry)) mm.geometry.dispose();
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
   });
 }
 

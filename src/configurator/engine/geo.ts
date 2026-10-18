@@ -161,8 +161,17 @@ export function wheel(m: Mats, R: number, side: 1 | -1, hubMat: THREE.Material =
   return g;
 }
 
-
 export function isCachedWheelGeo(geo: THREE.BufferGeometry) {
   for (const k of wheelCache.values()) if (Object.values(k).includes(geo)) return true;
   return geo === undefined;
+}
+
+const shared = new WeakSet<THREE.BufferGeometry>();
+/** Birden çok yapıda kullanılan ya da önbellekte duran geometri: yeniden kurulumda dispose edilmez */
+export function markShared<T extends THREE.BufferGeometry>(g: T): T {
+  shared.add(g);
+  return g;
+}
+export function isShared(g: THREE.BufferGeometry | undefined) {
+  return !g || shared.has(g) || isCachedWheelGeo(g);
 }
