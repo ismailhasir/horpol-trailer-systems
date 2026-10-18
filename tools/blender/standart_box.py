@@ -7,6 +7,7 @@
 #   Windows: "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b -P tools/blender/standart_box.py
 #   ardından: npm run models:pack   (Meshopt sıkıştırma: tools/blender/out → src/assets/models)
 #   --fast: düşük çözünürlük/örnekleme (yalnız deneme için; yayına girmez)
+#   --anchors: yalnız bağlantı noktası JSON'unu yazar (model ve pişirme yok)
 # Çıktılar: tools/blender/out/standart-chassis.glb, standart-body.glb (ham), src/assets/models/standart-contact.webp,
 #           src/configurator/engine/standart-anchors.json
 #
@@ -30,6 +31,7 @@ import sys
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 FAST = '--fast' in argv
+ANCHORS_ONLY = '--anchors' in argv  # yalnız bağlantı noktası JSON'u (modelsiz, saniyeler)
 PREVIEW = os.path.abspath(argv[argv.index('--preview') + 1]) if '--preview' in argv else None
 OUT_DIR = os.path.abspath('src/assets/models')  # temas gölgesi (WebP)
 RAW_DIR = os.path.abspath('tools/blender/out')  # ham GLB; npm run models:pack sıkıştırıp OUT_DIR'e yazar
@@ -40,8 +42,8 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bl_common import (  # noqa: E402
     Parts, add_obj, bake_ao, beam, bl, box, box2, build_wheel, cylinder, decal_mesh, delete_interior, export_glb, hose, join,
-    link_occlusion, logo_material, material, poly_tube, prism_xy, prism_xz, prism_zy, quad, rear_quad, run_bake,
-    select_only, side_quad, smart_uv, bez,
+    link_occlusion, logo_material, material, poly_tube, prism_xy, prism_xz, prism_zy, quad, rear_quad, rect_x, run_bake,
+    select_only, side_quad, smart_uv, bez, write_anchors,
 )
 
 scene = bpy.context.scene
@@ -77,6 +79,39 @@ PLATE_Y = 0.865
 CARRIER_X = -0.08  # lamba taşıyıcının arka yüzü (lambalar buraya oturur)
 SOCKET_Y = 1.62
 HARNESS_Y = 1.18  # tesisat düzlemi: traverslerin gövdesinden geçer, taban altına kelepçeli
+Y_RAIL_B = 1.205  # kasa alt köşe profili altı
+Y_PANEL0 = 1.29  # yan panel görünen alt kenarı
+Y_PANEL1 = 3.93  # yan panel görünen üst kenarı
+Y_TOP = HT
+CS = (XF - 0.5, XR + 0.5, -W2 - 0.45, W2 + 0.45)  # zemin temas gölgesi alanı (x0, x1, z0, z1)
+
+
+def anchors_dict():
+    """Sitenin okuyacağı bağlantı noktaları (three.js koordinatları; şema: src/configurator/engine/baked.ts)"""
+    sections = [rect_x(x, Y_RAIL_B, HT, W2) for x in [XF + (XR - XF) * i / 6 for i in range(7)]]
+    sections += [[[XF, y, z], [XR, y, z]] for y in (Y_RAIL_B, HT) for z in (W2, -W2)]
+    return {
+        '_source': 'tools/blender/standart_box.py tarafından üretilir; elle düzenleme',
+        'L': L,
+        'W': W,
+        'topY': HT,
+        # dropX: lamba dalları arka traversin önünden, lamba taşıyıcının içinden iner
+        'rear': {'x': CARRIER_X, 'lampY': LAMP_Y, 'lampZ': [0.925, 0.5], 'plateY': PLATE_Y, 'dropX': BEAM_X1 - 0.025},
+        'side': {'x0': XF + 1.0, 'x1': -0.6, 'z': RAIL_Z + 0.001, 'profile': [[XF, CH_TOP - 0.05], [XR, CH_TOP - 0.05]]},
+        'front': {'x': XF - 0.002, 'y': Y_PANEL1 - 0.07, 'z': W2 - 0.06},
+        'armFront': {'x': XF + 0.3, 'y': Y_PANEL1 - 0.2, 'z': W2},
+        'armRear': {'x': -0.3, 'y': Y_PANEL1 - 0.2, 'z': W2},
+        'extra': {'x': XR + 0.0, 'y': HT - 0.092, 'z0': 1.1, 'z1': 0.5},
+        'socket': {'x': XF - 0.012, 'y': SOCKET_Y},
+        'harness': {'y': HARNESS_Y, 'frontX': XF + 0.2, 'trunkZ': 0.86, 'rearZ': 0.7, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]]},
+        'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
+        'sections': sections,
+    }
+
+
+if ANCHORS_ONLY:
+    write_anchors(ANCHORS, anchors_dict())
+    raise SystemExit(0)
 
 # ================= malzemeler =================
 M = {
@@ -385,10 +420,6 @@ wheels.append(spare)
 # KASA
 # =====================================================================
 B = Parts()
-Y_RAIL_B = 1.205  # alt köşe profili altı
-Y_PANEL0 = 1.29
-Y_PANEL1 = 3.93
-Y_TOP = HT
 
 # taban (fenolik kontrplak) ve arka giriş sacı
 box2(B, 'floor', XF + 0.04, BEAM_X1, CH_TOP, FLOOR_TOP, -RAIL_Z + 0.02, RAIL_Z - 0.02, MB['floor'], 0.0)
@@ -535,7 +566,6 @@ print(f'TRIS chassis={tri(chassis)} wheel={tri(wheel)} body={tri(body)}')
 # --- zemin temas gölgesi: dorsenin altındaki düzleme AO pişir, ters çevir (beyaz = koyu), WebP ---
 import bmesh  # noqa: E402
 import numpy as np  # noqa: E402
-CS = (XF - 0.5, XR + 0.5, -W2 - 0.45, W2 + 0.45)
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 vs = [bm.verts.new(bl((CS[0], 0.0, CS[3]))), bm.verts.new(bl((CS[1], 0.0, CS[3]))), bm.verts.new(bl((CS[1], 0.0, CS[2]))), bm.verts.new(bl((CS[0], 0.0, CS[2])))]
@@ -597,32 +627,7 @@ out.file_format = 'WEBP'
 out.save(filepath=cpath, quality=90)
 print('CONTACT', cpath, f'{os.path.getsize(cpath) / 1024:.0f} KB')
 
-# =====================================================================
-# Sitenin okuyacağı bağlantı noktaları (three.js koordinatları)
-# =====================================================================
-anchors = {
-    '_source': 'tools/blender/standart_box.py tarafından üretilir; elle düzenleme',
-    'L': L,
-    'W': W,
-    'topY': HT,
-    'deckY': FLOOR_TOP,
-    'box': {'x0': XF, 'x1': XR, 'y0': Y_RAIL_B, 'y1': HT, 'halfW': W2},
-    # dropX: lamba dalları arka traversin önünden, lamba taşıyıcının içinden iner
-    'rear': {'x': CARRIER_X, 'lampY': LAMP_Y, 'lampZ': [0.925, 0.5], 'plateY': PLATE_Y, 'dropX': BEAM_X1 - 0.025},
-    'side': {'x0': XF + 1.0, 'x1': -0.6, 'z': RAIL_Z + 0.001, 'y': CH_TOP - 0.05},
-    'front': {'x': XF - 0.002, 'y': Y_PANEL1 - 0.07, 'z': W2 - 0.06},
-    'armFront': {'x': XF + 0.3, 'y': Y_PANEL1 - 0.2, 'z': W2},
-    'armRear': {'x': -0.3, 'y': Y_PANEL1 - 0.2, 'z': W2},
-    'extra': {'x': XR + 0.0, 'y': HT - 0.092, 'z0': 1.1, 'z1': 0.5},
-    'socket': {'x': XF - 0.012, 'y': SOCKET_Y},
-    'harness': {'y': HARNESS_Y, 'frontX': XF + 0.2, 'trunkZ': 0.86, 'rearZ': 0.7},
-    'chassisTop': CH_TOP,
-    'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
-}
-with open(ANCHORS, 'w', encoding='utf-8') as fh:
-    json.dump(anchors, fh, indent=2, ensure_ascii=False)
-    fh.write('\n')
-print('ANCHORS', ANCHORS)
+write_anchors(ANCHORS, anchors_dict())
 
 # ================= önizleme render'ları (yalnızca kontrol) =================
 if PREVIEW:

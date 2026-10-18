@@ -49,6 +49,35 @@
   max-width: 420px;
   margin: auto;
 }
+/* tip değişiminde model indirilirken: mevcut dorse görünür kalır, üstte küçük gösterge */
+.cfg-modelstate {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: calc(var(--cfg-gap) + 8px);
+  inset-inline: 0;
+  width: fit-content;
+  max-width: min(420px, 90%);
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow-sm);
+  color: var(--muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+.cfg-modelstate .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+.cfg-modelstate.fail {
+  color: var(--danger);
+  border-radius: 12px;
+}
 .spinner {
   width: 34px;
   height: 34px;

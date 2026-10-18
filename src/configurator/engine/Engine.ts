@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { lengthMeters, type CategoryId, type Config, type TrailerId } from '../data';
+import type { CategoryId, Config, TrailerId } from '../data';
 import { createMaterials, fadeTexture, setLensPower, type Mats } from './materials';
 import { buildTrailer, disposeGroup, modelUrls, setGhost, type Anchors, type TrailerBuild } from './trailer';
 import { loadedModel, loadModel } from './models';
@@ -18,6 +18,8 @@ export interface EngineOptions {
   theme: Theme;
   reducedMotion: boolean;
   onPick?: (cat: CategoryId) => void;
+  /** seçilen tipin 3D modeli indiriliyor / hazır / indirilemedi (arayüz küçük bir gösterge açar) */
+  onModelState?: (s: 'loading' | 'ready' | 'error') => void;
 }
 
 const THEMES = {
@@ -110,8 +112,7 @@ export class Engine {
           () => res(null),
         ),
       );
-    const [blue, white] = await Promise.all([load('/brand/logo-blue.png'), load('/brand/logo-white.png')]);
-    this.mats = createMaterials(blue, white);
+    this.mats = createMaterials(await load('/brand/logo-white.png'));
 
     const fade = fadeTexture();
     this.floor = new THREE.Mesh(
@@ -142,12 +143,11 @@ export class Engine {
   }
 
   /**
-   * Tipin Blender modelini (varsa) indirir. İlk görüntüden önce beklenir: kodla çizilen yedek modelin kısa süre görünüp
-   * yerini gerçeğine bırakması önlenir. Süre dolarsa ya da indirme başarısız olursa yedekle devam edilir.
+   * Tipin Blender modelini önceden indirir (ilk görüntüden önce ve listede üzerine gelindiğinde). Süre dolarsa beklemeden
+   * dönülür; model gelene kadar setConfig yükleniyor göstergesiyle bekler.
    */
   preload(type: TrailerId, timeout = 8000): Promise<void> {
     const urls = modelUrls(type);
-    if (!urls) return Promise.resolve();
     const all = Promise.all(urls.map(loadModel)).then(
       () => undefined,
       (e) => console.error(e),
@@ -156,19 +156,33 @@ export class Engine {
   }
 
   // ---------- yapılandırma ----------
+  /** modeli indirilmeyi bekleyen son istek (gelince uygulanır; arada gelen yeni istek bunun yerine geçer) */
+  private pending: Config | null = null;
+
   setConfig(c: Config, keepView = false) {
     if (this.disposed || !this.mats) return;
-    // Blender modelli tipler (standart, damper): model ilk seçimde indirilir; gelene kadar kodla çizilen yedek görünür,
-    // gelince yerine geçer
+    // model indirilene kadar ekrandaki dorse olduğu gibi kalır (ara görüntü yok), gelince tek seferde yerine geçer
     const urls = modelUrls(c.trailer);
-    if (urls && !urls.every((u) => loadedModel(u))) {
-      Promise.all(urls.map(loadModel))
-        .then(() => {
-          if (this.disposed || this.cfg?.trailer !== c.trailer) return;
-          this.key = '';
-          this.setConfig(this.cfg, true);
-        })
-        .catch((e) => console.error(e));
+    if (!urls.every((u) => loadedModel(u))) {
+      this.pending = c;
+      this.opts.onModelState?.('loading');
+      Promise.all(urls.map(loadModel)).then(
+        () => {
+          if (this.disposed || this.pending !== c) return;
+          this.setConfig(c, keepView);
+        },
+        (e) => {
+          console.error(e);
+          if (this.pending !== c) return;
+          this.pending = null;
+          this.opts.onModelState?.('error');
+        },
+      );
+      return;
+    }
+    if (this.pending) {
+      this.pending = null;
+      this.opts.onModelState?.('ready');
     }
     const k = `${c.trailer}|${c.length}`;
     const firstBuild = !this.trailer;
@@ -177,7 +191,7 @@ export class Engine {
         this.scene.remove(this.trailer.group);
         disposeGroup(this.trailer.group);
       }
-      this.trailer = buildTrailer(c.trailer, lengthMeters(c.length), this.mats);
+      this.trailer = buildTrailer(c.trailer, this.mats);
       this.scene.add(this.trailer.group);
       this.key = k;
       this.fitShadow(this.trailer.anchors);
@@ -318,7 +332,7 @@ export class Engine {
   }
   private applySystem() {
     if (!this.trailer) return;
-    setGhost(this.trailer, this.mats, this.system);
+    setGhost(this.trailer, this.system);
     this.trailer.outline.visible = this.system;
     if (this.equip) setHarnessHighlight(this.equip.harness, this.mats, this.system);
     this.shadowDirty = 3;

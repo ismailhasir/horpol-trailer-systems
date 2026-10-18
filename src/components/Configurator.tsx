@@ -108,6 +108,8 @@ export default function Configurator({ lang, t, ui }: Props) {
     return structuredClone(DEFAULT_CONFIG);
   });
   const [status, setStatus] = useState<'loading' | 'ready' | 'fail'>('loading');
+  // tip değişiminde seçilen dorsenin 3D modeli indiriliyor mu (mevcut dorse görünür kalır)
+  const [modelState, setModelState] = useState<'loading' | 'ready' | 'error'>('ready');
   const [view, setView] = useState<View>('overview');
   const [system, setSystem] = useState(false);
   const [lights, setLights] = useState(false);
@@ -141,6 +143,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             setTab('lamps');
             eng.focusCategory(c);
           },
+          onModelState: setModelState,
         });
         const model = eng.preload(cfgRef.current.trailer);
         await eng.init();
@@ -167,6 +170,11 @@ export default function Configurator({ lang, t, ui }: Props) {
       engineRef.current = null;
     };
   }, []);
+
+  // dorse listesinde vurgulanan tipin modeli önden indirilir (seçildiğinde çoğu zaman hazırdır)
+  useEffect(() => {
+    if (ddOpen && status === 'ready') engineRef.current?.preload(TRAILER_LIST[ddIdx].id);
+  }, [ddOpen, ddIdx, status]);
 
   // paneller sahnenin üstünde: kameraya boş alanı bildir
   const rootRef = useRef<HTMLDivElement>(null);
@@ -347,6 +355,17 @@ export default function Configurator({ lang, t, ui }: Props) {
             {t.webgl_fail}
           </div>
         )}
+        {status === 'ready' && modelState === 'loading' && (
+          <div class="cfg-modelstate" role="status">
+            <span class="spinner" aria-hidden="true" />
+            {t.model_loading}
+          </div>
+        )}
+        {status === 'ready' && modelState === 'error' && (
+          <div class="cfg-modelstate fail" role="alert">
+            {t.model_fail}
+          </div>
+        )}
         {system && (
           <ul class="cfg-legend" aria-label={t.system}>
             <li><i style="background:#3b82f6" />{t.legend_main}</li>
@@ -448,6 +467,7 @@ export default function Configurator({ lang, t, ui }: Props) {
                     aria-selected={tr.id === cfg.trailer}
                     class={i === ddIdx ? 'active' : ''}
                     onMouseEnter={() => setDdIdx(i)}
+                    onPointerDown={() => engineRef.current?.preload(tr.id)}
                     onClick={() => chooseTrailer(tr.id)}
                   >
                     <TrailerIcon id={tr.id} />

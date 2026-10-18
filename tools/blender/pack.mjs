@@ -1,16 +1,22 @@
 // Blender'ın ham GLB çıktılarını (tools/blender/out/) Meshopt ile sıkıştırıp sitenin kullandığı yere yazar (src/assets/models/).
 // Kuantalama kapalı (-vpf -vnf -vtf): öznitelikler Float32 kalır; sitedeki birleştirme (mergeByMaterial) matris uygulayıp
 // geometrileri birleştirdiği için kuantalanmış (Int16) veri kırpılır/düşer. Meshopt sıkıştırması yine işler.
-// Çalıştırma: npm run models:pack   (önce: blender -b -P tools/blender/standart_box.py)
+// Çalıştırma: npm run models:pack [-- lowbed]   (önce: blender -b -P tools/blender/<tip>.py)
 import { spawnSync } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const cli = require.resolve('gltfpack/cli.js');
-const MODELS = ['standart-chassis', 'standart-body'];
+// tools/blender/out altındaki tüm GLB'ler (ya da komut satırında verilenler: npm run models:pack -- lowbed)
+const only = process.argv.slice(2);
+const MODELS = readdirSync('tools/blender/out')
+  .filter((f) => f.endsWith('.glb'))
+  .map((f) => f.slice(0, -4))
+  .filter((n) => !only.length || only.some((o) => n.startsWith(o)))
+  .sort();
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 
 let total = 0;

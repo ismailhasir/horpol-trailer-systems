@@ -31,6 +31,7 @@ Giriş: `Devam Noktası.md` → `Dökümantasyon Wiki.md`. Kararlar: `02 - Karar
 ## Teknik kurallar (statik site, kodlandı 2026-10-15)
 - Komutlar: `npm install`, `npm run dev` (http://localhost:4321/tr/), `npm run build`. Astro 7, **Preact 10** (11 uyumsuz).
 - Sayfalar ürün verisini yalnızca `src/data/products.ts` + `src/lib/catalog.ts` üzerinden okur.
+- Dorse 3D modelleri yalnız Blender betiklerinden: `tools/blender/<tip>.py` (ölçülerin tek kaynağı; AO + yüzey dokusu pişirir, `*-anchors.json` yazar) → `npm run models:pack -- <tip>` → `src/configurator/engine/baked.ts` kaydı. Kodla çizilen model yok. Her tipin referansı ve kararları `docs/<Tip> Dorse/README.md`.
 - Yeni arayüz metni: `src/i18n/ui.ts` içinde **4 dile birden** (tr, en, ru, ar). RU/AR çevirmen onayı bekliyor.
 - Renkler yalnızca `src/styles/global.css` başındaki token'lardan. Arapça için `left/right` yok, mantıksal özellikler.
 - İletişim bilgileri gerçek (kullanıcı verdi), sosyal medya adresleri yer tutucu; hepsi yalnızca `src/config/site.ts`. Bilinmeyen iş bilgisini (rakam, süre, iddia) uydurma.
