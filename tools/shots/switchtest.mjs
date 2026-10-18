@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const p = await b.newPage({ viewport: { width: 1400, height: 860 } });
+p.on('pageerror', (e) => console.log('[err]', e.message));
+await p.route((u) => u.pathname.includes('lowbed-') && u.pathname.endsWith('.glb') && !u.search, async (r) => { await new Promise((x) => setTimeout(x, 4000)); r.continue(); });
+await p.goto('http://127.0.0.1:4321/tr/konfigurator/', { waitUntil: 'networkidle', timeout: 120000 });
+await p.waitForFunction(() => window.__engine?.anchors, null, { timeout: 120000 });
+await p.waitForTimeout(2000);
+const before = await p.evaluate(() => window.__engine.key);
+// arayüzden lowbed seç
+await p.click('.dd-btn');
+await p.click('.dd-menu li:has-text("Lowbed")');
+await p.waitForTimeout(800);
+const mid = await p.evaluate(() => ({ key: window.__engine.key, ind: document.querySelector('.cfg-modelstate')?.textContent ?? null }));
+await p.screenshot({ path: 'switch_mid.jpg' });
+await p.waitForFunction(() => window.__engine.key.startsWith('lowbed'), null, { timeout: 60000 });
+await p.waitForTimeout(500);
+const after = await p.evaluate(() => ({ key: window.__engine.key, ind: document.querySelector('.cfg-modelstate')?.textContent ?? null }));
+console.log(JSON.stringify({ before, mid, after }));
+await b.close();

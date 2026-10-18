@@ -10,6 +10,8 @@ Kullanıcı "dün bıraktığımız yerden devam edelim" ya da "devam" derse:
 
 Gün sonunda ("günü kapat") ya da büyük iş bitince: `Günlük/<tarih>.md` yaz, `Devam Noktası.md`'yi güncelle, yeni kararları `02 - Kararlar.md`'ye ADR olarak işle.
 
+**Vault'a erişemiyorsan (ör. Linux makinesi):** önce `docs/DEVAM.md`'yi oku (devam noktası, kalıcı kullanıcı istekleri, kurulum). Gün sonunda onu güncelle.
+
 ## Dökümantasyon (Obsidian vault)
 `C:\Users\DidebanGrafik\OneDrive\Desktop\Dideban Otomotiv\Horpol Trailer Systems\`
 (Windows güncellemesinden sonra Masaüstü OneDrive'a taşındı: notlar ve eski proje paketleri `C:\Users\DidebanGrafik\OneDrive\Desktop\` altında. `C:\Users\DidebanGrafik\Desktop\` altında yalnızca boş kopyalar var.)
