@@ -4,6 +4,7 @@ import { addToCart, openProduct, showToast } from '../lib/cart';
 import { fmt, type Ui } from '../i18n/ui';
 import type { CardItem } from '../lib/format';
 import type { Lang } from '../lib/labels';
+import SetVisual from './SetVisual';
 
 interface Props {
   items: CardItem[];
@@ -29,7 +30,7 @@ export default function Catalog({ items, ui, lang }: Props) {
   const rows = useMemo(() => {
     const needle = q.trim().toLocaleLowerCase(lang);
     return items.filter(
-      (i) => (filter === 'all' || i.cat === filter) && (!needle || `${i.code} ${i.name}`.toLocaleLowerCase(lang).includes(needle)),
+      (i) => (filter === 'all' || i.cat === filter) && (!needle || `${i.code} ${i.name} ${i.keys}`.toLocaleLowerCase(lang).includes(needle)),
     );
   }, [items, filter, q, lang]);
 
@@ -69,8 +70,12 @@ export default function Catalog({ items, ui, lang }: Props) {
         {rows.map((it) => (
           <article class="card" key={it.id}>
             <button type="button" class="card-ph" onClick={() => openProduct(it.id)} aria-label={`${it.name}: ${ui.detail_open}`}>
-              <img src={it.img.src} srcset={it.img.srcset} sizes="(max-width: 560px) 90vw, 280px" width={400} height={400} alt="" loading="lazy" decoding="async" />
-              <span class="code">{it.code}</span>
+              {it.lamps ? (
+                <SetVisual lamps={it.lamps} sizes="(max-width: 560px) 40vw, 120px" />
+              ) : (
+                it.img && <img src={it.img.src} srcset={it.img.srcset} sizes="(max-width: 560px) 90vw, 280px" width={400} height={400} alt="" loading="lazy" decoding="async" />
+              )}
+              {it.code !== it.name && <span class="code">{it.code}</span>}
             </button>
             <div class="card-body">
               <span class="kind">{kindLabel[it.cat]}</span>
@@ -79,7 +84,19 @@ export default function Catalog({ items, ui, lang }: Props) {
                   {it.name}
                 </button>
               </h3>
-              <p>{it.desc}</p>
+              {it.lamps ? (
+                <ul class="set-list" aria-label={ui.set_lamps}>
+                  {it.lamps.map((l) => (
+                    <li key={l.id}>
+                      <span class="q ltr">{l.qty}×</span>
+                      <span class="c mono ltr">{l.code}</span>
+                      <span class="nm">{l.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{it.desc}</p>
+              )}
               <div class="buy">
                 <div class="qty">
                   <button type="button" aria-label={ui.qty_dec} onClick={() => step(it.id, -1)}>

@@ -110,6 +110,57 @@ def outline():
     return right + [(-z, y) for z, y in reversed(right)][1:-1]
 
 
+# ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
+# Kasa devrilir: lamba, kol ve braketler YALNIZ şasiye bağlanır (kirişler, ön travers, arka lamba levhası, lamba kolları, merdiven).
+LP_Z = 1.20  # box2 'lamp_plate' z 0,30–1,20, y 0,96–1,12, x −0,06…0
+REAR_LAMP_Y = 1.00  # M8 saplamalar levhada; gövde levhanın 34 mm altına taşar → sis kanalı üst kenarı 0,99 (≤ 1,0)
+PLATE_W, PLATE_H = 0.52, 0.11
+PLATE_C = 0.865  # plaka tutucu (y 0,80–0,96) içinde; eski PLATE_Y 0,92'de plaka tutucunun üstünden taşıyordu
+SIDE_Y, SIDE_ZW = 1.25, 1.27  # marker braketi: çamurluk tepesinin (1,13) üstü, kasa altının (1,43) altı
+SIDE_X0, SIDE_X1, SIDE_N = -6.19, -0.95, 5  # ilk marker önden 2,65 m, son arkadan 0,95 m
+SIDE_AVOID = [[-6.10, -5.26], [-5.35, -4.95]]  # alet kutusu (+z), iniş ayağı
+FB_X, FB_Y = CH_X0 + 0.05, 1.33  # ön braket: ön traversin (z ±0,64) ucundan dışa
+FB_Z0, FB_Z1 = BZ + 0.06, 1.19
+WORK = (-0.10, 1.20, 0.83)  # lamba kolunun (x −0,40…−0,06, y 1,10–1,14, z 0,80–0,86) arka ucunun üstü
+BEACON = (-8.60, 3.10, 0.78)  # merdiven direğinin (üstü 3,08) tepesi
+TRUNK_Z = BZ - 0.03
+REAR_Y = 1.25  # arkada demet menteşe kulaklarının (alt 1,33) altına iner
+MODULE_X = -1.3
+REAR_JX = -0.25
+
+
+def mounts_dict():
+    fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
+    return {
+        'rear': {'x': XR, 'y': REAR_LAMP_Y, 'zOuter': LP_Z, 'zInner': 0.30, 'faceX': XR},
+        'plate': {'x': -0.01, 'y': 0.945, 'z': [-0.17, 0.17], 'plateY': PLATE_C, 'plateW': PLATE_W, 'plateH': PLATE_H},
+        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': [[CH_X0, SIDE_Y], [XR, SIDE_Y]], 'z': SIDE_ZW, 'maxPerSide': SIDE_N,
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': SIDE_AVOID,
+                 # her marker: kirişin dış başlığından (y 1,30, z 0,64) marker sırtına L braket (kasa devrilir, kasaya bağlanmaz)
+                 'brackets': {'x0': CH_X0, 'x1': XR, 'from': [1.30, BZ + 0.06], 'to': [SIDE_Y, SIDE_ZW - 0.01]}},
+        'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.17, 'bracket': fb},
+        'armFront': {'x': FB_X + 0.03, 'y': FB_Y, 'z': FB_Z1, 'wallZ': FB_Z1, 'bracket': fb},
+        'armRear': {'x': -0.03, 'y': 1.04, 'z': LP_Z, 'wallZ': LP_Z, 'bracket': None},
+        'work': [{'x': WORK[0], 'y': WORK[1], 'z': s * WORK[2], 'dir': [1, -0.35, 0],
+                  'bracket': [[WORK[0] - 0.04, 1.14, s * WORK[2]], [WORK[0], WORK[1] - 0.02, s * WORK[2]]]} for s in (1, -1)],
+        'beacon': [{'x': BEACON[0], 'y': BEACON[1], 'z': BEACON[2], 'bracket': [[BEACON[0], 3.08, BEACON[2]], [BEACON[0], BEACON[1], BEACON[2]]]}],
+        'harness': {'trunkY': HY, 'trunkZ': TRUNK_Z, 'profile': [[CH_X0, HY], [-0.6, HY], [-0.45, REAR_Y], [XR, REAR_Y]],
+                    'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
+                    'notes': 'Demet I kirişin gövdesinin iç yanında (y 1,32), önde traverslerin altından, arkada üstünden geçer; '
+                             'arka uçta menteşe kulaklarının altına (1,25) iner, dallar lamba levhasına arka traversin arkasından ulaşır.'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
+                    'armRear': 'chassis', 'work': 'chassis', 'beacon': 'chassis', 'harness': 'chassis'},
+        'notes': 'Kasa, kapak ve kasaya bağlı her şey devrilir; eski ön lamba ve kollar kasanın üst köşesindeydi (y 2,9), hepsi şasiye '
+                 'taşındı. Ön pozisyon ve ön lastik kol ön traversten dışa uzanan brakette (y 1,33, uç z 1,19; dış kenara 0,05 m). '
+                 'Arka kol lamba levhasının dış ucunda (Horpol şeması; arkada şasinin en yüksek sabit noktası). Yan markerlar '
+                 'kirişten uzanan braketlerde y 1,25 (çamurluk/tekerlek nedeniyle 0,9 m altı sürekli değil; R48 6.18 üst sınır 1,5 m). '
+                 'Arka lambalar y 1,00: LZD 3194 sis kanalının üst kenarı 0,99 m; sisi lambanın üst yarısında olan bir ürün seçilirse '
+                 'ayrı sis lambası gerekir. Çalışma lambaları lamba kollarının üstünde, devrilen kasanın altında kalır (kasa arka '
+                 'ucu devrilirken 1,37 m\'nin altına inmez). Tek tepe lambası merdiven direğinin üstünde: kasa üstünü 9 cm aşar, '
+                 'şasiye bağlı başka yüksek yer olmadığından ikinci tepe lambası yok.',
+    }
+
+
 def anchors_dict():
     """Sitenin okuyacağı bağlantı noktaları (three.js koordinatları; şema: src/configurator/engine/baked.ts)"""
     ol = outline()
@@ -136,6 +187,7 @@ def anchors_dict():
         'harness': {'y': HY, 'frontX': CH_X0 + 0.25, 'trunkZ': 0.70, 'rearZ': 0.4, 'profile': [[CH_X0, HY], [XR, HY]]},
         'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
         'sections': sections,
+        'mounts': mounts_dict(),
     }
 
 

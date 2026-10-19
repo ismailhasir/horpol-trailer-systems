@@ -1,6 +1,11 @@
-// Ürün verisi (geçici). Sayfalar ürünleri yalnızca bu dosya üzerinden okur; ileride veri kaynağı değişirse tek nokta burası.
-// Kodlar eski siteden alındı. Açıklamalar eski siteden, EN/RU/AR çevirileri yerli çevirmen onayı bekliyor.
-// `specs` değerleri ÖRNEKTİR, gerçek teknik veriler gelince değiştirilecek.
+// Ürün verisi. Sayfalar ürünleri yalnızca bu dosya üzerinden okur; ileride veri kaynağı değişirse tek nokta burası.
+// SETLER (HOR-101/102/111/1001) gerçektir. Kaynak: vault `Kablolama ve Işıklandırma/Ürün Data/Set-Ürün Kaynaklar.md`
+// (içerik kodları), set listeleri ve şemaları `HOR-<kod>-Liste.jpeg` / `-Diagram.jpeg` (lamba adetleri),
+// `Kablolama Şeması - Yeni.md` (kablo tesisatı). Lamba renkleri/işlevleri ürün PDF'lerinden (.claude/ref/lamps).
+// Set dosyası LD 2773'ü yan marker, LD 2774'ü ön lamba diye yazıyor; ürün verisine göre tersidir
+// (LD 2774 turuncu yan marker, LD 2773 beyaz ön pozisyon). Burada ürün verisi esas alındı.
+// Ara kablo ve soket kodları eski siteden; `specs` değerleri ÖRNEKTİR.
+// EN çevirileri bizden; RU/AR metinleri yerli çevirmen onayı bekliyor.
 import type { Lang } from '../lib/labels';
 
 export type Category = 'set' | 'cable' | 'socket';
@@ -13,6 +18,31 @@ export interface Spec {
   unit?: string;
 }
 type T = Record<Lang, string>;
+
+/** Setlerde kullanılan Horpol lambaları. id = simge dosyası adı (src/assets/lamps/<id>-off.webp) ve konfigüratör kimliği. */
+export type LampId = 'lzd3194' | 'lzd2423' | 'ld2774' | 'ld2773' | 'ld0128' | 'ld0127' | 'ltd2834' | 'ltd229' | 'ldcc2698' | 'lrd2679' | 'ldo2660';
+export interface Lamp {
+  code: string;
+  /** sağ eşin kodu (sol/sağ çift lambalar) */
+  codeR?: string;
+  name: T;
+}
+/** Set içindeki bir lamba satırı. qty: setteki toplam adet. */
+export interface SetLamp {
+  lamp: LampId;
+  qty: number;
+}
+/** Kablo tesisatı parçası (şemadan). core: damar düzeni (ör. 7×1, ondalık noktayla; dile göre biçimlenir); len: metre. */
+export interface HarnessPart {
+  name: T;
+  core?: string;
+  len?: number;
+  qty: number;
+}
+export interface SetContent {
+  lamps: SetLamp[];
+  harness: HarnessPart[];
+}
 export interface Product {
   id: string;
   code: string;
@@ -20,16 +50,63 @@ export interface Product {
   name: T;
   desc: T;
   specs: Spec[];
+  /** yalnızca setlerde: içerik */
+  set?: SetContent;
 }
 
 const t = (tr: string, en: string, ru: string, ar: string): T => ({ tr, en, ru, ar });
 
-const setSpecs: Spec[] = [
-  { k: 'socket', s: '7x2 / 15 pin' },
-  { k: 'length', n: 13.6, unit: 'm' },
-  { k: 'voltage', s: '24 V' },
-  { k: 'protection', s: 'IP67' },
+// RU/AR: çevirmen onayı bekliyor.
+export const lamps: Record<LampId, Lamp> = {
+  lzd3194: {
+    code: 'LZD 3194/AMP',
+    codeR: 'LZD 3195/AMP',
+    name: t('MAVIC kombine arka lamba (sol + sağ)', 'MAVIC rear combination lamp (left + right)', 'Задний комбинированный фонарь MAVIC (левый + правый)', 'مصباح خلفي متعدد الوظائف MAVIC (يسار + يمين)'),
+  },
+  lzd2423: { code: 'LZD 2423', name: t('LUCY yuvarlak arka lamba', 'LUCY round rear lamp', 'Круглый задний фонарь LUCY', 'مصباح خلفي دائري LUCY') },
+  ld2774: { code: 'LD 2774', name: t('Yan marker lambası, turuncu', 'Side marker light, amber', 'Боковой габаритный фонарь, оранжевый', 'مصباح تحديد جانبي، برتقالي') },
+  ld2773: { code: 'LD 2773', name: t('Ön pozisyon lambası, beyaz', 'Front position light, white', 'Передний габаритный фонарь, белый', 'مصباح الموضع الأمامي، أبيض') },
+  ld0128: { code: 'LD 0128', name: t('Yan marker lambası, turuncu', 'Side marker light, amber', 'Боковой габаритный фонарь, оранжевый', 'مصباح تحديد جانبي، برتقالي') },
+  ld0127: { code: 'LD 0127', name: t('Ön pozisyon lambası, beyaz', 'Front position light, white', 'Передний габаритный фонарь, белый', 'مصباح الموضع الأمامي، أبيض') },
+  ltd2834: { code: 'LTD 2834', name: t('Plaka lambası, pozisyonlu', 'Number plate lamp with position light', 'Фонарь номерного знака с габаритом', 'مصباح لوحة الأرقام مع ضوء موضع') },
+  ltd229: { code: 'LTD 229', name: t('Plaka lambası', 'Number plate lamp', 'Фонарь номерного знака', 'مصباح لوحة الأرقام') },
+  ldcc2698: { code: 'LDCC 2698', name: t('Lastik kollu marker lambası', 'Rubber-arm marker light', 'Габаритный фонарь на резиновом кронштейне', 'مصباح تحديد بذراع مطاطية') },
+  lrd2679: { code: 'LRD 2679', name: t('Çalışma lambası', 'Work light', 'Рабочая фара', 'مصباح عمل') },
+  ldo2660: { code: 'LDO 2660', name: t('Tepe lambası, turuncu', 'Beacon light, amber', 'Проблесковый маячок, оранжевый', 'منارة تحذيرية، برتقالية') },
+};
+
+// Kablo tesisatı parçaları (RU/AR: çevirmen onayı bekliyor).
+const P = {
+  socketLead: t('Soket bağlantı kablosu', 'Socket lead', 'Кабель от розетки', 'كابل المقبس'),
+  mainLine: t('Ana hat', 'Main line', 'Основная линия', 'الخط الرئيسي'),
+  module: t('Horpol kontrol modülü', 'Horpol control module', 'Модуль управления Horpol', 'وحدة التحكم Horpol'),
+  rearLine: t('Arka hat', 'Rear line', 'Задняя линия', 'الخط الخلفي'),
+  sideLine: t('Yan hat', 'Side line', 'Боковая линия', 'الخط الجانبي'),
+  markerBranch: t('Yan marker dalı', 'Side marker branch', 'Отвод бокового габарита', 'فرع المصباح الجانبي'),
+  plateLead: t('Plaka lambası kablosu', 'Plate lamp lead', 'Кабель фонаря номерного знака', 'كابل مصباح اللوحة'),
+  feedLine: t('Besleme hattı', 'Feed line', 'Питающая линия', 'خط التغذية'),
+  rearBranch: t('Arka dağıtım hattı', 'Rear distribution line', 'Задняя распределительная линия', 'خط التوزيع الخلفي'),
+};
+
+// Yeni şema (kablolama-şeması yeni.jpeg): soket → 0,5 m → 16,5 m ana hat → modül → 2 × 7×1 2,5 m arka hat;
+// arka lambalardan 2 × 2×0,5 17 m yan hat; yan marker dalı 600 mm; plaka 1,5 m.
+const harnessNew: HarnessPart[] = [
+  { name: P.socketLead, len: 0.5, qty: 1 },
+  { name: P.mainLine, len: 16.5, qty: 1 },
+  { name: P.module, qty: 1 },
+  { name: P.rearLine, core: '7×1', len: 2.5, qty: 2 },
+  { name: P.sideLine, core: '2×0.5', len: 17, qty: 2 },
+  { name: P.markerBranch, len: 0.6, qty: 8 },
+  { name: P.plateLead, len: 1.5, qty: 2 },
 ];
+// HOR-1001 şeması (mevcut şema, WhatsApp 2026-10-19 14.40.12 / HOR-1001-Diagram): 7×1 ve 2×1 17 m besleme, modül, 2 m arka dağıtım.
+const harness1001: HarnessPart[] = [
+  { name: P.feedLine, core: '7×1', len: 17, qty: 1 },
+  { name: P.feedLine, core: '2×1', len: 17, qty: 1 },
+  { name: P.module, qty: 1 },
+  { name: P.rearBranch, len: 2, qty: 2 },
+];
+
 const cableSpecs = (pins: string): Spec[] => [
   { k: 'pins', s: pins },
   { k: 'length', n: 3.5, unit: 'm' },
@@ -41,56 +118,88 @@ const socketSpecs = (pins: string): Spec[] => [
   { k: 'protection', s: 'IP65' },
 ];
 
+// Setler. Lamba adetleri set listelerinden (HOR-<kod>-Liste.jpeg) ve şemalardan; ikisi tutarlı.
+// Set adları ve açıklamaları içerikten türetildi (pazarlama iddiası yok). RU/AR: çevirmen onayı bekliyor.
 export const products: Product[] = [
   {
-    id: 'hor100', code: 'HOR-100', cat: 'set', specs: setSpecs,
-    name: t('Standart Dorse Aydınlatma Seti', 'Standard Semi-Trailer Lighting Set', 'Комплект освещения для стандартного полуприцепа', 'طقم إضاءة لنصف المقطورة القياسية'),
-    desc: t('13,6 m treylerler için eksiksiz aydınlatma ve ana tesisat çözümü.', 'Complete lighting and main wiring solution for 13.6 m trailers.', 'Полное решение по освещению и основной проводке для 13,6-метровых прицепов.', 'حل متكامل للإضاءة والتمديدات الرئيسية للمقطورات بطول 13.6 م.'),
+    id: 'hor101', code: 'HOR-101', cat: 'set', specs: [],
+    name: t('HOR-101', 'HOR-101', 'HOR-101', 'HOR-101'),
+    desc: t(
+      'İki MAVIC kombine arka lamba, neon yan marker lambaları, ön pozisyon ve pozisyonlu plaka lambaları; Horpol modüllü kablo tesisatıyla.',
+      'Two MAVIC rear combination lamps, neon side markers, front position lights and plate lamps with position light, with a Horpol module harness.',
+      'Два задних комбинированных фонаря MAVIC, неоновые боковые габариты, передние габариты и фонари номерного знака с габаритом; проводка с модулем Horpol.',
+      'مصباحان خلفيان متعددا الوظائف MAVIC، ومصابيح جانبية نيون، ومصابيح موضع أمامية، ومصابيح لوحة مع ضوء موضع؛ مع تمديدات بوحدة Horpol.',
+    ),
+    set: {
+      lamps: [
+        { lamp: 'lzd3194', qty: 2 },
+        { lamp: 'ld2774', qty: 8 },
+        { lamp: 'ld2773', qty: 2 },
+        { lamp: 'ltd2834', qty: 2 },
+      ],
+      harness: harnessNew,
+    },
   },
   {
-    id: 'hor110', code: 'HOR-110', cat: 'set', specs: setSpecs,
-    name: t('ADR Uyumlu Dorse Seti', 'ADR-Compliant Trailer Set', 'Комплект для полуприцепа ADR', 'طقم لنصف المقطورة المتوافق مع ADR'),
-    desc: t('Tehlikeli madde taşımacılığına uygun konnektör ve tesisat mimarisi.', 'Connector and wiring architecture suited to dangerous-goods transport.', 'Разъёмы и схема проводки для перевозки опасных грузов.', 'منظومة وصلات وتمديدات مناسبة لنقل البضائع الخطرة.'),
+    id: 'hor102', code: 'HOR-102', cat: 'set', specs: [],
+    name: t('HOR-102', 'HOR-102', 'HOR-102', 'HOR-102'),
+    desc: t(
+      'İki MAVIC kombine arka lamba, LD 0128 yan marker, LD 0127 ön pozisyon ve LTD 229 plaka lambaları; Horpol modüllü kablo tesisatıyla.',
+      'Two MAVIC rear combination lamps, LD 0128 side markers, LD 0127 front position lights and LTD 229 plate lamps, with a Horpol module harness.',
+      'Два задних комбинированных фонаря MAVIC, боковые габариты LD 0128, передние габариты LD 0127 и фонари номерного знака LTD 229; проводка с модулем Horpol.',
+      'مصباحان خلفيان متعددا الوظائف MAVIC، ومصابيح جانبية LD 0128، ومصابيح موضع أمامية LD 0127، ومصابيح لوحة LTD 229؛ مع تمديدات بوحدة Horpol.',
+    ),
+    set: {
+      lamps: [
+        { lamp: 'lzd3194', qty: 2 },
+        { lamp: 'ld0128', qty: 8 },
+        { lamp: 'ld0127', qty: 2 },
+        { lamp: 'ltd229', qty: 2 },
+      ],
+      harness: harnessNew,
+    },
   },
   {
-    id: 'hor120', code: 'HOR-120', cat: 'set', specs: setSpecs,
-    name: t('Tenteli Treyler Seti', 'Curtainside Trailer Set', 'Комплект для тентованного полуприцепа', 'طقم لمقطورة بستائر جانبية'),
-    desc: t('Tenteli ve kayar perdeli dorseler için montaja hazır sistem.', 'Ready-to-install system for curtainside and sliding-curtain trailers.', 'Готовая к монтажу система для тентованных и шторных полуприцепов.', 'نظام جاهز للتركيب للمقطورات ذات الستائر الجانبية والمنزلقة.'),
+    id: 'hor111', code: 'HOR-111', cat: 'set', specs: [],
+    name: t('HOR-111', 'HOR-111', 'HOR-111', 'HOR-111'),
+    desc: t(
+      'Sekiz LUCY yuvarlak arka lamba, neon yan marker lambaları, ön pozisyon ve pozisyonlu plaka lambaları, iki lastik kollu marker.',
+      'Eight LUCY round rear lamps, neon side markers, front position lights, plate lamps with position light and two rubber-arm markers.',
+      'Восемь круглых задних фонарей LUCY, неоновые боковые габариты, передние габариты, фонари номерного знака с габаритом и два габарита на резиновых кронштейнах.',
+      'ثمانية مصابيح خلفية دائرية LUCY، ومصابيح جانبية نيون، ومصابيح موضع أمامية، ومصابيح لوحة مع ضوء موضع، ومصباحا تحديد بذراع مطاطية.',
+    ),
+    set: {
+      lamps: [
+        { lamp: 'lzd2423', qty: 8 },
+        { lamp: 'ld2774', qty: 8 },
+        { lamp: 'ld2773', qty: 2 },
+        { lamp: 'ltd2834', qty: 2 },
+        { lamp: 'ldcc2698', qty: 2 },
+      ],
+      harness: harnessNew,
+    },
   },
   {
-    id: 'hor130', code: 'HOR-130', cat: 'set', specs: setSpecs,
-    name: t('Frigo Treyler Seti', 'Refrigerated Trailer Set', 'Комплект для рефрижераторного полуприцепа', 'طقم لمقطورة مبرّدة'),
-    desc: t('Soğuk zincir treylerleri için dayanıklı, sızdırmaz aydınlatma paketi.', 'Durable, sealed lighting package for cold-chain trailers.', 'Прочный герметичный комплект освещения для рефрижераторов.', 'حزمة إضاءة متينة ومحكمة الإغلاق لمقطورات سلسلة التبريد.'),
-  },
-  {
-    id: 'hor140', code: 'HOR-140', cat: 'set', specs: setSpecs,
-    name: t('Damper Dorse Seti', 'Tipper Trailer Set', 'Комплект для самосвального полуприцепа', 'طقم لمقطورة قلّابة'),
-    desc: t('Titreşimli ve zorlu saha koşullarına uygun ağır hizmet çözümü.', 'Heavy-duty solution for vibration and tough field conditions.', 'Усиленное решение для вибраций и тяжёлых условий эксплуатации.', 'حل شديد التحمل للاهتزازات وظروف العمل القاسية.'),
-  },
-  {
-    id: 'hor150', code: 'HOR-150', cat: 'set', specs: setSpecs,
-    name: t('Lowbed Seti', 'Lowbed Trailer Set', 'Комплект для низкорамного трала', 'طقم لمقطورة منخفضة (لوبد)'),
-    desc: t('Uzun ve özel ölçülü lowbed uygulamalarına göre hazırlanmış sistem.', 'System prepared for long and special-size lowbed applications.', 'Система для длинных и нестандартных низкорамных тралов.', 'نظام مُعدّ لتطبيقات المقطورات المنخفضة الطويلة وذات المقاسات الخاصة.'),
-  },
-  {
-    id: 'hor160', code: 'HOR-160', cat: 'set', specs: setSpecs,
-    name: t('Konteyner Taşıyıcı Set', 'Container Chassis Set', 'Комплект для контейнеровоза', 'طقم لشاسيه نقل الحاويات'),
-    desc: t('Konteyner şasileri için kompakt, modüler elektrik tesisatı.', 'Compact, modular electrical wiring for container chassis.', 'Компактная модульная электропроводка для контейнерных шасси.', 'تمديدات كهربائية مدمجة ومعيارية لشاسيهات الحاويات.'),
-  },
-  {
-    id: 'hor170', code: 'HOR-170', cat: 'set', specs: setSpecs,
-    name: t('Tanker Aydınlatma Seti', 'Tanker Lighting Set', 'Комплект освещения для цистерны', 'طقم إضاءة للصهريج'),
-    desc: t('Tanker gövde yapısına uygun çevresel işaretleme ve bağlantılar.', 'Perimeter marking and connections suited to tanker bodies.', 'Контурная маркировка и соединения для кузовов цистерн.', 'إشارات محيطية ووصلات مناسبة لهياكل الصهاريج.'),
-  },
-  {
-    id: 'hor180', code: 'HOR-180', cat: 'set', specs: setSpecs,
-    name: t('Römork Seti', 'Trailer Set', 'Комплект для прицепа', 'طقم للمقطورة'),
-    desc: t('Orta ve ağır sınıf römorklar için pratik tak-çalıştır sistem.', 'Practical plug-and-play system for medium and heavy trailers.', 'Практичная система plug-and-play для средних и тяжёлых прицепов.', 'نظام عملي جاهز للتوصيل للمقطورات المتوسطة والثقيلة.'),
-  },
-  {
-    id: 'hor190', code: 'HOR-190', cat: 'set', specs: setSpecs,
-    name: t('Özel Proje Seti', 'Custom Project Set', 'Комплект под проект', 'طقم لمشروع خاص'),
-    desc: t('Şasi ölçüsüne ve fonksiyonlara göre projelendirilen özel çözüm.', 'Custom solution engineered to chassis size and functions.', 'Индивидуальное решение под размеры шасси и функции.', 'حل مخصص يُصمَّم وفق مقاس الشاسيه والوظائف.'),
+    id: 'hor1001', code: 'HOR-1001', cat: 'set', specs: [],
+    name: t('HOR-1001', 'HOR-1001', 'HOR-1001', 'HOR-1001'),
+    desc: t(
+      'Sekiz LUCY yuvarlak arka lamba, neon yan marker, ön pozisyon ve plaka lambaları, lastik kollu markerlar; ek olarak iki çalışma ve iki tepe lambası.',
+      'Eight LUCY round rear lamps, neon side markers, front position and plate lamps, rubber-arm markers, plus two work lights and two beacons.',
+      'Восемь круглых задних фонарей LUCY, неоновые боковые габариты, передние габариты и фонари номерного знака, габариты на резиновых кронштейнах, а также две рабочие фары и два маячка.',
+      'ثمانية مصابيح خلفية دائرية LUCY، ومصابيح جانبية نيون، ومصابيح موضع أمامية ولوحة، ومصابيح بذراع مطاطية، إضافة إلى مصباحَي عمل ومنارتين تحذيريتين.',
+    ),
+    set: {
+      lamps: [
+        { lamp: 'lzd2423', qty: 8 },
+        { lamp: 'ld2774', qty: 8 },
+        { lamp: 'ld2773', qty: 2 },
+        { lamp: 'ltd2834', qty: 2 },
+        { lamp: 'ldcc2698', qty: 2 },
+        { lamp: 'lrd2679', qty: 2 },
+        { lamp: 'ldo2660', qty: 2 },
+      ],
+      harness: harness1001,
+    },
   },
   {
     id: 'hk7', code: 'HK-7P', cat: 'cable', specs: cableSpecs('7'),

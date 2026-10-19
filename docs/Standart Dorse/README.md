@@ -184,3 +184,20 @@ iki pişirme hedefinde olursa betik `UYARI` basar.
 - Gerçek cihaz FPS ölçümü (entegre GPU'lu dizüstü + Android).
 - Tesisat görünümünde "Gerçekçi / Şema" seçeneği (plan Görev 4.1).
 - HDRI ortam ışığı (plan Görev 3.1; tüm tipleri etkiler).
+
+## 13. Lamba montaj haritası (R48)
+
+Kaynak: `standart_box.py` → `mounts_dict()` → `standart-anchors.json` içindeki `mounts` (şema `baked.ts` → `BakedMounts`).
+Kontrol: `node tools/check-lighting.mjs` (tüm kurallar UYGUN). Kapalı kasa **sabit** olduğu için kasaya lamba bağlanabilir;
+kapılar lamba yeri değildir.
+
+| Montaj | Yer (x, y, z) | Parça | Gerekçe |
+|---|---|---|---|
+| Arka lambalar | yüz x −0,08; y 0,86; z 1,19 → içe (en çok 0,30) | Lamba taşıyıcı (şasi) | Dış kenara 0,085 m (≤ 0,40); stop iç kenarları ≥ 0,60 |
+| Plaka + lambası | plaka y 0,865 (520 × 110); lambalar y 0,95, z ±0,17 | Lamba taşıyıcı | Plakanın üst kenarının 3 cm üstü |
+| Yan marker | x −12,9 … −0,5; y 1,19; z 1,266; yan başına en çok 9 | Şasinin dış C rayı | İlki önden 0,8, sonuncu arkadan 0,5 m. Boyun ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır 1,5 m). Eşit dağıtımda yan başına en az 6 |
+| Ön pozisyon | x −13,70; y 1,95; z 1,215 | Ön köşe dikmesi (kasa) | Eski y 3,86 kural dışıydı (≤ 2,10); dış kenara 5 mm |
+| Lastik kol ön / arka | x −13,635 / −0,065; y 3,95; duvar z 1,275 | Ön / arka köşe dikmesi (kasa) | En yüksek sabit nokta; 270° açılan kapının (üst kenar 3,875) katlanma bölgesinin üstü. Alternatif: lamba taşıyıcının ucu (`armRearAlt`) |
+| Çalışma (2) | x 0; y 3,95; z ±0,80; yön (1, −0,35, 0) | Arka başlık (paslanmaz) | Yükleme ağzını yukarıdan aydınlatır |
+| Tepe (2) | x −0,065; y 4,02; z ±1,0 | Arka başlık üstü + adaptör levhası | Başlık 130 mm derin (Ø150 için levha). Toplam yükseklik ~4,15 m: 4,0 m sınırı ülkeye göre kontrol edilmeli |
+| Tesisat | y 1,18; yan hat z 0,515 (kiriş iç yanı); modül x −2,2; arka dağıtım x −0,185 | Traverslerin gövdesinden | Dallar arka traversin önünden lamba taşıyıcının içine iner |

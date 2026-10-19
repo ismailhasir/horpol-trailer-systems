@@ -2,17 +2,19 @@
 // UI'dan bağımsızdır: yalnızca Config alır, olaylarla (onPick) geri bildirir.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { CategoryId, Config, TrailerId } from '../data';
-import { createMaterials, fadeTexture, setLensPower, type Mats } from './materials';
+import { createMaterials, fadeTexture, type Mats } from './materials';
 import { buildTrailer, disposeGroup, modelUrls, setGhost, type Anchors, type TrailerBuild } from './trailer';
 import { loadedModel, loadModel } from './models';
-import { buildEquipment, disposeEquipment, setHarnessHighlight, type EquipmentBuild } from './equipment';
+import { buildEquipment, disposeEquipment, lampIds, setHarnessHighlight, type EquipmentBuild } from './equipment';
+import { fnGroup, lampFailed, lampReady, lampUrl, loadLamp, needsAnimation, setLampState, tickLamps, type FnToggle } from './lampfx';
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
 /** Arayüz düğmeleri dışında motorun kendi kullandığı kamera pozları */
 type Pose = View | 'arm' | 'system' | 'extra';
+/** lamba yüklemesi bitince setConfig'i tekrarlamak için */
+const LAMP_RETRY = Symbol('lampRetry');
 
 export interface EngineOptions {
   theme: Theme;
@@ -22,10 +24,196 @@ export interface EngineOptions {
   onModelState?: (s: 'loading' | 'ready' | 'error') => void;
 }
 
-const THEMES = {
-  light: { bg: '#e8ecf2', floor: '#d6dde6', bgNight: '#141a24', floorNight: '#1b222d' },
-  dark: { bg: '#10151d', floor: '#18202a', bgNight: '#070a10', floorNight: '#0e131a' },
+// ---------- ortam ışığı (IBL) ----------
+// Dış dosya yok: küçük bir "ortam sahnesi" (gökyüzü/zemin gradyanı + yumuşak ışık panelleri) bir kez PMREM'e
+// çizilir. Metal (alüminyum, krom), lens ve boya yansımaları buradan gelir; yanında tek yönlü ışık (güneş/ay) gölge verir.
+type EnvKind = 'studioLight' | 'studioDark' | 'night';
+type RGB = [number, number, number];
+interface EnvDef {
+  /** doğrusal ışıma (1 = beyaz kâğıdı tam aydınlatan gök) */
+  zenith: RGB;
+  horizon: RGB;
+  ground: RGB;
+  /** [yatay açı° (+x arka, +z kameranın tarafı), yükseklik°, genişlik, yükseklik, ışıma, renk] */
+  panels: [number, number, number, number, number, string][];
+}
+const ENVS: Record<EnvKind, EnvDef> = {
+  // açık tema: bulutlu gök + stüdyo tavanı; zemin koyu, metallerde ufuk çizgisi okunur
+  studioLight: {
+    zenith: [0.5, 0.62, 0.86],
+    horizon: [1.05, 1.03, 1.0],
+    ground: [0.14, 0.135, 0.13],
+    panels: [
+      [50, 60, 34, 18, 3.2, '#fff6ea'], // ana tepe softbox (güneş yönünde)
+      [125, 14, 5, 22, 2.4, '#ffffff'], // yan şerit: tank/krom üzerinde dik yansıma çizgisi
+      [-55, 14, 5, 22, 2.0, '#eef4ff'],
+      [70, 4, 40, 4, 1.4, '#ffffff'], // kamera tarafında alçak dolgu (yan panel karanlıkta kalmasın)
+    ],
+  },
+  // koyu tema: karanlık stüdyo; kontrastlı, parlak softbox yansımaları
+  studioDark: {
+    zenith: [0.17, 0.18, 0.21],
+    horizon: [0.52, 0.54, 0.58],
+    ground: [0.09, 0.09, 0.1],
+    panels: [
+      [50, 60, 34, 18, 5.0, '#fff4e6'],
+      [125, 14, 5, 22, 3.4, '#ffffff'],
+      [-55, 14, 5, 22, 2.8, '#e6efff'],
+      [70, 4, 40, 4, 1.6, '#ffffff'],
+    ],
+  },
+  // gece: lacivert gök, ufukta hafif şehir ışığı; ay ve arkada zayıf bir şerit siluet kenarını çizer
+  night: {
+    zenith: [0.006, 0.009, 0.02],
+    horizon: [0.05, 0.05, 0.06],
+    ground: [0.004, 0.004, 0.005],
+    panels: [
+      [-125, 38, 3, 3, 30, '#c8d6ff'], // ay
+      [-150, 10, 40, 6, 0.35, '#8fa3cc'], // arka kenar ışığı (siluet)
+    ],
+  },
 };
+
+/**
+ * Ortam kaynağı ve PMREM üreticisi motor ömrü boyunca bir kez kurulur: tema/gece geçişinde yalnızca gradyan
+ * değerleri ve paneller güncellenip yeniden çizilir (~2 ms). Her seferinde yeniden kurmak gölgelendirici
+ * derlemesi yüzünden ~50 ms takılma yapıyordu. Bedeli: üreticinin ara hedefi (256 px'te ~8 MB, 128 px'te ~2 MB).
+ */
+class EnvBaker {
+  private pmrem: THREE.PMREMGenerator;
+  private scene = new THREE.Scene();
+  private sky: THREE.ShaderMaterial;
+  private panels: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
+  constructor(
+    renderer: THREE.WebGLRenderer,
+    private size: number,
+  ) {
+    this.pmrem = new THREE.PMREMGenerator(renderer);
+    this.sky = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: { zen: { value: new THREE.Vector3() }, hor: { value: new THREE.Vector3() }, gnd: { value: new THREE.Vector3() } },
+      vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader:
+        'uniform vec3 zen, hor, gnd; varying vec3 vD; void main(){ float t = normalize(vD).y;' +
+        ' vec3 c = t > 0.0 ? mix(hor, zen, pow(smoothstep(0.0, 1.0, t), 0.55)) : mix(hor, gnd, smoothstep(0.0, 0.05, -t));' +
+        ' gl_FragColor = vec4(c, 1.0); }',
+    });
+    this.scene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), this.sky));
+    const plane = new THREE.PlaneGeometry(1, 1);
+    const n = Math.max(...Object.values(ENVS).map((d) => d.panels.length));
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      this.panels.push(m);
+      this.scene.add(m);
+    }
+  }
+  bake(def: EnvDef): THREE.WebGLRenderTarget {
+    const u = this.sky.uniforms;
+    u.zen.value.set(...def.zenith);
+    u.hor.value.set(...def.horizon);
+    u.gnd.value.set(...def.ground);
+    this.panels.forEach((m, i) => {
+      const p = def.panels[i];
+      m.visible = !!p;
+      if (!p) return;
+      const [az, el, w, h, I, col] = p;
+      const a = THREE.MathUtils.degToRad(az);
+      const e = THREE.MathUtils.degToRad(el);
+      m.material.color.set(col).multiplyScalar(I);
+      m.position.set(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)).multiplyScalar(40);
+      m.scale.set(w, h, 1);
+      m.lookAt(0, 0, 0);
+    });
+    return this.pmrem.fromScene(this.scene, 0.02, 0.1, 100, { size: this.size });
+  }
+  dispose() {
+    this.pmrem.dispose();
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    });
+  }
+}
+
+/** Dorsenin altındaki yumuşak temas gölgesi (gök ışığının kapandığı alan): yumuşak kenarlı dikdörtgen alfa */
+function contactTexture(inX: number, inY: number) {
+  const W = 128;
+  const H = 64;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(W, H);
+  const f = (d: number) => {
+    const t = Math.min(1, Math.max(0, d));
+    const s = 1 - t * t * (3 - 2 * t);
+    return s * s;
+  };
+  for (let y = 0; y < H; y++) {
+    const dy = Math.max(0, (Math.abs((y + 0.5) / H - 0.5) * 2 - inY) / (1 - inY));
+    for (let x = 0; x < W; x++) {
+      const dx = Math.max(0, (Math.abs((x + 0.5) / W - 0.5) * 2 - inX) / (1 - inX));
+      const v = Math.round(255 * f(Math.hypot(dx, dy)));
+      const i = (y * W + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return new THREE.CanvasTexture(c);
+}
+
+interface Look {
+  env: EnvKind;
+  envI: number;
+  exposure: number;
+  /** yönlü ışık (güneş / ay): renk, şiddet, geldiği yön [yatay açı°, yükseklik°] */
+  sun: string;
+  sunI: number;
+  sunDir: [number, number];
+  /** arka plan: üst ve ufuk rengi (ufuk = sayfa zemin tonu, zemin buna karışarak kaybolur) */
+  bgTop: string;
+  bg: string;
+  floor: string;
+  /** temas gölgesi yoğunluğu */
+  contact: number;
+}
+const LOOKS: Record<Theme, { day: Look; night: Look }> = {
+  light: {
+    day: { env: 'studioLight', envI: 1.3, exposure: 1.05, sun: '#fff3e2', sunI: 3.4, sunDir: [50, 55], bgTop: '#d9e1ec', bg: '#e8ecf2', floor: '#c9d0d9', contact: 0.45 },
+    night: { env: 'night', envI: 4.4, exposure: 1.0, sun: '#a9bce8', sunI: 1.0, sunDir: [-125, 38], bgTop: '#090d15', bg: '#161c27', floor: '#1d232d', contact: 0.6 },
+  },
+  dark: {
+    day: { env: 'studioDark', envI: 1.5, exposure: 1.05, sun: '#fff1de', sunI: 3.4, sunDir: [50, 55], bgTop: '#0b0f15', bg: '#10151d', floor: '#2a313b', contact: 0.5 },
+    night: { env: 'night', envI: 4.0, exposure: 1.0, sun: '#a9bce8', sunI: 0.95, sunDir: [-125, 38], bgTop: '#04060a', bg: '#0b0f16', floor: '#121821', contact: 0.6 },
+  },
+};
+
+/** Arka plan için dikey gradyan (üst → ufuk; alt yarı ufuk rengi, zemin oraya karışarak kaybolur) */
+function gradientTexture(top: string, horizon: string) {
+  const c = document.createElement('canvas');
+  c.width = 2;
+  c.height = 256;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, top);
+  g.addColorStop(0.55, horizon);
+  g.addColorStop(1, horizon);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** zayıf cihaz (dokunmatik/küçük ekran/az bellek): daha küçük ortam ve gölge haritası */
+function lowEnd() {
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+  return matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700 || mem <= 4;
+}
 
 export class Engine {
   private renderer: THREE.WebGLRenderer;
@@ -34,9 +222,14 @@ export class Engine {
   private controls: OrbitControls;
   private mats!: Mats;
   private floor!: THREE.Mesh;
-  private hemi!: THREE.HemisphereLight;
   private sun!: THREE.DirectionalLight;
-  private rearGlow: THREE.PointLight[] = [];
+  private contact!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private bgTex: THREE.CanvasTexture | null = null;
+  private envKind: EnvKind | null = null;
+  private envRT: THREE.WebGLRenderTarget | null = null;
+  private envBaker: EnvBaker | null = null;
+  private low = lowEnd();
+  /** artık boş: arka kırmızı nokta ışıkları kaldırıldı (zemine/arka yüze renkli ışık + her malzemede ışık döngüsü maliyeti) */
   private trailer: TrailerBuild | null = null;
   private equip: EquipmentBuild | null = null;
   private key = '';
@@ -64,7 +257,9 @@ export class Engine {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // Khronos PBR Neutral: ürün renklerini (beyaz boya, logo mavisi) kaydırmadan korur; ACES kırmızıyı turuncuya,
+    // sarıya; AgX doygun renkleri soluk pastele çeker. Yanan lambalar ton eşlemesiz (lampfx), bundan etkilenmez.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap; // r180+: PCFSoft kaldırıldı, yumuşaklık shadow.radius ile
@@ -84,10 +279,6 @@ export class Engine {
       this.tween = null;
       this.userMoved = true;
     });
-
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
 
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas.parentElement ?? canvas);
@@ -117,27 +308,31 @@ export class Engine {
     const fade = fadeTexture();
     this.floor = new THREE.Mesh(
       new THREE.CircleGeometry(48, 96),
-      new THREE.MeshStandardMaterial({ color: THEMES[this.theme].floor, roughness: 0.92, metalness: 0, alphaMap: fade, transparent: true }),
+      new THREE.MeshStandardMaterial({ color: LOOKS[this.theme].day.floor, roughness: 0.9, metalness: 0, alphaMap: fade, transparent: true }),
     );
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
+    // temas gölgesi: zeminin üstünde, tek çizim çağrısı; boyutu fitShadow'da dorseye göre
+    this.contact = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, depthWrite: false }),
+    );
+    this.contact.rotation.x = -Math.PI / 2;
+    this.contact.position.y = 0.004;
+    this.contact.renderOrder = 1;
+    this.contact.visible = false;
+    this.scene.add(this.contact);
 
-    this.hemi = new THREE.HemisphereLight('#ffffff', '#7d8794', 0.6);
-    this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight('#ffffff', 2.3);
+    // tek yönlü ışık (gündüz güneş, gece ay); gölge haritası yalnız sahne değişince güncellenir
+    this.sun = new THREE.DirectionalLight('#ffffff', 2.5);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    const sm = this.low ? 1024 : 2048;
+    this.sun.shadow.mapSize.set(sm, sm);
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.02;
-    this.sun.shadow.radius = 4;
+    this.sun.shadow.radius = this.low ? 2.5 : 4;
     this.scene.add(this.sun, this.sun.target);
-    for (const z of [-0.9, 0.9]) {
-      const p = new THREE.PointLight('#ff2a1a', 0, 5, 2);
-      p.position.set(0.6, 0.9, z);
-      this.rearGlow.push(p);
-      this.scene.add(p);
-    }
     this.applyLook();
     this.resize();
   }
@@ -205,6 +400,17 @@ export class Engine {
     this.equip = buildEquipment(c, this.trailer!.anchors, this.mats);
     this.scene.add(this.equip.group);
     this.cfg = c;
+    // lamba modelleri ilk kullanımda indirilir; o ana kadar yer tutucu görünür, gelince ekipman yeniden kurulur
+    // yalnız modeli VAR olup henüz yüklenmemiş lambalar için (modeli olmayan ürünler yer tutucuyla kalır; döngü yok)
+    const missing = lampIds(c).filter((id) => lampUrl(id) && !lampReady(id) && !lampFailed(id));
+    if (this.equip.placeholders > 0 && missing.length) {
+      const ids = missing;
+      const token = ((this as unknown as Record<symbol, number>)[LAMP_RETRY] = ((this as unknown as Record<symbol, number>)[LAMP_RETRY] ?? 0) + 1);
+      Promise.all(ids.map(loadLamp)).then(() => {
+        if (this.disposed || this.cfg !== c || (this as unknown as Record<symbol, number>)[LAMP_RETRY] !== token) return;
+        this.setConfig(c, true);
+      });
+    }
     this.applySystem();
     this.applyLights();
     this.shadowDirty = 3;
@@ -319,7 +525,7 @@ export class Engine {
   }
 
   focusCategory(cat: CategoryId) {
-    const map: Record<CategoryId, Pose> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', extra: 'extra' };
+    const map: Record<CategoryId, Pose> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', work: 'extra', beacon: 'arm' };
     if (this.system) return;
     this.setView(map[cat]);
   }
@@ -345,45 +551,91 @@ export class Engine {
     this.applyLook();
     this.invalidate();
   }
+  /** Işıklar modunda yanan işlevler (pozisyon, fren, sinyal, geri vites, sis, çalışma, tepe) */
+  private fns: FnToggle[] = ['position'];
+  setLampFunctions(fns: FnToggle[]) {
+    this.fns = [...fns];
+    this.applyLights();
+    this.invalidate();
+  }
   private applyLights() {
     if (!this.mats) return;
-    setLensPower(this.mats, this.lights);
-    Object.values(this.mats.lens).forEach((mm) => (mm.needsUpdate = true));
-    this.equip?.glows.forEach((g) => (g.visible = this.lights));
-    this.equip?.pools.forEach((p) => (p.visible = this.lights));
-    const hasStop = (this.cfg?.lamps.stop.qty ?? 0) > 0;
-    this.rearGlow.forEach((p) => (p.intensity = this.lights && hasStop ? 2.2 : 0));
+    setLampState(this.lights, this.fns);
+    this.syncGlows();
   }
+  private syncGlows() {
+    for (const g of this.equip?.glows ?? []) {
+      g.sprite.visible = this.lights && this.fns.includes(fnGroup(g.fn)) && (fnGroup(g.fn) !== 'turn' || this.blinkOn) && (fnGroup(g.fn) !== 'beacon' || this.flashOn);
+    }
+  }
+  private blinkOn = true;
+  private flashOn = true;
 
   setTheme(t: Theme) {
     this.theme = t;
     this.applyLook();
     this.invalidate();
   }
+  private get look(): Look {
+    const l = LOOKS[this.theme];
+    return this.lights ? l.night : l.day;
+  }
   private applyLook() {
     if (!this.floor) return;
-    const th = THEMES[this.theme];
-    const night = this.lights;
-    const bg = new THREE.Color(night ? th.bgNight : th.bg);
-    this.scene.background = bg;
-    this.scene.fog = new THREE.Fog(bg, 34, 70);
-    (this.floor.material as THREE.MeshStandardMaterial).color.set(night ? th.floorNight : th.floor);
-    // gece: ay ışığı (soğuk, zayıf) + yerden yansıyan dolgu; dorsenin alt yarısı karanlıkta kaybolmasın
-    this.scene.environmentIntensity = night ? 0.3 : 0.75;
-    this.hemi.color.set(night ? '#9db2dc' : '#ffffff');
-    this.hemi.groundColor.set(night ? '#4a5568' : '#7d8794');
-    this.hemi.intensity = night ? 0.5 : 0.42;
-    this.sun.color.set(night ? '#c3d0f5' : '#ffffff');
-    this.sun.intensity = night ? 0.55 : 2.7;
-    this.renderer.toneMappingExposure = night ? 1.15 : 1.0;
+    const lk = this.look;
+    this.setEnvironment(lk.env);
+    this.scene.environmentIntensity = lk.envI;
+    this.renderer.toneMappingExposure = lk.exposure;
+    // arka plan: üstten ufka dikey gradyan (ton eşlemesiz sRGB doku, tek tam ekran çizim); sis ufuk rengine karışır
+    this.bgTex?.dispose();
+    this.bgTex = gradientTexture(lk.bgTop, lk.bg);
+    this.scene.background = this.bgTex;
+    this.scene.fog = new THREE.Fog(lk.bg, 34, 70);
+    (this.floor.material as THREE.MeshStandardMaterial).color.set(lk.floor);
+    this.contact.material.opacity = lk.contact;
+    this.sun.color.set(lk.sun);
+    this.sun.intensity = lk.sunI;
+    this.placeSun();
     this.shadowDirty = 3;
+  }
+
+  /** Ortam haritası: yalnızca etkin olan tutulur (256 px; zayıf cihazda 128 px), değişince yeniden pişirilir */
+  private setEnvironment(kind: EnvKind) {
+    if (this.envKind === kind) return;
+    this.envBaker ??= new EnvBaker(this.renderer, this.low ? 128 : 256);
+    const rt = this.envBaker.bake(ENVS[kind]);
+    this.envRT?.dispose();
+    this.envRT = rt;
+    this.envKind = kind;
+    this.scene.environment = rt.texture;
+  }
+
+  /** Yönlü ışığı görünümün yönüne yerleştirir: gündüz arka-yan üstten (gölge öne ve uzak tarafa), gece aydan (arkadan) */
+  private placeSun() {
+    const a = this.trailer?.anchors;
+    const cx = a ? -a.L / 2 : -6;
+    const [az, el] = this.look.sunDir.map(THREE.MathUtils.degToRad);
+    const d = new THREE.Vector3(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el));
+    this.sun.target.position.set(cx, 0, 0);
+    this.sun.position.set(cx, 0, 0).addScaledVector(d, 20);
   }
 
   private fitShadow(a: Anchors) {
     const cx = -a.L / 2;
-    // ışık yukarıdan ve hafif arkadan: gölge dorsenin altına ve kameraya doğru düşer (zemine oturma hissi)
-    this.sun.position.set(cx + 3, 20, -5);
-    this.sun.target.position.set(cx, 0, 0);
+    this.placeSun();
+    // temas gölgesi: dorse izdüşümünün kenarında yumuşak geçiş (0,3 m içeriden 0,6 m dışarıya)
+    const mi = 0.3;
+    const mo = 0.6;
+    const x0 = -a.L - 0.3;
+    const x1 = 0.35;
+    const lx = x1 - x0 + 2 * mo;
+    const lz = a.W + 2 * mo;
+    this.contact.material.alphaMap?.dispose();
+    this.contact.material.alphaMap = contactTexture((x1 - x0 - 2 * mi) / lx, (a.W - 2 * mi) / lz);
+    this.contact.material.needsUpdate = true;
+    this.contact.scale.set(lx, lz, 1);
+    this.contact.position.x = (x0 + x1) / 2;
+    this.contact.visible = true;
     const cam = this.sun.shadow.camera;
     const half = a.L / 2 + 3;
     cam.left = -half;
@@ -404,6 +656,15 @@ export class Engine {
   private frame = (now: number) => {
     this.raf = 0;
     let busy = false;
+    if (needsAnimation()) {
+      const s = now / 1000;
+      this.blinkOn = (s * 1.5) % 1 < 0.55;
+      const f = (s * 2.1) % 1;
+      this.flashOn = f < 0.18 || (f > 0.3 && f < 0.42);
+      tickLamps(s);
+      this.syncGlows();
+      busy = true;
+    }
     if (this.tween) {
       const t = Math.min(1, (now - this.tween.t0) / this.tween.dur);
       const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -530,6 +791,14 @@ export class Engine {
     this.controls.dispose();
     if (this.trailer) disposeGroup(this.trailer.group);
     if (this.equip) disposeEquipment(this.equip.group);
+    this.envRT?.dispose();
+    this.envBaker?.dispose();
+    this.bgTex?.dispose();
+    if (this.contact) {
+      this.contact.geometry.dispose();
+      this.contact.material.alphaMap?.dispose();
+      this.contact.material.dispose();
+    }
     this.renderer.dispose();
   }
 }

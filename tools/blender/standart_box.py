@@ -85,6 +85,53 @@ Y_PANEL1 = 3.93  # yan panel görünen üst kenarı
 Y_TOP = HT
 CS = (XF - 0.5, XR + 0.5, -W2 - 0.45, W2 + 0.45)  # zemin temas gölgesi alanı (x0, x1, z0, z1)
 
+# ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
+# Sabit parçalar: şasi (lamba taşıyıcı, yan C ray) ve SABİT kapalı kasa (köşe dikmeleri, arka başlık). Kapılar lamba yeri değil.
+CARRIER_Z = 1.19  # lamba taşıyıcının dış ucu (box2 'lamp_carrier' z ±1,19)
+CARRIER_TOP = 1.05
+REAR_ZIN = 0.30  # arka bölgenin iç sınırı: plaka (±0,26) + boşluk; stop iç kenarları arası ≥ 0,60
+PLATE_W, PLATE_H = 0.52, 0.11
+SIDE_Y = CH_TOP - 0.035  # yan C rayın (y 1,155–1,225) ortası
+SIDE_X0, SIDE_X1, SIDE_N = XF + 0.8, -0.5, 9  # ilk/son marker (önden 0,8 / arkadan 0,5 m), yan başına en çok 9 (~1,55 m)
+FRONT_LAMP_Y = 1.95  # ön köşe dikmesinin ön yüzü; R48 üst sınırı 2,10 (kasa sabit)
+ARM_Y = 3.95  # lastik kollar: kapı üst kenarının (3,875) üstü; 270° açılan kapı katlanınca kola çarpmaz
+POST_D = 0.13  # ön/arka köşe dikmesinin yan yüz derinliği
+WORK_Y, WORK_Z = Y_TOP - 0.07, 0.80  # arka başlık (y 3,88–4,02) ortası
+BEACON_Z = 1.0
+TRUNK_Z = BZ - 0.035  # ana demet: kiriş gövdesinin iç yanı, üst başlığın altında
+MODULE_X = -2.2  # Horpol modülü: hava tanklarının önünde, kirişlerin arasında
+REAR_JX = BEAM_X1 - 0.025  # arka dağıtım: arka traversin önü, iniş lamba taşıyıcının içinden
+
+
+def mounts_dict():
+    side_y = [[XF, SIDE_Y], [XR, SIDE_Y]]
+    return {
+        'rear': {'x': CARRIER_X, 'y': LAMP_Y, 'zOuter': CARRIER_Z, 'zInner': REAR_ZIN, 'faceX': CARRIER_X},
+        'plate': {'x': CARRIER_X, 'y': round(PLATE_Y + PLATE_H / 2 + 0.03, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
+                  'plateW': PLATE_W, 'plateH': PLATE_H},
+        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y, 'z': RAIL_Z + 0.001, 'maxPerSide': SIDE_N,
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None},
+        'front': {'x': XF, 'y': FRONT_LAMP_Y, 'z': W2 - 0.06, 'bracket': None},
+        'armFront': {'x': XF + POST_D / 2, 'y': ARM_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
+        'armRear': {'x': XR - POST_D / 2, 'y': ARM_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
+        'armRearAlt': {'x': -0.14, 'y': LAMP_Y, 'z': CARRIER_Z, 'wallZ': CARRIER_Z, 'bracket': None},
+        'work': [{'x': XR, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'bracket': None} for s in (1, -1)],
+        'beacon': [{'x': XR - 0.065, 'y': Y_TOP, 'z': s * BEACON_Z, 'bracket': [[XR - 0.13, Y_TOP, s * BEACON_Z], [XR + 0.02, Y_TOP, s * BEACON_Z]]}
+                   for s in (1, -1)],
+        'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]], 'moduleX': MODULE_X,
+                    'rearJunctionX': REAR_JX,
+                    'notes': 'Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst '
+                             'başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner.'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
+                    'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
+        'notes': 'Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol, çalışma ve tepe lambaları kasaya bağlanır. '
+                 'Ön pozisyon ön köşe dikmesinin ön yüzünde y 1,95 (R48 üst sınırı 2,10). Lastik kollar köşe dikmelerinin yan yüzünde '
+                 'y 3,95: en yüksek sabit nokta ve 270° açılan kapının (üst kenar 3,875) katlanma bölgesinin üstü. Yan markerlar şasinin '
+                 'dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır '
+                 '1,5 m). Çalışma lambaları arka başlığın arka yüzünde, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için '
+                 'adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli).',
+    }
+
 
 def anchors_dict():
     """Sitenin okuyacağı bağlantı noktaları (three.js koordinatları; şema: src/configurator/engine/baked.ts)"""
@@ -106,6 +153,7 @@ def anchors_dict():
         'harness': {'y': HARNESS_Y, 'frontX': XF + 0.2, 'trunkZ': 0.86, 'rearZ': 0.7, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]]},
         'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
         'sections': sections,
+        'mounts': mounts_dict(),
     }
 
 

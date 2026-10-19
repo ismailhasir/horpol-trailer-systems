@@ -10,6 +10,12 @@
   --surface: #ffffff;
   --surface-2: #f4f8fd;
   --photo: #ffffff;
+  /* fotoğraf zemini üstündeki set simge döşemeleri ve simgesi olmayan lamba yer tutucusu (iki temada aynı: zemin beyaz) */
+  --photo-tile: #ffffff;
+  /* set kartı ve set ayrıntısında ürün karolarının arkasındaki grup zemini (karolar beyaz, grup hafif mavi-gri) */
+  --photo-group: #e4eaf2;
+  --photo-line: #d3dce8;
+  --photo-ink: #7a889d;
   /* hero: logo mavisiyle güçlü marka alanı */
   --hero-bg: linear-gradient(135deg, #1d5399 0%, #153a73 100%);
   --hero-line: transparent;
@@ -41,6 +47,10 @@
   --focus: #1c5198;
   --ok: #17784a;
   --danger: #b42318;
+  /* lamba ışık renkleri (konfigüratördeki işlev düğmeleri; iki temada aynı) */
+  --lamp-red: #ff2a1a;
+  --lamp-amber: #ff8a00;
+  --lamp-white: #f2f6ff;
   /* ürün kodu etiketi (fotoğrafın beyaz zemini üstünde, iki temada aynı) */
   --code-bg: #0f2c57;
   --code-ink: #ffffff;
@@ -76,6 +86,12 @@
   --surface: #121a27;
   --surface-2: #172131;
   --photo: #ffffff;
+  /* fotoğraf zemini üstündeki set simge döşemeleri ve simgesi olmayan lamba yer tutucusu (iki temada aynı: zemin beyaz) */
+  --photo-tile: #ffffff;
+  /* set kartı ve set ayrıntısında ürün karolarının arkasındaki grup zemini (karolar beyaz, grup hafif mavi-gri) */
+  --photo-group: #e4eaf2;
+  --photo-line: #d3dce8;
+  --photo-ink: #7a889d;
   --ink: #e8edf5;
   --muted: #a1adc1;
   --faint: #7d8aa0;
@@ -1150,6 +1166,211 @@ dialog::backdrop {
 .note {
   font-size: 0.82rem;
   color: var(--faint);
+}
+/* set: lamba simgelerinden kompozisyon (kart + ayrıntı), içerik listeleri */
+.set-vis {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  /* set kartında kod rozeti yok (başlık kodun kendisi): üst boşluk diğer kenarlarla aynı */
+  padding: 12px;
+}
+.set-vis {
+  background: var(--photo-group);
+}
+.set-vis.odd > :first-child {
+  grid-row: span 2;
+}
+.set-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--photo-tile);
+}
+.set-tile img,
+.card-ph .set-tile img,
+.dlg-im .set-tile img {
+  /* hücreye sabitlenir: ızgara öğesinde yüzde yükseklik çözülmez, görsel taşıp kesiliyordu */
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  max-height: none;
+  object-fit: contain;
+}
+.set-q {
+  position: absolute;
+  inset-block-end: 4px;
+  inset-inline-end: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.lamp-ph {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  color: var(--photo-ink);
+  text-align: center;
+}
+.lamp-ph svg {
+  width: min(52px, 70%);
+  height: auto;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.lamp-ph rect {
+  stroke: var(--photo-line);
+}
+.lamp-ph path {
+  stroke: currentColor;
+}
+.lamp-ph .mono {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.66rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.set-list {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.88rem;
+}
+.set-list li {
+  display: grid;
+  grid-template-columns: 2.4em auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.set-list .q {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.set-list .c {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.set-list .nm {
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dlg-set {
+  grid-template-columns: minmax(0, 1fr);
+}
+.dlg-set .dlg-im {
+  position: relative;
+  min-height: clamp(220px, 38vh, 340px);
+  padding: 0;
+  border-inline-end: 0;
+  border-bottom: 1px solid var(--line);
+}
+.dlg-im .set-vis {
+  /* bitiş tarafı: kapat düğmesine yer */
+  padding: 16px;
+  padding-inline-end: 60px;
+}
+.set-detail {
+  display: grid;
+  gap: 14px 28px;
+  margin-top: 4px;
+}
+.set-detail h3 {
+  margin-bottom: 4px;
+  color: var(--faint);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+html[lang='ar'] .set-detail h3 {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.85rem;
+}
+.set-note {
+  grid-column: 1 / -1;
+}
+.set-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.set-lines li {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.set-harness li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.set-ic {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--photo-tile);
+}
+.set-ic img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.set-ic .lamp-ph .mono {
+  display: none;
+}
+.set-tx {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.set-tx > .ltr {
+  align-self: flex-start;
+}
+.set-tx .mono {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.set-n {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 700px) {
+  .set-detail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .search-dlg {
   max-width: 560px;

@@ -143,3 +143,20 @@ npm run models:pack -- tanker
 | Genel ![](gorseller/genel.jpg) | Arka 3/4 ![](gorseller/arka-34.jpg) |
 | Ön 3/4 ![](gorseller/on-34.jpg) | Tesisat, ön ![](gorseller/tesisat-on.jpg) |
 | Tesisat, arka ![](gorseller/tesisat-arka.jpg) | |
+
+## 12. Lamba montaj haritası (R48)
+
+Kaynak: `tanker.py` → `mounts_dict()` → `tanker-anchors.json` içindeki `mounts`. Kontrol: `node tools/check-lighting.mjs`.
+Tank kabuğu lamba taşımaz.
+
+| Montaj | Yer (x, y, z) | Parça | Gerekçe |
+|---|---|---|---|
+| Arka lambalar | yüz x 0; y 0,56; z 1,20 → 0,30 | Tampon | Dış kenara 0,075 m |
+| Plaka + lambası | plaka y 0,56; lambalar y 0,645, z ±0,17 | Tampon | |
+| Yan marker | x −9,73 … −0,96; y 1,27 (arka uçta 1,30); z 1,273; yan başına en çok 6 | Hortum rafı dudağı; −7,47'nin önünde kirişten L braket (`side.brackets`) | Eski ilk marker önden 5,2 m gerideydi (≤ 3). İniş ayağı ve tesisat kolları `side.avoid`. Tekerlek ve dolap nedeniyle 0,9 m altına inilemez (R48 6.18 ≤ 1,5). En az 4 |
+| Ön pozisyon | x −11,575; y 1,40; z 1,15 | Kirişten dışa ön braket (x −11,55, z 0,55 → 1,19) | Eski yer ADR panosunda z 1,02 idi (dış kenara ~0,2 m). Tank burada r ≈ 0,94: braketin üstü boş |
+| Lastik kol ön | x −11,52; y 1,40; duvar z 1,19 | Aynı ön braket | |
+| Lastik kol arka | x −0,14; y 1,08; duvar z 1,0 | Arka çerçeve üst kuşağının uç yüzü | Dış kenara 0,275 m; arkada en yüksek sabit uç. Alternatif: tampon ucu y 0,56 (`armRearAlt`) |
+| Çalışma (2) | x −0,08; y 1,18; z ±0,60; yön (1, −0,35, 0) | Üst kuşağın üstü (braket) | Arka kapak bombesi (x ≈ −0,45) önde kalır |
+| Tepe (2) | x −0,85; y 3,33; z ±0,66 | Devrilme korkuluğu üst başlığının arka ucu + adaptör | En yüksek sabit yer, 360° |
+| Tesisat | önde king pin plakası üstü 1,30, plaka bitince kiriş alt başlığı hizası 0,80; yan hat z 0,42; modül x −0,80; arka dağıtım x −0,25 | Kutu kirişin iç yüzü | Modül tankın en alt noktasının (0,85) altında. Önde orta ana hat tank kabuğunun altından geçer (bilinen sınırlama) |

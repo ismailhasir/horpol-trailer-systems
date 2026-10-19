@@ -8,12 +8,13 @@ import {
   SOCKETS,
   TRAILER_LIST,
   fromQuery,
+  maxQty,
+  sideMinPerSide,
   normalize,
   productById,
   toQuery,
   type CategoryId,
   type Config,
-  type LampStyle,
   type LengthId,
   type TrailerId,
 } from '../configurator/data';
@@ -25,6 +26,10 @@ import { numberLocale, type Lang } from '../lib/labels';
 import type { Ui } from '../i18n/ui';
 import TrailerIcon from './TrailerIcon';
 import type { Engine, View } from '../configurator/engine/Engine';
+import type { FnToggle } from '../configurator/engine/lampfx';
+
+/** {anahtar} yer tutucularını doldurur */
+const fmtT = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ''));
 
 interface Props {
   lang: Lang;
@@ -52,55 +57,27 @@ const IC = {
   expand: ['M15 3h6v6', 'M9 21H3v-6', 'm21 3-7 7', 'm3 21 7-7'],
 };
 
-/** Ürün seçeneği için küçük temsili lamba çizimi */
-function LampGlyph({ style }: { style: LampStyle }) {
-  const r = '#d4221c';
-  const a = '#f29a0c';
-  const w = '#dfe6f0';
-  const h = '#1d2026';
-  const body = (children: preact.ComponentChildren) => (
-    <svg class="lglyph" viewBox="0 0 40 20" width="40" height="20" aria-hidden="true">
-      {children}
-    </svg>
+// Ürün simgeleri: Blender'da lamba modelinden render (tools/blender/lamps.py --icons), sönük ve yanık hâl
+const ICONS = import.meta.glob('../assets/lamps/*.webp', { eager: true, import: 'default' }) as Record<string, { src: string } | string>;
+function iconSrc(id: string, state: 'off' | 'on') {
+  const v = ICONS[`../assets/lamps/${id}-${state}.webp`];
+  return v ? (typeof v === 'string' ? v : v.src) : null;
+}
+/** Ürün simgesi: sönük hâl; üzerine gelince ya da ışıklar açıkken yanık hâl */
+function LampIcon({ id, lit }: { id: string; lit: boolean }) {
+  const off = iconSrc(id, 'off');
+  const on = iconSrc(id, 'on');
+  if (!off) return <span class="lglyph ph" aria-hidden="true" />;
+  return (
+    <span class={`lglyph${lit ? ' lit' : ''}`} aria-hidden="true">
+      <img src={off} alt="" width={56} height={56} loading="lazy" decoding="async" />
+      {on && <img class="on" src={on} alt="" width={56} height={56} loading="lazy" decoding="async" />}
+    </span>
   );
-  switch (style) {
-    case 'block':
-      return body(<><rect x="2" y="4" width="36" height="12" rx="2" fill={h} /><rect x="4" y="5.5" width="8" height="9" rx="1" fill={a} /><rect x="13" y="5.5" width="10" height="9" rx="1" fill={r} /><rect x="24" y="5.5" width="7" height="9" rx="1" fill={r} /><rect x="32" y="5.5" width="4.5" height="9" rx="1" fill={w} /></>);
-    case 'carmen':
-      return body(<><rect x="1" y="5" width="38" height="10" rx="4" fill={h} /><rect x="3" y="6.4" width="34" height="2.2" rx="1" fill={a} /><rect x="3" y="9.5" width="27" height="4" rx="1.5" fill={r} /><rect x="31" y="9.5" width="5.5" height="4" rx="1.5" fill={w} /></>);
-    case 'navia':
-      return body(<><rect x="6" y="2.5" width="28" height="15" rx="6" fill={h} /><rect x="8" y="4.5" width="24" height="7" rx="3.5" fill={r} /><rect x="10" y="12.5" width="13" height="3" rx="1.5" fill={a} /><circle cx="27.5" cy="14" r="2" fill={w} /></>);
-    case 'compact':
-      return body(<><rect x="9" y="4" width="22" height="12" rx="2" fill={h} /><rect x="11" y="5.5" width="6" height="9" rx="1" fill={a} /><rect x="18" y="5.5" width="11" height="9" rx="1" fill={r} /></>);
-    case 'round':
-      return body(<><rect x="2" y="4" width="36" height="12" rx="3" fill={h} /><circle cx="9" cy="10" r="4.3" fill={a} /><circle cx="20" cy="10" r="4.3" fill={r} /><circle cx="31" cy="10" r="4.3" fill={r} /></>);
-    case 'oval':
-      return body(<><rect x="8" y="5" width="24" height="10" rx="5" fill={h} /><rect x="10" y="6.5" width="20" height="7" rx="3.5" fill={a} /></>);
-    case 'rect':
-      return body(<><rect x="9" y="5" width="22" height="10" rx="1.5" fill={h} /><rect x="11" y="6.6" width="18" height="6.8" rx="1" fill={a} /></>);
-    case 'slim':
-      return body(<><rect x="4" y="7" width="32" height="6" rx="3" fill={h} /><rect x="6" y="8.3" width="28" height="3.4" rx="1.7" fill={a} /></>);
-    case 'disc':
-      return body(<><circle cx="20" cy="10" r="7" fill={h} /><circle cx="20" cy="10" r="5.2" fill={a} /></>);
-    case 'plate-wide':
-    case 'plate-small': {
-      const wd = style === 'plate-wide' ? 26 : 16;
-      return body(<><rect x={20 - wd / 2} y="5" width={wd} height="7" rx="1.5" fill={h} /><rect x={20 - wd / 2 + 2} y="11" width={wd - 4} height="2.5" rx="1" fill={w} /></>);
-    }
-    case 'pos-rect':
-      return body(<><rect x="10" y="5" width="20" height="10" rx="2" fill={h} /><rect x="12" y="6.6" width="16" height="6.8" rx="1.4" fill={w} /></>);
-    case 'pos-round':
-      return body(<><circle cx="20" cy="10" r="7" fill={h} /><circle cx="20" cy="10" r="5" fill={w} /></>);
-    case 'strip':
-      return body(<><rect x="5" y="7.5" width="30" height="5" rx="2.5" fill={h} /><rect x="7" y="8.8" width="26" height="2.4" rx="1.2" fill={r} /></>);
-    case 'arm-dragon':
-      return body(<><path d="M8 16 22 7" stroke={h} stroke-width="3" stroke-linecap="round" /><rect x="21" y="3" width="12" height="8" rx="1.5" fill={h} /><rect x="22" y="4.2" width="3.5" height="5.6" fill={w} /><rect x="26" y="4.2" width="3" height="5.6" fill={a} /><rect x="29.5" y="4.2" width="2.5" height="5.6" fill={r} /></>);
-    case 'arm-classic':
-      return body(<><path d="M6 10h16" stroke={h} stroke-width="3" stroke-linecap="round" /><rect x="21" y="6" width="12" height="8" rx="1.5" fill={h} /><rect x="22" y="7.2" width="3.5" height="5.6" fill={w} /><rect x="26" y="7.2" width="3" height="5.6" fill={a} /><rect x="29.5" y="7.2" width="2.5" height="5.6" fill={r} /></>);
-  }
 }
 
-const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e', extra: '#38bdf8' };
+const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e', work: '#a5b4fc', beacon: '#f59e0b' };
+const FN_LIST: FnToggle[] = ['position', 'stop', 'turn', 'reverse', 'fog', 'work', 'beacon'];
 
 export default function Configurator({ lang, t, ui }: Props) {
   const [cfg, setCfg] = useState<Config>(() => {
@@ -271,7 +248,7 @@ export default function Configurator({ lang, t, ui }: Props) {
   const step = (cat: CategoryId, dir: 1 | -1) => {
     const def = CATEGORIES.find((c) => c.id === cat)!;
     update((c) => {
-      c.lamps[cat].qty += dir * def.step;
+      c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), c.lamps[cat].qty + dir * def.step));
       return c;
     });
     engineRef.current?.focusCategory(cat);
@@ -306,6 +283,14 @@ export default function Configurator({ lang, t, ui }: Props) {
     setLights(on);
     engineRef.current?.setLights(on);
   };
+  /** Işıklar modunda yanan işlevler (pozisyon varsayılan) */
+  const [fns, setFns] = useState<FnToggle[]>(['position']);
+  const toggleFn = (f: FnToggle) => {
+    const next = fns.includes(f) ? fns.filter((x) => x !== f) : [...fns, f];
+    setFns(next);
+    engineRef.current?.setLampFunctions(next);
+  };
+  const fnAvail = (f: FnToggle) => (f === 'work' ? cfg.lamps.work.qty > 0 : f === 'beacon' ? cfg.lamps.beacon.qty > 0 : f === 'position' || cfg.lamps.stop.qty > 0);
   const reset = () => {
     setCfg(structuredClone(DEFAULT_CONFIG));
     setOrderQty(1);
@@ -373,6 +358,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             <li><i style="background:#ef4444" />{t.legend_rear}</li>
             <li><i style="background:#e5e7eb" />{t.legend_plate}</li>
             <li><i style="background:#22c55e" />{t.legend_marker}</li>
+            {cfg.lamps.work.qty + cfg.lamps.beacon.qty > 0 && <li><i style="background:#a855f7" />{t.legend_aux}</li>}
           </ul>
         )}
         <p class="cfg-hint">{touch ? t.hint_touch : t.hint}</p>
@@ -397,6 +383,16 @@ export default function Configurator({ lang, t, ui }: Props) {
             <Ico d={IC.reset} />
           </button>
         </div>
+        {lights && (
+          <div class="cfg-fns" role="group" aria-label={t.fn_title}>
+            {FN_LIST.filter(fnAvail).map((f) => (
+              <button type="button" class={`fn-${f}`} aria-pressed={fns.includes(f)} onClick={() => toggleFn(f)}>
+                <i aria-hidden="true" />
+                {t[`fn_${f}` as keyof CUi]}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ---------- mobil sekmeler ---------- */}
@@ -524,6 +520,8 @@ export default function Configurator({ lang, t, ui }: Props) {
             const ch = cfg.lamps[cat.id];
             const prod = productById(cat.id, ch.product);
             const open = openCat === cat.id;
+            const max = maxQty(cfg, cat.id);
+            const sideMin = cat.id === 'side' ? sideMinPerSide(cfg.trailer) : 0;
             return (
               <section class={`lc ${open ? 'open' : ''} ${ch.qty === 0 ? 'off' : ''}`} key={cat.id}>
                 <div class="lc-head">
@@ -536,21 +534,22 @@ export default function Configurator({ lang, t, ui }: Props) {
                     <Ico d={IC.chevron} size={16} />
                   </button>
                   <div class="qty sm" role="group" aria-label={`${categoryName(t, cat.id)}: ${t.qty}`}>
-                    <button type="button" aria-label={ui.qty_dec} disabled={ch.qty <= cat.min} onClick={() => step(cat.id, -1)}>
+                    <button type="button" aria-label={ui.qty_dec} disabled={ch.qty <= 0} onClick={() => step(cat.id, -1)}>
                       −
                     </button>
                     <output>{ch.qty}</output>
-                    <button type="button" aria-label={ui.qty_inc} disabled={ch.qty >= cat.max} onClick={() => step(cat.id, 1)}>
+                    <button type="button" aria-label={ui.qty_inc} disabled={ch.qty >= max} title={ch.qty >= max ? fmtT(t.max_reached, { n: max }) : undefined} onClick={() => step(cat.id, 1)}>
                       +
                     </button>
                   </div>
                 </div>
+                {sideMin > 0 && ch.qty / 2 < sideMin && <p class="lc-rule">{fmtT(t.side_rule, { n: sideMin })}</p>}
                 {open && (
                   <div class="lc-opts" role="radiogroup" aria-label={`${categoryName(t, cat.id)}: ${t.model}`}>
                     {cat.products.map((p) => (
                       <button type="button" role="radio" aria-checked={p.id === ch.product} onClick={() => pickProduct(cat.id, p.id)}>
-                        <LampGlyph style={p.style} />
-                        <span class="mono">{p.code}</span>
+                        <LampIcon id={p.id} lit={lights} />
+                        <span class="mono">{p.code}{p.codeR ? ` / ${p.codeR}` : ''}</span>
                       </button>
                     ))}
                   </div>

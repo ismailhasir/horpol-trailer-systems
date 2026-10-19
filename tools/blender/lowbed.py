@@ -101,6 +101,65 @@ def side_y_profile():
     return [[XF, 1.39], [XN_B, 1.39], [-9.62, 1.22], [-9.30, 0.95], [XG + 0.04, 0.82], [XR, 0.82]]
 
 
+# ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
+# Sabit parçalar: şasi (lamba ve plaka tutucuları, dış yan kiriş levhası) ve kaynaklı başlık / uyarı direkleri. Rampalar lamba yeri değil.
+HOLDER_Z0, HOLDER_Z1 = 0.36, 1.25  # box2 'lamp_holder' z (her yan), y 0,33–0,56
+PLATE_HOLDER_X = -0.005  # plaka tutucunun arka yüzü (y 0,405–0,56)
+PLATE_W, PLATE_H = 0.52, 0.11
+SIDE_Y_DECK = 0.74  # platform yan kirişinde (0,676–0,875) kazık ceplerinin (≥ 0,785) altı
+SIDE_Y_ARCH = 0.835  # tekerlek kemerlerinin (üstü 0,795) üstünde
+SIDE_X0, SIDE_X1, SIDE_N = -11.0, -0.6, 9  # ilk marker boyunda (önden 2,19 m), son arkadan 0,6 m; yan başına en çok 9 (1,3 m)
+FRONT_LAMP_Y = 1.85  # başlık köşe dikmesinin ön yüzü (dikme z 1,195–1,275, üstü 2,0)
+ARM_FRONT_Y = 1.88
+WARN_X, WARN_Z, WARN_TOP = -0.40, 1.265, 1.5  # arka köşe uyarı direği (x −0,425…−0,375, z 1,215–1,265, üstü 1,5)
+ARM_REAR_Y = 1.44
+WORK_Z = 1.18
+BEACON_Z = 1.0
+TRUNK_Z = BZ - 0.035  # kiriş gövdesinin iç yanı
+MODULE_X = -1.3  # son aksın arkasında, iki travers arasında
+REAR_JX = -0.16  # arka traversin önü
+
+
+def side_marker_profile():
+    """Yan marker yükseklik profili: boyunda levha ortası, kaz boynunda eğik levha, platformda kazık ceplerinin altı;
+    tekerlek kemerlerinin üstünde kemer tepesinin üstüne çıkar (her konumda levha üzerinde, kemer ve ceplerle çakışmaz)."""
+    p = [[XF, 1.39], [XN_B, 1.39], [-9.62, 1.22], [-9.30, 0.95], [XG + 0.04, SIDE_Y_DECK]]
+    for a in AXLES:
+        p += [[a - 0.32, SIDE_Y_DECK], [a - 0.26, SIDE_Y_ARCH], [a + 0.26, SIDE_Y_ARCH], [a + 0.32, SIDE_Y_DECK]]
+    return p + [[XR, SIDE_Y_DECK]]
+
+
+def mounts_dict():
+    hp = [[XF, NECK_H], [XN_B, NECK_H], [-9.90, 1.25], [-9.62, 1.08], [-9.45, 0.9], [XG - 0.06, HARNESS_Y], [XR, HARNESS_Y]]
+    return {
+        'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': HOLDER_Z1, 'zInner': HOLDER_Z0, 'faceX': XR},
+        'plate': {'x': PLATE_HOLDER_X, 'y': round(PLATE_Y + PLATE_H / 2 + 0.02, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
+                  'plateW': PLATE_W, 'plateH': PLATE_H},
+        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_marker_profile(), 'z': W2 + 0.001, 'maxPerSide': SIDE_N,
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None},
+        'front': {'x': XF, 'y': FRONT_LAMP_Y, 'z': W2 - 0.06, 'bracket': None},
+        'armFront': {'x': XF + 0.04, 'y': ARM_FRONT_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
+        'armRear': {'x': WARN_X, 'y': ARM_REAR_Y, 'z': WARN_Z, 'wallZ': WARN_Z, 'bracket': None},
+        'armRearAlt': {'x': -0.05, 'y': LAMP_Y, 'z': HOLDER_Z1, 'wallZ': HOLDER_Z1, 'bracket': None},
+        'work': [{'x': WARN_X + 0.02, 'y': WARN_TOP + 0.06, 'z': s * WORK_Z, 'dir': [1, -0.4, 0],
+                  'bracket': [[WARN_X, WARN_TOP, s * 1.24], [WARN_X, WARN_TOP + 0.03, s * WORK_Z]]} for s in (1, -1)],
+        'beacon': [{'x': XF + 0.04, 'y': HEAD_TOP, 'z': s * BEACON_Z, 'bracket': [[XF, HEAD_TOP, s * BEACON_Z], [XF + 0.12, HEAD_TOP, s * BEACON_Z]]}
+                   for s in (1, -1)],
+        'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': hp, 'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
+                    'notes': 'Boyunda traverslerin gövdesinden (y 1,40), kaz boynunda kiriş alt eğrisinin ~0,1 m üstünden iner, '
+                             'platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında.'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
+                    'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
+        'notes': 'Rampalar hareketli; lamba konmaz. Başlık ve arka uyarı direkleri kaynaklı sabit parçalar (GLB\'de "body"). '
+                 'Arka lambalar alçak tutucularda y 0,45 (alt kenar 0,376 ≥ 0,35). Yan markerlar dış yan kiriş levhasında: boyunda '
+                 'y 1,39 (boyun altında yapı yok; R48 6.18 üst sınır 1,5 m), platformda 0,74, kemerlerin üstünde 0,835. Ön pozisyon '
+                 've ön lastik kol başlığın köşe dikmesinde (en yüksek sabit nokta), arka kol uyarı direğinin yan yüzünde y 1,44 '
+                 '(alternatif: lamba tutucunun dış ucu, armRearAlt). Çalışma lambaları uyarı direklerinin üstünde, rampalara bakar. '
+                 'Tepe lambaları başlık üst kuşağında (80 mm derinlik, adaptör levhası); dik duran rampalar arkadan görünürlüğü keser '
+                 '(yüklemede rampalar iner).',
+    }
+
+
 def anchors_dict():
     """Sitenin okuyacağı bağlantı noktaları (three.js koordinatları; şema: src/configurator/engine/baked.ts)"""
     h = RAMP_W / 2
@@ -132,6 +191,7 @@ def anchors_dict():
         'harness': {'y': HARNESS_Y, 'frontX': XF + 0.3, 'trunkZ': 0.6, 'rearZ': 0.38, 'profile': hp},
         'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
         'sections': sections,
+        'mounts': mounts_dict(),
     }
 
 

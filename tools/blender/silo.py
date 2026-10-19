@@ -168,6 +168,55 @@ def side_y_profile():
     return [[SX0, 1.03], [SX1, 1.03], [FR0, 1.14], [XR, 1.14]]
 
 
+# ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
+# Sabit parçalar: şasi (lamba barı, yan koruma rayı, çamurluk rayı, kirişler), arka kule ve yürüme yolu. Tank kabuğu lamba yeri değil.
+BAR_Z = 1.24  # box2 'lamp_bar' z ±1,24, y 0,50–0,74, arka yüz x = 0
+PLATE_W, PLATE_H = 0.52, 0.11
+SIDE_Y_GUARD = 1.025  # yan koruma üst rayı (0,99–1,06) ortası
+SIDE_Y_RAIL = 1.14  # çamurluk rayı (1,10–1,18) ortası
+SIDE_ZW = 1.272  # rayların dış yüzü
+SIDE_X0, SIDE_X1, SIDE_N = -6.50, -0.98, 5  # ilk marker yan korumanın önünde (önden 2,885 m), son çamurluk rayında (arkadan 0,98 m)
+SIDE_GAP = (SX1 - 0.055, FR0 + 0.055)  # yan koruma ile çamurluk rayı arası (marker merkezi giremez)
+FB_X, FB_Y = -7.20, 1.34  # ön braket: iniş ayağının (−6,81) önünde, kirişin (−7,35…) dış yüzünden dışa
+FB_Z0, FB_Z1 = BZ + 0.05, 1.19
+WORK_Y, WORK_Z = 2.55, 0.50  # arka kulenin arka yüzü (x −0,62), üst köşe yuvarlağının içinde
+TRUNK_Y, TRUNK_Z = 1.34, BZ - 0.08  # alüminyum kutu kirişin (y 1,27–1,41) iç yüzü
+MODULE_X = -0.95  # −1,775 ve −0,62 traversleri arasında
+REAR_JX = -0.28  # arka traversin (−0,42…−0,30) arka yüzü
+
+
+def mounts_dict():
+    fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
+    walk_y = TOP + 0.02 + 0.022  # yürüme yolu üstü (WALK_Y + sac)
+    return {
+        'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': BAR_Z, 'zInner': 0.30, 'faceX': XR},
+        'plate': {'x': XR, 'y': round(PLATE_Y + PLATE_H / 2 + 0.025, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
+                  'plateW': PLATE_W, 'plateH': PLATE_H},
+        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y_profile(), 'z': SIDE_ZW, 'maxPerSide': SIDE_N,
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [list(SIDE_GAP)], 'brackets': None},
+        'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.17, 'bracket': fb},
+        'armFront': {'x': FB_X + 0.03, 'y': FB_Y, 'z': FB_Z1, 'wallZ': FB_Z1, 'bracket': fb},
+        'armRear': {'x': -0.07, 'y': LAMP_Y, 'z': BAR_Z, 'wallZ': BAR_Z, 'bracket': None},
+        'armRearAlt': {'x': FR1 - 0.06, 'y': SIDE_Y_RAIL, 'z': SIDE_ZW, 'wallZ': SIDE_ZW, 'bracket': None},
+        'work': [{'x': RTW[1] + 0.005, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'bracket': None} for s in (1, -1)],
+        'beacon': [{'x': -7.35, 'y': walk_y, 'z': 0.0, 'bracket': None}, {'x': -1.82, 'y': walk_y, 'z': -0.12, 'bracket': None}],
+        'harness': {'trunkY': TRUNK_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, TRUNK_Y], [XR, TRUNK_Y]], 'moduleX': MODULE_X,
+                    'rearJunctionX': REAR_JX,
+                    'notes': 'Demet king pin konsolunun içinden ve kutu kirişlerin iç yüzünde (y 1,34) arkaya gider; traverslerin '
+                             'uçlarından geçer. Arka dallar arka traversin arka yüzünden lamba barına iner.'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
+                    'armRear': 'chassis', 'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
+        'notes': 'Tank kabuğu ince yüzey olduğu için lamba ve kol taşımaz. Burun kulesi orta düzlemde dar (z ±0,42): ön pozisyon orada '
+                 'dış kenara ~0,9 m kalır; bu yüzden ön pozisyon ve ön lastik kol, kirişten dışa uzanan sabit ön brakette (x −7,20, '
+                 'y 1,34, uç z 1,19). Huni bu x\'te dar olduğundan braket tankın ~0,3 m altında kalır. Yan markerlar yan koruma üst '
+                 'rayında (1,025) ve çamurluk rayında (1,14): tekerlek ve hortum taşıyıcı nedeniyle 0,9 m altına inilemez (R48 6.18 '
+                 'üst sınır 1,5 m). Arka kule yarı genişliği 0,74: kontur için dış kenara 0,53 m, kural dışı; arka kol lamba barının '
+                 'dış ucunda (Horpol şeması; daha yüksek alternatif çamurluk rayı ucu y 1,14, armRearAlt, ama son markerla çakışmaması '
+                 'için marker x1 −0,98 kalır). Çalışma lambaları arka kulenin arka yüzünde. Tepe lambaları yürüme yolunun ön ucunda ve '
+                 'arka ucunda (merdiven +z yanından gelir, lamba −z yarısında); kapaklar düşük açıları kısmen keser, iki lamba birlikte 360°.',
+    }
+
+
 def tank_rings(step_body, n_head):
     xs = []
     x = XHF
@@ -219,6 +268,7 @@ def anchors_dict():
                     'profile': [[XF, SOCKET_Y], [-8.75, SOCKET_Y], [-8.45, HY], [XR, HY]]},
         'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
         'sections': sections,
+        'mounts': mounts_dict(),
     }
 
 

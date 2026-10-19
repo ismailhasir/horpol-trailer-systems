@@ -27,6 +27,50 @@ import dmContact from '../../assets/models/damper-contact.webp?url';
 import dmAnchors from './damper-anchors.json';
 
 type P3 = { x: number; y: number; z: number };
+/** Sabit braket: şasiden lambaya kırık çizgi [x, y, z][] (yoksa null) */
+export type BakedBracket = number[][] | null;
+/**
+ * Lamba montaj haritası (UN R48): her dorse betiğinin `mounts_dict()` çıktısı. Ayrıntı: docs/<Tip> Dorse/README.md,
+ * "Lamba montaj haritası (R48)". Kontrol: node tools/check-lighting.mjs
+ */
+export interface BakedMounts {
+  /** arka lamba bölgesi: lambalar zOuter'dan (dış uç) içe, en çok zInner'a kadar dizilir; faceX lamba arka yüzünün dayandığı x */
+  rear: { x: number; y: number; zOuter: number; zInner: number; faceX: number };
+  /** plaka lambaları (x, y, z[]) ve plakanın merkez yüksekliği / ölçüsü */
+  plate: { x: number; y: number; z: number[]; plateY: number; plateW: number; plateH: number };
+  /**
+   * yan markerlar: x0 → x1 eşit aralıkla, yan başına en çok maxPerSide. y: yükseklik profili [x, y] (x artan); z: marker sırtının
+   * dayandığı dış düzlem. avoid: marker merkezinin giremeyeceği x aralıkları; brackets: bu x aralığındaki markerlar kirişten
+   * (from: [y, z]) marker sırtına (to: [y, z]) L braketle taşınır.
+   */
+  side: {
+    x0: number;
+    x1: number;
+    y: number[][];
+    z: number;
+    maxPerSide: number;
+    rule: { firstFromFront: number; lastFromRear: number; maxGap: number };
+    avoid: number[][];
+    brackets: { x0: number; x1: number; from: number[]; to: number[] } | null;
+  };
+  /** ön pozisyon (beyaz), öne (−x) bakar; x montaj yüzü */
+  front: P3 & { bracket: BakedBracket };
+  /** lastik kol: taban plakası merkezi; wallZ plakanın dayandığı yan düzlem, kol +z'ye uzanır */
+  armFront: P3 & { wallZ: number; bracket: BakedBracket };
+  armRear: P3 & { wallZ: number; bracket: BakedBracket };
+  /** arka kol için alternatif (ör. lamba barının dış ucu) */
+  armRearAlt?: P3 & { wallZ: number; bracket: BakedBracket };
+  /** çalışma lambaları (en çok 2): dir ışık yönü */
+  work: (P3 & { dir: number[]; bracket: BakedBracket })[];
+  /** tepe lambaları (en çok 2): taban yatay yüzeyde, y taban yüksekliği */
+  beacon: (P3 & { bracket: BakedBracket })[];
+  /** ana demet: kirişin iç yanında korumalı güzergâh; profile [x, y] (x artan), modül ve arka dağıtım x'i */
+  harness: { trunkY: number; trunkZ: number; profile: number[][]; moduleX: number; rearJunctionX: number; notes: string };
+  /** montajın bağlı olduğu sabit parça: 'chassis' (şasi GLB) | 'body' (sabit üst yapı: kapalı kasa, başlık, kule, korkuluk) */
+  parents: Record<string, string>;
+  notes: string;
+}
+
 /** Betiğin yazdığı JSON (tools/blender/bl_common.py → write_anchors) */
 export interface BakedAnchors {
   L: number;
@@ -46,6 +90,8 @@ export interface BakedAnchors {
   contact: { x0: number; x1: number; z0: number; z1: number };
   /** tesisat görünümünde gizlenen gövdenin yerini gösteren kontur çizgileri (kapalı çokgenler) */
   sections: number[][][];
+  /** lamba montaj haritası (UN R48) */
+  mounts?: BakedMounts;
 }
 
 export interface BakedSpec {

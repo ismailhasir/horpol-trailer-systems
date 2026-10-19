@@ -5,6 +5,7 @@ import { addToCart, removeFromCart, restoreItem, setMult, setQty, showToast, use
 import { fmt, type Ui } from '../i18n/ui';
 import type { DetailItem } from '../lib/format';
 import type { Lang } from '../lib/labels';
+import SetVisual, { LampIcon } from './SetVisual';
 
 interface Props {
   /** false: konfigüratör sayfası. Ürün arama ve teklif listesi (sepet) gösterilmez, yalnızca bildirim çalışır. */
@@ -147,7 +148,7 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
 
   const results = useMemo(() => {
     const needle = q.trim().toLocaleLowerCase(lang);
-    const list = needle ? items.filter((i) => `${i.code} ${i.name}`.toLocaleLowerCase(lang).includes(needle)) : items;
+    const list = needle ? items.filter((i) => `${i.code} ${i.name} ${i.keys}`.toLocaleLowerCase(lang).includes(needle)) : items;
     return list.slice(0, 8);
   }, [q, items, lang]);
 
@@ -262,28 +263,81 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
       {/* ürün ayrıntısı */}
       <dialog ref={prod.ref} aria-label={detail?.name} onClick={prod.onBackdrop}>
         {detail && (
-          <div class="dlg">
+          <div class={detail.lamps ? 'dlg dlg-set' : 'dlg'}>
             <button type="button" class="icon-btn dlg-x" aria-label={ui.close} onClick={closeProduct}>
               <Svg d={I.close} />
             </button>
             <div class="dlg-im">
-              <img src={detail.img.src} srcset={detail.img.srcset} sizes="(max-width: 760px) 90vw, 380px" width={400} height={400} alt="" />
+              {detail.lamps ? (
+                <SetVisual lamps={detail.lamps} sizes="(max-width: 760px) 30vw, 140px" />
+              ) : (
+                detail.img && <img src={detail.img.src} srcset={detail.img.srcset} sizes="(max-width: 760px) 90vw, 380px" width={400} height={400} alt="" />
+              )}
             </div>
             <div class="dlg-in">
-              <span class="code-inline mono ltr">{detail.code}</span>
+              {detail.code !== detail.name && <span class="code-inline mono ltr">{detail.code}</span>}
               <h2>{detail.name}</h2>
               <p class="desc">{detail.desc}</p>
-              <table class="spec">
-                <tbody>
-                  {detail.specs.map((s) => (
-                    <tr>
-                      <th scope="row">{s.label}</th>
-                      <td class="ltr" style="text-align:start">{s.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p class="note">{ui.spec_note}</p>
+              {detail.specs.length > 0 && (
+                <>
+                  <table class="spec">
+                    <tbody>
+                      {detail.specs.map((s) => (
+                        <tr>
+                          <th scope="row">{s.label}</th>
+                          <td class="ltr" style="text-align:start">{s.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p class="note">{ui.spec_note}</p>
+                </>
+              )}
+              {detail.lamps && (
+                <div class="set-detail">
+                  <section>
+                    <h3>{ui.set_lamps}</h3>
+                    <ul class="set-lines">
+                      {detail.lamps.map((l) => (
+                        <li key={l.id}>
+                          <span class="set-ic">
+                            <LampIcon lamp={l} sizes="48px" />
+                          </span>
+                          <span class="set-tx">
+                            <span class="mono ltr">
+                              {l.code}
+                              {l.codeR ? ` · ${l.codeR}` : ''}
+                            </span>
+                            <span>{l.name}</span>
+                          </span>
+                          <span class="set-n ltr">
+                            ×{l.qty}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                  {detail.harness && detail.harness.length > 0 && (
+                    <section>
+                      <h3>{ui.set_harness}</h3>
+                      <ul class="set-lines set-harness">
+                        {detail.harness.map((h, i) => (
+                          <li key={i}>
+                            <span class="set-tx">
+                              <span>{h.name}</span>
+                              {h.spec && <span class="mono ltr">{h.spec}</span>}
+                            </span>
+                            <span class="set-n ltr">
+                              ×{h.qty}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                  <p class="note set-note">{ui.set_note}</p>
+                </div>
+              )}
               <div class="buy">
                 <div class="qty">
                   <button type="button" aria-label={ui.qty_dec} onClick={() => setPqty((n) => Math.max(1, n - 1))}>

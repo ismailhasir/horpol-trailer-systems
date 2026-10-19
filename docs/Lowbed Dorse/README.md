@@ -185,3 +185,20 @@ npm run models:pack -- lowbed
 
 - 4 akslı ve uzayan (extendable) varyantlar ayrı betik sabitleriyle üretilebilir.
 - Rampa güvenlik zinciri / gaz yayı, konteyner kilitleri, kazıklar eklenmedi.
+
+## 13. Lamba montaj haritası (R48)
+
+Kaynak: `lowbed.py` → `mounts_dict()` → `lowbed-anchors.json` içindeki `mounts`. Kontrol: `node tools/check-lighting.mjs`.
+Rampalar hareketli, lamba yeri değil. Başlık ve arka uyarı direkleri kaynaklı sabit parçalar (GLB'de "body").
+
+| Montaj | Yer (x, y, z) | Parça | Gerekçe |
+|---|---|---|---|
+| Arka lambalar | yüz x 0; y 0,45; z 1,25 → 0,36 | Alçak lamba tutucuları | Dış kenara 0,025 m; alt kenar 0,376 (≥ 0,35) |
+| Plaka + lambası | plaka y 0,47; lambalar y 0,545, z ±0,17 | Plaka tutucu | |
+| Yan marker | x −11,0 … −0,6; z 1,276; yan başına en çok 9 | Dış yan kiriş levhası | Boyunda y 1,39 (altında yapı yok; R48 6.18 ≤ 1,5), kaz boynunda levha ortası, platformda 0,74 (kazık ceplerinin altı), tekerlek kemerlerinin üstünde 0,835. Eşit dağıtımda yan başına en az 5 |
+| Ön pozisyon | x −13,19; y 1,85; z 1,215 | Başlık köşe dikmesi | Dış kenara 5 mm |
+| Lastik kol ön | x −13,15; y 1,88; duvar z 1,275 | Başlık köşe dikmesi yan yüzü | Önde en yüksek sabit nokta |
+| Lastik kol arka | x −0,40; y 1,44; duvar z 1,265 | Arka uyarı direği yan yüzü | Platform üstünde en yüksek sabit yer. Alternatif: lamba tutucunun ucu y 0,45 (`armRearAlt`) |
+| Çalışma (2) | x −0,38; y 1,56; z ±1,18; yön (1, −0,4, 0) | Uyarı direklerinin üstü (braket) | Rampalara ve arka yükleme alanına bakar |
+| Tepe (2) | x −13,15; y 2,0; z ±1,0 | Başlık üst kuşağı + adaptör levhası | Dik duran rampalar arkadan görünürlüğü keser (yüklemede iner) |
+| Tesisat | boyun 1,40 → platform 0,80; yan hat z 0,415; modül x −1,3; arka dağıtım x −0,16 | Traverslerin gövdesi | |

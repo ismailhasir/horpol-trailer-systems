@@ -449,5 +449,161 @@
       [-10.97, 3.33, 0.68],
       [-0.76, 3.33, 0.68]
     ]
-  ]
+  ],
+  "mounts": {
+    "rear": {
+      "x": 0.0,
+      "y": 0.56,
+      "zOuter": 1.2,
+      "zInner": 0.3,
+      "faceX": 0.0
+    },
+    "plate": {
+      "x": 0.0,
+      "y": 0.645,
+      "z": [-0.17, 0.17],
+      "plateY": 0.56,
+      "plateW": 0.52,
+      "plateH": 0.11
+    },
+    "side": {
+      "x0": -9.73,
+      "x1": -0.96,
+      "y": [
+        [-12.41, 1.27],
+        [-1.16, 1.27],
+        [-0.96, 1.3],
+        [0.0, 1.3]
+      ],
+      "z": 1.273,
+      "maxPerSide": 6,
+      "rule": {
+        "firstFromFront": 3.0,
+        "lastFromRear": 1.0,
+        "maxGap": 3.0
+      },
+      "avoid": [
+        [-9.56, -9.44],
+        [-8.81, -8.04],
+        [-7.91, -7.79]
+      ],
+      "brackets": {
+        "x0": -12.41,
+        "x1": -7.415,
+        "from": [1.121, 0.55],
+        "to": [1.27, 1.263]
+      }
+    },
+    "front": {
+      "x": -11.575,
+      "y": 1.4,
+      "z": 1.15,
+      "bracket": [
+        [-11.55, 1.4, 0.55],
+        [-11.55, 1.4, 1.19]
+      ]
+    },
+    "armFront": {
+      "x": -11.52,
+      "y": 1.4,
+      "z": 1.19,
+      "wallZ": 1.19,
+      "bracket": [
+        [-11.55, 1.4, 0.55],
+        [-11.55, 1.4, 1.19]
+      ]
+    },
+    "armRear": {
+      "x": -0.14,
+      "y": 1.08,
+      "z": 1.0,
+      "wallZ": 1.0,
+      "bracket": null
+    },
+    "armRearAlt": {
+      "x": -0.06,
+      "y": 0.56,
+      "z": 1.22,
+      "wallZ": 1.22,
+      "bracket": null
+    },
+    "work": [
+      {
+        "x": -0.08,
+        "y": 1.18,
+        "z": 0.6,
+        "dir": [1, -0.35, 0],
+        "bracket": [
+          [-0.14, 1.12, 0.6],
+          [-0.1, 1.17, 0.6]
+        ]
+      },
+      {
+        "x": -0.08,
+        "y": 1.18,
+        "z": -0.6,
+        "dir": [1, -0.35, 0],
+        "bracket": [
+          [-0.14, 1.12, -0.6],
+          [-0.1, 1.17, -0.6]
+        ]
+      }
+    ],
+    "beacon": [
+      {
+        "x": -0.85,
+        "y": 3.33,
+        "z": 0.66,
+        "bracket": [
+          [-0.93, 3.33, 0.66],
+          [-0.77, 3.33, 0.66]
+        ]
+      },
+      {
+        "x": -0.85,
+        "y": 3.33,
+        "z": -0.66,
+        "bracket": [
+          [-0.93, 3.33, -0.66],
+          [-0.77, 3.33, -0.66]
+        ]
+      }
+    ],
+    "harness": {
+      "trunkY": 0.8,
+      "trunkZ": 0.42,
+      "profile": [
+        [-12.0, 1.3],
+        [-9.75, 1.3],
+        [-9.5, 0.975],
+        [-9.25, 0.926],
+        [-9.0, 0.881],
+        [-8.75, 0.847],
+        [-8.5, 0.826],
+        [-8.25, 0.813],
+        [-8.0, 0.803],
+        [-7.75, 0.802],
+        [-7.5, 0.802],
+        [-7.25, 0.802],
+        [-7.0, 0.8],
+        [0.0, 0.8]
+      ],
+      "moduleX": -0.8,
+      "rearJunctionX": -0.25,
+      "notes": "Yan hatlar kutu kirişin iç yüzünde. Önde king pin plakasının üstünde tank ile plaka arası dar: orta ana hat (z ≈ 0) x < −9,75 bölgesinde tank kabuğunun altından geçer (bilinen sınırlama, tank tesisat görünümünde gizli). Plaka bitince demet kiriş alt başlığına iner (0,80); modül tankın en alt noktasının (0,85) altında."
+    },
+    "parents": {
+      "rear": "chassis",
+      "plate": "chassis",
+      "side": "chassis",
+      "front": "chassis",
+      "armFront": "chassis",
+      "armRear": "chassis",
+      "armRearAlt": "chassis",
+      "work": "chassis",
+      "beacon": "body",
+      "harness": "chassis"
+    },
+    "notes": "Tank kabuğu lamba taşımaz. Eski ön pozisyon (ADR panosunda z 1,02) dış kenara 0,2 m kalıyordu; yeni yer kirişten dışa uzanan ön braket (x −11,55, y 1,40, uç z 1,19; tank burada r ≈ 0,94, braketin üstü boş). Eski ilk yan marker önden 5,2 m gerideydi; hortum rafı −7,47'de başladığı için ilk marker(lar) kirişten dışa L braketle (side.brackets) raf hizasına (y 1,27, z 1,273) taşınır; iniş ayağı ve tesisat kolları side.avoid. Yan markerlar raf dudağında y 1,27: tekerlek ve dolap nedeniyle 0,9 m altına inilemez (R48 6.18 üst sınır 1,5 m). Arka kol arka çerçevenin üst kuşağının uç yüzünde (y 1,08, dış kenara 0,275 m; alternatif tampon ucu y 0,56). Çalışma lambaları üst kuşağın üstünde, tepe lambaları devrilme korkuluğunun arka ucunda (en yüksek sabit yer, 360°)."
+  }
 }

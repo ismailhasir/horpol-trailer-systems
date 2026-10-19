@@ -43,6 +43,8 @@ export interface Anchors {
   /** profile: tesisatın taban boyunca izlediği yükseklik [x, y] (x artan); boyunlu/basamaklı tiplerde kademeli */
   /** trunkZ / rearZ: yan ana hattın ve arka hatların yanal konumu (verilmezse 0,85 / 0,62) */
   harness: { y: number; railZ: number; junctionX: number; frontX: number; profile: [number, number][]; trunkZ?: number; rearZ?: number };
+  /** R48 lamba montaj haritası (betiğin `mounts` alanı; şema baked.ts → BakedMounts). Yoksa eski noktalar kullanılır. */
+  mounts?: unknown;
   center: THREE.Vector3;
   size: THREE.Vector3;
 }
@@ -121,7 +123,9 @@ export function buildTrailer(type: TrailerId, m: Mats): TrailerBuild {
   // gövde tesisat görünümünde gizlenir (yerini kontur çizgileri gösterir); şasi kendi malzemesiyle kalır
   for (const mm of mergedFromModel(bodyModel)) body.add(mm);
   for (const mm of mergedFromModel(rig)) chassisG.add(mm);
-  plate(group, S.rear.plateY, S.rear.x + 0.006);
+  // plaka: montaj haritasındaki tutucu yüksekliği (yoksa eski nokta)
+  const mp = (S as { mounts?: { plate?: { plateY?: number } } }).mounts?.plate;
+  plate(group, mp?.plateY ?? S.rear.plateY, S.rear.x + 0.006);
 
   const edgePos: number[] = [];
   for (const loop of bakedSections(S)) {
@@ -151,6 +155,7 @@ export function buildTrailer(type: TrailerId, m: Mats): TrailerBuild {
     armFront: S.armFront,
     socket: { x: S.socket.x, y: S.socket.y, onWall: true },
     harness: { y: S.harness.y, railZ: 0.4, junctionX: -0.65, frontX: S.harness.frontX, profile: S.harness.profile as [number, number][], trunkZ: S.harness.trunkZ, rearZ: S.harness.rearZ },
+    mounts: (S as { mounts?: unknown }).mounts,
     center: new THREE.Vector3(-L / 2, topY / 2, 0),
     size: new THREE.Vector3(L, topY, W),
   };

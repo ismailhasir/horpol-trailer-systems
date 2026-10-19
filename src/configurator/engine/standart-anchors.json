@@ -119,5 +119,126 @@
       [-13.7, 4.02, -1.275],
       [0.0, 4.02, -1.275]
     ]
-  ]
+  ],
+  "mounts": {
+    "rear": {
+      "x": -0.08,
+      "y": 0.86,
+      "zOuter": 1.19,
+      "zInner": 0.3,
+      "faceX": -0.08
+    },
+    "plate": {
+      "x": -0.08,
+      "y": 0.95,
+      "z": [-0.17, 0.17],
+      "plateY": 0.865,
+      "plateW": 0.52,
+      "plateH": 0.11
+    },
+    "side": {
+      "x0": -12.9,
+      "x1": -0.5,
+      "y": [
+        [-13.7, 1.19],
+        [0.0, 1.19]
+      ],
+      "z": 1.266,
+      "maxPerSide": 9,
+      "rule": {
+        "firstFromFront": 3.0,
+        "lastFromRear": 1.0,
+        "maxGap": 3.0
+      },
+      "avoid": [],
+      "brackets": null
+    },
+    "front": {
+      "x": -13.7,
+      "y": 1.95,
+      "z": 1.215,
+      "bracket": null
+    },
+    "armFront": {
+      "x": -13.635,
+      "y": 3.95,
+      "z": 1.275,
+      "wallZ": 1.275,
+      "bracket": null
+    },
+    "armRear": {
+      "x": -0.065,
+      "y": 3.95,
+      "z": 1.275,
+      "wallZ": 1.275,
+      "bracket": null
+    },
+    "armRearAlt": {
+      "x": -0.14,
+      "y": 0.86,
+      "z": 1.19,
+      "wallZ": 1.19,
+      "bracket": null
+    },
+    "work": [
+      {
+        "x": 0.0,
+        "y": 3.95,
+        "z": 0.8,
+        "dir": [1, -0.35, 0],
+        "bracket": null
+      },
+      {
+        "x": 0.0,
+        "y": 3.95,
+        "z": -0.8,
+        "dir": [1, -0.35, 0],
+        "bracket": null
+      }
+    ],
+    "beacon": [
+      {
+        "x": -0.065,
+        "y": 4.02,
+        "z": 1.0,
+        "bracket": [
+          [-0.13, 4.02, 1.0],
+          [0.02, 4.02, 1.0]
+        ]
+      },
+      {
+        "x": -0.065,
+        "y": 4.02,
+        "z": -1.0,
+        "bracket": [
+          [-0.13, 4.02, -1.0],
+          [0.02, 4.02, -1.0]
+        ]
+      }
+    ],
+    "harness": {
+      "trunkY": 1.18,
+      "trunkZ": 0.515,
+      "profile": [
+        [-13.7, 1.18],
+        [0.0, 1.18]
+      ],
+      "moduleX": -2.2,
+      "rearJunctionX": -0.185,
+      "notes": "Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner."
+    },
+    "parents": {
+      "rear": "chassis",
+      "plate": "chassis",
+      "side": "chassis",
+      "front": "body",
+      "armFront": "body",
+      "armRear": "body",
+      "armRearAlt": "chassis",
+      "work": "body",
+      "beacon": "body",
+      "harness": "chassis"
+    },
+    "notes": "Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol, çalışma ve tepe lambaları kasaya bağlanır. Ön pozisyon ön köşe dikmesinin ön yüzünde y 1,95 (R48 üst sınırı 2,10). Lastik kollar köşe dikmelerinin yan yüzünde y 3,95: en yüksek sabit nokta ve 270° açılan kapının (üst kenar 3,875) katlanma bölgesinin üstü. Yan markerlar şasinin dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır 1,5 m). Çalışma lambaları arka başlığın arka yüzünde, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli)."
+  }
 }

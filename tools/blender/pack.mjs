@@ -28,7 +28,9 @@ for (const name of MODELS) {
     console.error(`Eksik: ${src} (önce Blender betiğini çalıştırın)`);
     process.exit(1);
   }
-  const r = spawnSync(process.execPath, [cli, '-i', src, '-o', dst, '-cc', '-ce', 'ext', '-vpf', '-vnf', '-vtf'], { stdio: 'inherit' });
+  // lambalar: düğüm adları (EMIT.<işlev>) ve malzemeler (E.<işlev>.<renk>) korunmalı; site ışık işlevlerini adlardan tanır
+  const keep = name.startsWith('lamp-') ? ['-kn', '-km'] : [];
+  const r = spawnSync(process.execPath, [cli, '-i', src, '-o', dst, '-cc', '-ce', 'ext', '-vpf', '-vnf', '-vtf', ...keep], { stdio: 'inherit' });
   if (r.status !== 0) process.exit(r.status ?? 1);
   const size = statSync(dst).size;
   const gz = gzipSync(readFileSync(dst), { level: 9 }).length;

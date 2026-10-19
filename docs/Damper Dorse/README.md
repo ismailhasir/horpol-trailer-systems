@@ -147,3 +147,20 @@ npm run models:pack -- damper
 | Genel ![](gorseller/genel.jpg) | Arka 3/4 ![](gorseller/arka-34.jpg) |
 | Ön 3/4 ![](gorseller/on-34.jpg) | Tesisat, arka ![](gorseller/tesisat-arka.jpg) |
 | Önceki (yarım boru) ![](gorseller/onceki-arka-34.jpg) | Önceki, tesisat ![](gorseller/onceki-tesisat-arka.jpg) |
+
+## 13. Lamba montaj haritası (R48)
+
+Kaynak: `damper.py` → `mounts_dict()` → `damper-anchors.json` içindeki `mounts`. Kontrol: `node tools/check-lighting.mjs`.
+Kasa ve kapak devrilir: her lamba, kol ve braket **yalnız şasiye** bağlanır.
+
+| Montaj | Yer (x, y, z) | Parça | Gerekçe |
+|---|---|---|---|
+| Arka lambalar | yüz x 0; y 1,00; z 1,20 → 0,30 | Lamba levhası (y 0,96–1,12) | M8 saplamalar levhada, gövde 34 mm aşağı taşar: LZD 3194 sis kanalının üst kenarı 0,99 (≤ 1,0). Sisi üst yarıda olan bir ürün seçilirse ayrı sis lambası gerekir |
+| Plaka + lambası | plaka y 0,865 (tutucu 0,80–0,96 içinde); lambalar y 0,945, z ±0,17 | Plaka tutucu | Eski plateY 0,92 tutucunun üstünden taşıyordu |
+| Yan marker | x −6,19 … −0,95; y 1,25; z 1,27; yan başına en çok 5 | Kirişten L braket (her marker) | Alet kutusu (+z) ve iniş ayağı `side.avoid`. Çamurluk tepesi 1,13, kasa altı 1,43 (R48 6.18 ≤ 1,5). En az 3 |
+| Ön pozisyon | x −8,265; y 1,33; z 1,17 | Ön traversten dışa braket (z 0,64 → 1,19) | Eski yer devrilen kasanın üst köşesindeydi (y 2,95) |
+| Lastik kol ön | x −8,21; y 1,33; duvar z 1,19 | Aynı ön braket | Şasinin önündeki en yüksek sabit yer |
+| Lastik kol arka | x −0,03; y 1,04; duvar z 1,20 | Lamba levhasının dış ucu | Horpol şeması; şasinin arkadaki en yüksek sabit noktası |
+| Çalışma (2) | x −0,10; y 1,20; z ±0,83; yön (1, −0,35, 0) | Lamba kollarının üstü (braket) | Devrilen kasanın altında kalır; kasa arka ucu devrilirken ~1,37 m'nin altına inmez |
+| Tepe (1) | x −8,60; y 3,10; z 0,78 | Ön merdiven direğinin tepesi | Şasiye bağlı tek yüksek yer; kasa üstünü 9 cm aşar. İkinci yer yok |
+| Tesisat | y 1,32 (I kiriş gövdesinin iç yanı, z 0,55), arkada menteşe kulaklarının altına 1,25; modül x −1,3; arka dağıtım x −0,25 | Kiriş gövdesi | |

@@ -169,3 +169,20 @@ Blender önizleme render'ları (`--preview`), 2026-10-19:
 | Arka 3/4 ![](gorseller/arka-34.jpg) | Önden ![](gorseller/on.jpg) |
 | Arkadan ![](gorseller/arka.jpg) | Alt (yan koruma, hortum taşıyıcı) ![](gorseller/alt.jpg) |
 | Şasi (tesisat görünümündeki gibi, tank gizli) ![](gorseller/sasi.jpg) | |
+
+## 13. Lamba montaj haritası (R48)
+
+Kaynak: `silo.py` → `mounts_dict()` → `silo-anchors.json` içindeki `mounts`. Kontrol: `node tools/check-lighting.mjs`.
+Tank kabuğu ince yüzey: lamba ve kol taşımaz.
+
+| Montaj | Yer (x, y, z) | Parça | Gerekçe |
+|---|---|---|---|
+| Arka lambalar | yüz x 0; y 0,62; z 1,24 → 0,30 | Alüminyum lamba barı | Dış kenara 0,035 m |
+| Plaka + lambası | plaka y 0,62 (bar ortası); lambalar y 0,70, z ±0,17 | Lamba barı | |
+| Yan marker | x −6,50 … −0,98; z 1,272; yan başına en çok 5 | Yan koruma üst rayı (y 1,025), çamurluk rayı (y 1,14) | İlki önden 2,885, sonuncu arkadan 0,98 m; raylar arası boşluk (−4,535…−4,27) yasak. Tekerlek/hortum taşıyıcı nedeniyle 0,9 m altına inilemez (R48 6.18 ≤ 1,5). En az 3 |
+| Ön pozisyon | x −7,225; y 1,34; z 1,17 | Kirişten dışa ön braket (x −7,20, z 0,60 → 1,19) | Eski yer burun kulesinde z 0,30 idi (dış kenara ~0,9 m). Huni burada dar: braketin üstünde tank ≥ 0,35 m yukarıda |
+| Lastik kol ön | x −7,17; y 1,34; duvar z 1,19 | Aynı ön braket | Önde dış kenara yakın tek sabit yer (kule z ±0,42) |
+| Lastik kol arka | x −0,07; y 0,62; duvar z 1,24 | Lamba barının dış ucu | Arka kule yarı genişliği 0,74 (dış kenara 0,535, kural dışı). Daha yüksek alternatif: çamurluk rayı ucu y 1,14 (`armRearAlt`) |
+| Çalışma (2) | x −0,615; y 2,55; z ±0,50; yön (1, −0,35, 0) | Arka kulenin arka yüzü | Boşaltma dolabını aydınlatır |
+| Tepe (2) | (−7,35; 3,907; 0) ve (−1,82; 3,907; −0,12) | Yürüme yolunun ön ve arka ucu | Tankın üstündeki en yüksek sabit yatay yüzey; arka lamba merdivenin geldiği +z yarısını boş bırakır; ikisi birlikte 360° |
+| Tesisat | y 1,34 (kutu kirişin iç yüzü), z 0,47; modül x −0,95; arka dağıtım x −0,28 | Konsol içi, kiriş iç yüzü | Arka dallar arka traversin arka yüzünden lamba barına iner |

@@ -65,6 +65,9 @@ const tr = {
   spec_protection: 'Koruma sınıfı',
   spec_pins: 'Pin',
   spec_note: 'Teknik değerler örnektir.',
+  set_lamps: 'Lambalar',
+  set_harness: 'Kablo tesisatı',
+  set_note: 'Adetler ve kablo uzunlukları şemaya göredir.',
 
   about_eyebrow: 'Sistemin temeli',
   about_title: 'Dorse seti nedir?',
@@ -185,6 +188,9 @@ const en: Ui = {
   spec_protection: 'Protection class',
   spec_pins: 'Pins',
   spec_note: 'Technical values are examples.',
+  set_lamps: 'Lights',
+  set_harness: 'Wiring harness',
+  set_note: 'Quantities and cable lengths are taken from the wiring diagram.',
 
   about_eyebrow: 'The basics',
   about_title: 'What is a trailer set?',
@@ -303,6 +309,9 @@ const ru: Ui = {
   spec_protection: 'Степень защиты',
   spec_pins: 'Контакты',
   spec_note: 'Технические значения приведены для примера.',
+  set_lamps: 'Фонари',
+  set_harness: 'Жгут проводки',
+  set_note: 'Количество и длины кабелей указаны по схеме.',
 
   about_eyebrow: 'Основа системы',
   about_title: 'Что такое комплект для прицепа?',
@@ -421,6 +430,9 @@ const ar: Ui = {
   spec_protection: 'درجة الحماية',
   spec_pins: 'الدبابيس',
   spec_note: 'القيم الفنية أمثلة توضيحية.',
+  set_lamps: 'المصابيح',
+  set_harness: 'حزمة الأسلاك',
+  set_note: 'الكميات وأطوال الكابلات وفق المخطط.',
 
   about_eyebrow: 'أساس المنظومة',
   about_title: 'ما هو طقم المقطورة؟',

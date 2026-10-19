@@ -144,6 +144,78 @@ DOMES = [max((a + b) / 2, RAIL_X0 + 0.45) if i == 0 else min((a + b) / 2, XT2 - 
 VALVES = [max(min(b - 0.3, XT2 - 0.35), XT0 + 0.3) for a, b in COMP]  # dip vanaları: bölmenin arka ucunda, tank altında
 
 
+# ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
+# Sabit parçalar: şasi (tampon, arka çerçeve, hortum rafı, kirişler) ve devrilme korkuluğu. Tank kabuğu lamba yeri değil.
+BUMPER_Z = 1.20  # box2 'bumper' z ±1,22 (+ lastik uç); y 0,45–0,67, arka yüz x = 0
+PLATE_W, PLATE_H = 0.52, 0.11
+SIDE_Y, SIDE_Y_END = 1.27, 1.30  # hortum rafı dış dudağı (1,18–1,36); eğik arka uçta biraz yukarı
+SIDE_ZW = 1.273
+SIDE_X0, SIDE_X1, SIDE_N = -9.73, -0.96, 6  # ilk marker önden 2,68 m (braket), son arkadan 0,96 m (raf ucu)
+# braket bölgesi (raf başlamadan önce): marker kirişten dışa uzanan brakette; tesisat kolları ve iniş ayağı yasak
+SIDE_AVOID = [[-9.56, -9.44], [-8.81, -8.04], [-7.91, -7.79]]
+FB_X, FB_Y = -11.55, 1.40  # ön braket: kiriş (1,33–1,49) dış yüzünden dışa; tank burada dar (r ≈ 0,94)
+FB_Z0, FB_Z1 = BZ + 0.05, 1.19
+ARM_REAR = (-0.14, 1.08, 1.0)  # arka üst kuşağın ('rear_top' x −0,20…−0,08, y 1,04–1,12, z ±1,0) dış uç yüzü
+WORK_Z = 0.60
+BEACON_X = RAIL_X1 - 0.09  # devrilme korkuluğu üst başlığının arka ucu
+TRUNK_Z = BZ - 0.08  # kutu kirişin iç yüzü
+TRUNK_REAR = 0.80  # orta ve arkada: kiriş alt başlığı hizası, tankın en altının (0,85) altında
+MODULE_X = -0.80  # −1,16 ve −0,45 beşikleri arasında, tankın altında
+REAR_JX = -0.25  # arka traversin (−0,30…−0,20) altı, arka dikmelerin önü
+
+
+def beam_bottom(x):
+    t = under(x, BZ + 0.05) - 0.005
+    return max(H5 + 0.02, t - 0.16) if x < PLATE_X1 else t - 0.16
+
+
+def trunk_profile():
+    """Önde king pin plakasının üstünden (1,30), plaka bitince kiriş alt başlığına iner, ortada ve arkada 0,80."""
+    p = [[PLATE_X0, 1.30], [PLATE_X1, 1.30]]
+    x = PLATE_X1 + 0.25
+    while x < -7.0:
+        p.append([round(x, 3), round(max(TRUNK_REAR, min(1.30, beam_bottom(x) - 0.02)), 3)])
+        x += 0.25
+    return p + [[-7.0, TRUNK_REAR], [XR, TRUNK_REAR]]
+
+
+def mounts_dict():
+    fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
+    yb = round(beam_bottom(SIDE_X0) + 0.08, 3)
+    return {
+        'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': BUMPER_Z, 'zInner': 0.30, 'faceX': XR},
+        'plate': {'x': XR, 'y': round(PLATE_Y + PLATE_H / 2 + 0.03, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
+                  'plateW': PLATE_W, 'plateH': PLATE_H},
+        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': [[-L, SIDE_Y], [TR_X1 - 0.35, SIDE_Y], [SIDE_X1, SIDE_Y_END], [XR, SIDE_Y_END]],
+                 'z': SIDE_ZW, 'maxPerSide': SIDE_N, 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0},
+                 'avoid': SIDE_AVOID,
+                 # TR_X0'ın önündeki markerlar: kirişin dış yüzünden (y, z) marker sırtına (SIDE_Y, SIDE_ZW) L braket
+                 'brackets': {'x0': -L, 'x1': TR_X0 + 0.055, 'from': [yb, BZ + 0.05], 'to': [SIDE_Y, SIDE_ZW - 0.01]}},
+        'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.15, 'bracket': fb},
+        'armFront': {'x': FB_X + 0.03, 'y': FB_Y, 'z': FB_Z1, 'wallZ': FB_Z1, 'bracket': fb},
+        'armRear': {'x': ARM_REAR[0], 'y': ARM_REAR[1], 'z': ARM_REAR[2], 'wallZ': ARM_REAR[2], 'bracket': None},
+        'armRearAlt': {'x': -0.06, 'y': LAMP_Y, 'z': BUMPER_Z + 0.02, 'wallZ': BUMPER_Z + 0.02, 'bracket': None},
+        'work': [{'x': -0.08, 'y': 1.18, 'z': s * WORK_Z, 'dir': [1, -0.35, 0],
+                  'bracket': [[-0.14, 1.12, s * WORK_Z], [-0.10, 1.17, s * WORK_Z]]} for s in (1, -1)],
+        'beacon': [{'x': BEACON_X, 'y': RAIL_TOP, 'z': s * (RAIL_Z - 0.02),
+                    'bracket': [[BEACON_X - 0.08, RAIL_TOP, s * (RAIL_Z - 0.02)], [BEACON_X + 0.08, RAIL_TOP, s * (RAIL_Z - 0.02)]]}
+                   for s in (1, -1)],
+        'harness': {'trunkY': TRUNK_REAR, 'trunkZ': TRUNK_Z, 'profile': trunk_profile(), 'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
+                    'notes': 'Yan hatlar kutu kirişin iç yüzünde. Önde king pin plakasının üstünde tank ile plaka arası dar: orta ana hat '
+                             '(z ≈ 0) x < −9,75 bölgesinde tank kabuğunun altından geçer (bilinen sınırlama, tank tesisat görünümünde '
+                             'gizli). Plaka bitince demet kiriş alt başlığına iner (0,80); modül tankın en alt noktasının (0,85) altında.'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
+                    'armRear': 'chassis', 'armRearAlt': 'chassis', 'work': 'chassis', 'beacon': 'body', 'harness': 'chassis'},
+        'notes': 'Tank kabuğu lamba taşımaz. Eski ön pozisyon (ADR panosunda z 1,02) dış kenara 0,2 m kalıyordu; yeni yer kirişten dışa '
+                 'uzanan ön braket (x −11,55, y 1,40, uç z 1,19; tank burada r ≈ 0,94, braketin üstü boş). Eski ilk yan marker önden '
+                 '5,2 m gerideydi; hortum rafı −7,47\'de başladığı için ilk marker(lar) kirişten dışa L braketle (side.brackets) '
+                 'raf hizasına (y 1,27, z 1,273) taşınır; iniş ayağı ve tesisat kolları side.avoid. Yan markerlar raf dudağında y 1,27: '
+                 'tekerlek ve dolap nedeniyle 0,9 m altına inilemez (R48 6.18 üst sınır 1,5 m). Arka kol arka çerçevenin üst kuşağının '
+                 'uç yüzünde (y 1,08, dış kenara 0,275 m; alternatif tampon ucu y 0,56). Çalışma lambaları üst kuşağın üstünde, tepe '
+                 'lambaları devrilme korkuluğunun arka ucunda (en yüksek sabit yer, 360°).',
+    }
+
+
 def anchors_dict():
     """Sitenin okuyacağı bağlantı noktaları (three.js koordinatları; şema: src/configurator/engine/baked.ts)"""
     sections = []
@@ -186,6 +258,7 @@ def anchors_dict():
                     'profile': [[PLATE_X0, SOCKET_Y], [-9.6, SOCKET_Y], [-9.0, HY], [-1.15, HY], [-0.95, 0.85], [XR, 0.85]]},
         'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
         'sections': sections,
+        'mounts': mounts_dict(),
     }
 
 

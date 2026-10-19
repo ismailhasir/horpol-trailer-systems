@@ -1,7 +1,6 @@
 // Konfigüratör verisi: dorse tipleri, soketler, uzunluklar ve lamba katalogu.
-// Ürün kodları gerçek Horpol kodlarıdır (Dideban ürün verisinden). 3D görünümleri TEMSİLİDİR:
-// gerçek GLB modeller gelince `style` yerine model dosyası bağlanacak.
-// Adet sınırları ve uyumluluk kuralları ÖRNEKTİR, satış ekibiyle doğrulanacak.
+// Lamba ürünleri gerçek Horpol ürünleridir (vault: Kablolama ve Işıklandırma/Ürün Data); 3D modelleri üreticinin teknik
+// çizimlerinden Blender'da yapıldı. Adet tavanları kurala ve fiziksel yuvaya dayalı önerimizdir, satış ekibiyle doğrulanacak.
 
 export type TrailerId =
   | 'standart'
@@ -18,7 +17,7 @@ export type TrailerId =
 
 export type SocketId = '7x2' | '15' | '7x2+15';
 export type LengthId = '13.6' | '12' | '9';
-export type CategoryId = 'stop' | 'side' | 'plate' | 'front' | 'arm' | 'extra';
+export type CategoryId = 'stop' | 'side' | 'plate' | 'front' | 'arm' | 'work' | 'beacon';
 
 export interface TrailerDef {
   id: TrailerId;
@@ -50,55 +49,45 @@ export const SOCKETS: SocketId[] = ['7x2', '15', '7x2+15'];
 export const LENGTHS: LengthId[] = ['13.6', '12', '9'];
 export const lengthMeters = (l: LengthId) => Number(l);
 
-/** 3D görünüm biçimi (temsili) */
-export type LampStyle =
-  | 'block'
-  | 'carmen'
-  | 'navia'
-  | 'compact'
-  | 'round'
-  | 'oval'
-  | 'rect'
-  | 'slim'
-  | 'disc'
-  | 'plate-wide'
-  | 'plate-small'
-  | 'pos-rect'
-  | 'pos-round'
-  | 'arm-dragon'
-  | 'arm-classic'
-  | 'strip';
-
+/**
+ * Lamba ürünü. 3D modeli tools/blender/lamps.py üretir (src/assets/models/lamp-<id>.glb); simgesi src/assets/lamps/<id>-off|on.webp.
+ * pair: sol/sağ çift (sağdaki ayna; kodu `codeR`). max: ürünün fiziksel tavanı (kategori tavanından küçükse geçerli).
+ */
 export interface LampProduct {
   id: string;
   code: string;
-  style: LampStyle;
+  codeR?: string;
+  max?: number;
 }
 
 export interface CategoryDef {
   id: CategoryId;
-  /** adet: en az, en çok, adım */
+  /** adet: en az, en çok (genel tavan), adım. Alt sınır her kategoride 0 (kullanıcı isteği). */
   min: number;
   max: number;
   step: number;
   products: LampProduct[];
-  /** sahnede lens rengi (temsili) */
+  /** sahnede ışık rengi (temsili) */
   color: string;
 }
 
+// Tavanlar (2026-10-19): arka lambalar çift (sol + sağ); büyük kombine lambalar tek çift, yuvarlak/küçük lambalar lamba
+// barında her yanda 4'e (Lucy/Luna) ya da 2'ye (CUBE) kadar. Yan marker tavanı dorseye göre (sideMax); ön pozisyon ve
+// plaka 2; lastik kol 4 (önde ve arkada birer çift); çalışma ve tepe lambası 2 (modülün boş portları ve sabit yuvalar).
 export const CATEGORIES: CategoryDef[] = [
   {
     id: 'stop',
-    min: 2,
-    max: 4,
+    min: 0,
+    max: 8,
     step: 2,
     color: '#e0322d',
     products: [
-      { id: 'lzd3049', code: 'LZD 3049/H101/AMP1', style: 'block' },
-      { id: 'lzd2300', code: 'LZD 2300', style: 'carmen' },
-      { id: 'lzd2341', code: 'LZD 2341', style: 'navia' },
-      { id: 'lzd2246', code: 'LZD 2246', style: 'compact' },
-      { id: 'lzd844', code: 'LZD 844', style: 'round' },
+      { id: 'lzd3194', code: 'LZD 3194/AMP', codeR: 'LZD 3195/AMP', max: 2 },
+      { id: 'lzd2856', code: 'LZD 2856', codeR: 'LZD 2857', max: 2 },
+      { id: 'lzd2423', code: 'LZD 2423', max: 8 },
+      { id: 'lzd2448', code: 'LZD 2448', max: 8 },
+      { id: 'lzd2877', code: 'LZD 2877', max: 4 },
+      { id: 'lzd2880', code: 'LZD 2880', max: 4 },
     ],
   },
   {
@@ -108,22 +97,20 @@ export const CATEGORIES: CategoryDef[] = [
     step: 2,
     color: '#f5a00a',
     products: [
-      { id: 'ld2774', code: 'LD 2774', style: 'oval' },
-      { id: 'ld141', code: 'LD 141', style: 'rect' },
-      { id: 'ld180', code: 'LD 180', style: 'slim' },
-      { id: 'ld185', code: 'LD 185', style: 'disc' },
+      { id: 'ld2774', code: 'LD 2774' },
+      { id: 'ld2765', code: 'LD 2765' },
+      { id: 'ld0128', code: 'LD 0128' },
     ],
   },
   {
     id: 'plate',
-    min: 1,
+    min: 0,
     max: 2,
     step: 1,
     color: '#f4f7ff',
     products: [
-      { id: 'ltd2834', code: 'LTD 2834', style: 'plate-wide' },
-      { id: 'ltd665', code: 'LTD 665', style: 'plate-small' },
-      { id: 'ltd702', code: 'LTD 702', style: 'plate-wide' },
+      { id: 'ltd2834', code: 'LTD 2834' },
+      { id: 'ltd229', code: 'LTD 229' },
     ],
   },
   {
@@ -133,8 +120,8 @@ export const CATEGORIES: CategoryDef[] = [
     step: 2,
     color: '#f4f7ff',
     products: [
-      { id: 'ld364', code: 'LD 364', style: 'pos-rect' },
-      { id: 'ld442', code: 'LD 442', style: 'pos-round' },
+      { id: 'ld2773', code: 'LD 2773' },
+      { id: 'ld0127', code: 'LD 0127' },
     ],
   },
   {
@@ -144,20 +131,56 @@ export const CATEGORIES: CategoryDef[] = [
     step: 2,
     color: '#f5a00a',
     products: [
-      { id: 'ld2994', code: 'LD 2994 Dragon', style: 'arm-dragon' },
-      { id: 'ldcc2776', code: 'LDCC 2776', style: 'arm-classic' },
+      { id: 'ld2994', code: 'LD 2994 Dragon' },
+      { id: 'ldcc2698', code: 'LDCC 2698' },
     ],
   },
   {
-    // Additional Lights: ÖRNEK kategori ve model (LD 233 dekoratif işaret lambası); gerçek ek lamba grupları sonra eklenecek
-    id: 'extra',
+    id: 'work',
     min: 0,
-    max: 4,
-    step: 2,
-    color: '#e0322d',
-    products: [{ id: 'ld233', code: 'LD 233', style: 'strip' }],
+    max: 2,
+    step: 1,
+    color: '#f4f7ff',
+    products: [{ id: 'lrd2679', code: 'LRD 2679' }],
+  },
+  {
+    id: 'beacon',
+    min: 0,
+    max: 2,
+    step: 1,
+    color: '#f5a00a',
+    products: [{ id: 'ldo2660', code: 'LDO 2660' }],
   },
 ];
+
+/** Dorse başına yan marker tavanı (iki yan toplamı): yan rayda çakışmasız yuva sayısı (~1,5 m'de bir). */
+export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 18, lowbed: 18, silo: 10, tanker: 12, damper: 10 };
+
+/** Dorse modellerinin boyu (m; tools/blender/<tip>.py). R48 yan marker hesabı için. */
+export const TRAILER_L: Partial<Record<TrailerId, number>> = { standart: 13.7, lowbed: 13.19, silo: 9.385, tanker: 12.41, damper: 8.84 };
+/**
+ * UN R48 yan marker: uzunluk > 6 m ise zorunlu; ilki önden ≤ 3 m, sonuncusu arkadan ≤ 1 m, ardışık aralık ≤ 3 m.
+ * Site markerları montaj haritasındaki yan rayın (x0 … x1) boyuna eşit aralıkla dizer; açıklık SIDE_SPAN (tools/check-lighting.mjs).
+ * Döner: her yanda en az kaç adet (alt sınır DEĞİL: kullanıcı sıfıra inebilir, arayüz uyarı gösterir).
+ */
+const SIDE_SPAN: Partial<Record<TrailerId, number>> = { standart: 12.4, lowbed: 10.4, silo: 5.52, tanker: 8.77, damper: 5.24 };
+export function sideMinPerSide(t: TrailerId): number {
+  const L = TRAILER_L[t] ?? 13.6;
+  if (L <= 6) return 1;
+  return Math.ceil((SIDE_SPAN[t] ?? L - 1.5) / 3) + 1;
+}
+/** Tepe lambası yuvası (montaj haritası): damperde tek sabit yatay yüzey var */
+const BEACON_MAX: Partial<Record<TrailerId, number>> = { damper: 1 };
+
+/** Kategorinin bu yapılandırmadaki tavanı (ürün ve dorse sınırları dahil) */
+export function maxQty(c: Pick<Config, 'trailer' | 'lamps'>, cat: CategoryId): number {
+  const def = categoryById(cat);
+  const prod = productById(cat, c.lamps[cat]?.product ?? def.products[0].id);
+  let m = Math.min(def.max, prod.max ?? def.max);
+  if (cat === 'side') m = Math.min(m, SIDE_MAX[c.trailer] ?? def.max);
+  if (cat === 'beacon') m = Math.min(m, BEACON_MAX[c.trailer] ?? def.max);
+  return m;
+}
 
 export const categoryById = (id: CategoryId) => CATEGORIES.find((c) => c.id === id)!;
 export const productById = (cat: CategoryId, id: string) =>
@@ -180,12 +203,13 @@ export const DEFAULT_CONFIG: Config = {
   socket: '7x2',
   length: '13.6',
   lamps: {
-    stop: { product: 'lzd3049', qty: 2 },
-    side: { product: 'ld2774', qty: 8 },
+    stop: { product: 'lzd3194', qty: 2 },
+    side: { product: 'ld2774', qty: 12 },
     plate: { product: 'ltd2834', qty: 2 },
-    front: { product: 'ld364', qty: 2 },
+    front: { product: 'ld2773', qty: 2 },
     arm: { product: 'ld2994', qty: 2 },
-    extra: { product: 'ld233', qty: 0 },
+    work: { product: 'lrd2679', qty: 0 },
+    beacon: { product: 'ldo2660', qty: 0 },
   },
 };
 
@@ -199,7 +223,7 @@ export function normalize(c: Config): Config {
     const cur = c.lamps[cat.id] ?? DEFAULT_CONFIG.lamps[cat.id];
     const product = cat.products.some((p) => p.id === cur.product) ? cur.product : cat.products[0].id;
     let qty = Math.round(Number(cur.qty) || 0);
-    qty = Math.max(cat.min, Math.min(cat.max, qty));
+    qty = Math.max(cat.min, Math.min(maxQty({ trailer: t.id, lamps: { ...c.lamps, [cat.id]: { product, qty } } }, cat.id), qty));
     qty = cat.min + Math.round((qty - cat.min) / cat.step) * cat.step;
     lamps[cat.id] = { product, qty };
   }
