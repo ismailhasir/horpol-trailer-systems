@@ -1,4 +1,4 @@
-# Blender betikleri için ortak yardımcılar (standart_box.py, lowbed.py, silo.py, tanker.py; damper_chassis.py kendi kopyasıyla kalır).
+# Blender betikleri için ortak yardımcılar (standart_box.py, lowbed.py, silo.py, tanker.py, damper.py).
 # Koordinatlar three.js düzenindedir (x boyuna: arka uç 0, ön -L; y yukarı; z yanal). bl() Blender'a çevirir (Blender Z yukarı);
 # glTF dışa aktarıcı tekrar Y-yukarıya döndürür, yani sitede aynı sayılar geçerlidir.
 import bpy

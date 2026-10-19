@@ -1,11 +1,11 @@
-# Devam noktası (Linux makinesi, 2026-10-18 sonu)
+# Devam noktası (2026-10-19: silo K.SSL 33'e göre yeniden yapıldı)
 
 Bu dosya, başka bir bilgisayardaki Claude Code oturumunun kaldığımız yerden devam etmesi içindir. Önce `CLAUDE.md`'yi oku.
 
 ## Durum
 Konfigüratördeki **5 dorse tipinin hepsi** Blender'da betikle modellenip pişirilen GLB'dir (kodla çizilen model kalmadı):
-standart (K.SBT), lowbed (K.SLS), silo (K.SSL 38), tanker (K.STB E 45), damper (K.SKS B 27).
-Son commit: tüm bunları içerir. `git status` temiz olmalı (tools/shots + bu dosya yeni olabilir).
+standart (K.SBT), lowbed (K.SLS), silo (**K.SSL 33**, 9,385 m, 2 kapak; 2026-10-19'da yanlış referans K.SSL 38'den düzeltildi), tanker (K.STB E 45), damper (K.SKS B 27).
+Silo düzeltmesi `silo-kssl33` dalında (paketlendi, 2,50 MB). Yeni makinede önce `npm install` (gltfpack devDependency).
 
 | Tip | Betik | Belge |
 |---|---|---|
@@ -26,7 +26,7 @@ Ortak yardımcılar: `tools/blender/bl_common.py`. Site tarafı: `src/configurat
 
 ## Bekleyen kararlar (öneri, onay yok)
 - Silobas tankı doğal fırçalanmış alüminyum (referansta beyaz), damper kasası Horpol mavisi (#1c5198), tanker beyaz.
-- Doğrulanmadı listeleri her belgenin 4. bölümünde (silo: tablo/çizim dingil mesafesi 7.615/7.815, boy 10.605/10.823; tanker: konikliğin bittiği yer, hacim ~47 m³ çıkıyor; damper: kasa alt kavisi, silindir bağlantıları).
+- Doğrulanmadı listeleri her belgenin 4. bölümünde (silo: huni kesiti ve ağızların yeri, kulelerin derinliği; tanker: konikliğin bittiği yer, hacim ~47 m³ çıkıyor; damper: kasa alt kavisi, silindir bağlantıları).
 - Bilinen sınırlama: gövdeye bağlı lambaların (gabari/ön) kabloları tesisat görünümünde havada; tankerde orta hatlar kirişlerin ~0,2 m üstünde.
 
 ## Olası sonraki işler
