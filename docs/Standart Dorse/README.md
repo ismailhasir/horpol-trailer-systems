@@ -201,3 +201,12 @@ kapılar lamba yeri değildir.
 | Çalışma (2) | x 0; y 3,95; z ±0,80; yön (1, −0,35, 0) | Arka başlık (paslanmaz) | Yükleme ağzını yukarıdan aydınlatır |
 | Tepe (2) | x −0,065; y 4,02; z ±1,0 | Arka başlık üstü + adaptör levhası | Başlık 130 mm derin (Ø150 için levha). Toplam yükseklik ~4,15 m: 4,0 m sınırı ülkeye göre kontrol edilmeli |
 | Tesisat | y 1,18; yan hat z 0,515 (kiriş iç yanı); modül x −2,2; arka dağıtım x −0,185 | Traverslerin gövdesinden | Dallar arka traversin önünden lamba taşıyıcının içine iner |
+
+## Revize (2026-10-20, kullanıcı isteği)
+
+Önceki "Lamba montaj haritası" tablosunu geçersiz kılan değişiklikler (sayılar `tools/blender/standart_box.py` → `mounts_dict`):
+- **Ön pozisyon:** kasanın ön ÜST köşeleri, öne bakar (x −13,70; y 3,85; z ±1,215). R48'in 2,10 m üst sınırının üstünde: kullanıcı kararı, bilinçli.
+- **Lastik kollar:** kasanın 4 ALT köşesi, köşe dikmesinin yan yüzü (y 1,36). 2 adet seçilirse arka köşeler, 4 adette ön köşeler de.
+- **Stop lambaları:** taşıyıcının dış ucundan 9 cm boşluk (zOuter 1,10).
+- **Çalışma ve tepe lambası kabloları:** kapı bölgesinden değil, arka köşe dikmesinin içinden yukarı çıkar, başlık boyunca lambaya gider (`equipment.ts → auxTo`).
+- Tepe lambasının zemine yansıması kaldırıldı (tüm tiplerde).

@@ -93,8 +93,9 @@ REAR_ZIN = 0.30  # arka bölgenin iç sınırı: plaka (±0,26) + boşluk; stop 
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y = CH_TOP - 0.035  # yan C rayın (y 1,155–1,225) ortası
 SIDE_X0, SIDE_X1, SIDE_N = XF + 0.8, -0.5, 9  # ilk/son marker (önden 0,8 / arkadan 0,5 m), yan başına en çok 9 (~1,55 m)
-FRONT_LAMP_Y = 1.95  # ön köşe dikmesinin ön yüzü; R48 üst sınırı 2,10 (kasa sabit)
-ARM_Y = 3.95  # lastik kollar: kapı üst kenarının (3,875) üstü; 270° açılan kapı katlanınca kola çarpmaz
+FRONT_LAMP_Y = Y_PANEL1 - 0.08  # kullanıcı isteği (2026-10-20): kasanın ön ÜST köşeleri, öne bakar (R48 önerisi 2,10 m üstü: bilinçli)
+REAR_GAP = 0.09  # stop lambalarının taşıyıcının dış ucundan boşluğu (kullanıcı isteği)
+ARM_Y = Y_PANEL0 + 0.07  # lastik kollar: kasanın 4 ALT köşesi (kullanıcı isteği 2026-10-20), köşe dikmesinin yan yüzü
 POST_D = 0.13  # ön/arka köşe dikmesinin yan yüz derinliği
 WORK_Y, WORK_Z = Y_TOP - 0.07, 0.80  # arka başlık (y 3,88–4,02) ortası
 BEACON_Z = 1.0
@@ -106,7 +107,7 @@ REAR_JX = BEAM_X1 - 0.025  # arka dağıtım: arka traversin önü, iniş lamba 
 def mounts_dict():
     side_y = [[XF, SIDE_Y], [XR, SIDE_Y]]
     return {
-        'rear': {'x': CARRIER_X, 'y': LAMP_Y, 'zOuter': CARRIER_Z, 'zInner': REAR_ZIN, 'faceX': CARRIER_X},
+        'rear': {'x': CARRIER_X, 'y': LAMP_Y, 'zOuter': round(CARRIER_Z - REAR_GAP, 3), 'zInner': REAR_ZIN, 'faceX': CARRIER_X},
         'plate': {'x': CARRIER_X, 'y': round(PLATE_Y + PLATE_H / 2 + 0.03, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y, 'z': RAIL_Z + 0.001, 'maxPerSide': SIDE_N,

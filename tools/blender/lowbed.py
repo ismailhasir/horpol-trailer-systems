@@ -109,11 +109,11 @@ PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y_DECK = 0.74  # platform yan kirişinde (0,676–0,875) kazık ceplerinin (≥ 0,785) altı
 SIDE_Y_ARCH = 0.835  # tekerlek kemerlerinin (üstü 0,795) üstünde
 SIDE_X0, SIDE_X1, SIDE_N = -11.0, -0.6, 9  # ilk marker boyunda (önden 2,19 m), son arkadan 0,6 m; yan başına en çok 9 (1,3 m)
-FRONT_LAMP_Y = 1.85  # başlık köşe dikmesinin ön yüzü (dikme z 1,195–1,275, üstü 2,0)
-ARM_FRONT_Y = 1.88
-WARN_X, WARN_Z, WARN_TOP = -0.40, 1.265, 1.5  # arka köşe uyarı direği (x −0,425…−0,375, z 1,215–1,265, üstü 1,5)
-ARM_REAR_Y = 1.44
-WORK_Z = 1.18
+FRONT_LAMP_Y = HEAD_TOP - 0.08  # başlığın ön ÜST köşeleri, öne bakar (kullanıcı isteği 2026-10-20)
+ARM_FRONT_Y = NECK_BOT + 0.10  # lastik kollar kasanın 4 ALT köşesi: önde boyun yan kirişinin alt köşesi
+ARM_REAR_X, ARM_REAR_Y = -0.06, SIDE_BOT + 0.08  # arkada platform yan kirişinin alt köşesi
+# arka uyarı levhaları (direkli) kullanıcı isteğiyle kaldırıldı (2026-10-20)
+WORK_Y, WORK_Z = 0.565, 0.62  # çalışma lambaları: arka travers yüzünde, plaka ile kırmızı kontur bandı (y 0,70) arasında
 BEACON_Z = 1.0
 TRUNK_Z = BZ - 0.035  # kiriş gövdesinin iç yanı
 MODULE_X = -1.3  # son aksın arkasında, iki travers arasında
@@ -139,10 +139,9 @@ def mounts_dict():
                  'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None},
         'front': {'x': XF, 'y': FRONT_LAMP_Y, 'z': W2 - 0.06, 'bracket': None},
         'armFront': {'x': XF + 0.04, 'y': ARM_FRONT_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
-        'armRear': {'x': WARN_X, 'y': ARM_REAR_Y, 'z': WARN_Z, 'wallZ': WARN_Z, 'bracket': None},
+        'armRear': {'x': ARM_REAR_X, 'y': ARM_REAR_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRearAlt': {'x': -0.05, 'y': LAMP_Y, 'z': HOLDER_Z1, 'wallZ': HOLDER_Z1, 'bracket': None},
-        'work': [{'x': WARN_X + 0.02, 'y': WARN_TOP + 0.06, 'z': s * WORK_Z, 'dir': [1, -0.4, 0],
-                  'bracket': [[WARN_X, WARN_TOP, s * 1.24], [WARN_X, WARN_TOP + 0.03, s * WORK_Z]]} for s in (1, -1)],
+        'work': [{'x': XR + 0.02, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.15, 0], 'bracket': None} for s in (1, -1)],
         'beacon': [{'x': XF + 0.04, 'y': HEAD_TOP, 'z': s * BEACON_Z, 'bracket': [[XF, HEAD_TOP, s * BEACON_Z], [XF + 0.12, HEAD_TOP, s * BEACON_Z]]}
                    for s in (1, -1)],
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': hp, 'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
@@ -150,13 +149,11 @@ def mounts_dict():
                              'platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında.'},
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
                     'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
-        'notes': 'Rampalar hareketli; lamba konmaz. Başlık ve arka uyarı direkleri kaynaklı sabit parçalar (GLB\'de "body"). '
-                 'Arka lambalar alçak tutucularda y 0,45 (alt kenar 0,376 ≥ 0,35). Yan markerlar dış yan kiriş levhasında: boyunda '
-                 'y 1,39 (boyun altında yapı yok; R48 6.18 üst sınır 1,5 m), platformda 0,74, kemerlerin üstünde 0,835. Ön pozisyon '
-                 've ön lastik kol başlığın köşe dikmesinde (en yüksek sabit nokta), arka kol uyarı direğinin yan yüzünde y 1,44 '
-                 '(alternatif: lamba tutucunun dış ucu, armRearAlt). Çalışma lambaları uyarı direklerinin üstünde, rampalara bakar. '
-                 'Tepe lambaları başlık üst kuşağında (80 mm derinlik, adaptör levhası); dik duran rampalar arkadan görünürlüğü keser '
-                 '(yüklemede rampalar iner).',
+        'notes': 'Rampalar hareketli; lamba konmaz. Arka köşe uyarı levhaları kaldırıldı (kullanıcı, 2026-10-20). Arka lambalar alçak '
+                 'tutucularda y 0,45. Yan markerlar dış yan kiriş levhasında. Ön pozisyon başlığın ön üst köşelerinde, öne bakar. '
+                 'Lastik kollar kasanın 4 alt köşesinde: arkada platform yan kirişinin alt köşesi, önde boyun yan kirişinin alt köşesi '
+                 '(2 adet seçilirse arka, 4 adette ön de). Çalışma lambaları arka travers yüzünde, plaka ile kırmızı kontur bandı arasında. '
+                 'Tepe lambaları başlık üst kuşağında; kabloları başlığın arkasından köşe dikmesini izler (önden görünmez).',
     }
 
 
@@ -566,25 +563,7 @@ def clip(poly, a, b, c):
     return out
 
 
-# uyarı levhaları (arka köşeler, direk üstünde, arkaya bakar): kırmızı-beyaz 45° şeritler + 3'lü lamba grubu
-for s in (-1, 1):
-    zp = s * 1.24
-    box2(B, 'warn_post', -0.425, -0.375, DECK, 1.5, zp - 0.025, zp + 0.025, MB['paint'], 0.005)
-    za, zb = s * 0.86, s * 1.26
-    z0, z1 = min(za, zb), max(za, zb)
-    y0, y1 = 1.02, 1.44
-    box2(B, 'warn_back', -0.40, -0.376, y0, y1, z0, z1, MB['dark'], 0.004)
-    sq = [(z0, y0), (z1, y0), (z1, y1), (z0, y1)]
-    wv = 0.1
-    k = -3
-    while k < 8:
-        band = clip(clip(sq, -1, 1, (k + 1) * wv - z0 + y0), 1, -1, -(k * wv - z0 + y0))
-        if len(band) >= 3:
-            prism_zy(B, 'warn_stripe', band, -0.376, -0.372, MB['warnRed'] if k % 2 == 0 else MB['warnWhite'], 0.0)
-        k += 1
-    for y, ln in ((1.1, MB['lensWhite']), (1.22, MB['lensAmber']), (1.34, MB['lensRed'])):
-        box2(B, 'warn_lamp', -0.375, -0.35, y - 0.04, y + 0.04, zp - 0.03, zp + 0.03, MB['dark'], 0.006)
-        box2(B, 'warn_lens', -0.35, -0.345, y - 0.03, y + 0.03, zp - 0.022, zp + 0.022, ln, 0.004)
+# (arka köşe uyarı levhaları kullanıcı isteğiyle kaldırıldı, 2026-10-20)
 
 body = join(B, 'LbBody')
 

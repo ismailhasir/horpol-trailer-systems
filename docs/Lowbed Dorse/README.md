@@ -202,3 +202,12 @@ Rampalar hareketli, lamba yeri değil. Başlık ve arka uyarı direkleri kaynakl
 | Çalışma (2) | x −0,38; y 1,56; z ±1,18; yön (1, −0,4, 0) | Uyarı direklerinin üstü (braket) | Rampalara ve arka yükleme alanına bakar |
 | Tepe (2) | x −13,15; y 2,0; z ±1,0 | Başlık üst kuşağı + adaptör levhası | Dik duran rampalar arkadan görünürlüğü keser (yüklemede iner) |
 | Tesisat | boyun 1,40 → platform 0,80; yan hat z 0,415; modül x −1,3; arka dağıtım x −0,16 | Traverslerin gövdesi | |
+
+## Revize (2026-10-20, kullanıcı isteği)
+
+Önceki "Lamba montaj haritası" tablosunu ve uyarı levhası anlatımını geçersiz kılan değişiklikler (sayılar `tools/blender/lowbed.py`):
+- **Arka köşe uyarı levhaları (direk, kırmızı-beyaz şeritli levha, 3'lü lamba) modelden kaldırıldı;** model yeniden üretildi (paketli toplam 1,98 → 1,89 MB).
+- **Lastik kollar:** kasanın 4 ALT köşesi: arkada platform yan kirişinin alt köşesi (x −0,06; y 0,756), önde boyun yan kirişinin alt köşesi (y NECK_BOT + 0,10). 2 adette arka, 4 adette ön de.
+- **Ön pozisyon:** başlığın ön ÜST köşeleri, öne bakar (y 1,92).
+- **Çalışma lambaları:** arka travers yüzünde, plaka ile kırmızı kontur bandı (y 0,70) arasında (y 0,565; z ±0,62), arkaya bakar.
+- **Tepe lambası kabloları:** ön paneli delmez; başlığın arkasından köşe dikmesini izleyerek lambaya çıkar (önden görünmez).

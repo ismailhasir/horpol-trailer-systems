@@ -150,14 +150,13 @@ BUMPER_Z = 1.20  # box2 'bumper' z ±1,22 (+ lastik uç); y 0,45–0,67, arka y�
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y, SIDE_Y_END = 1.27, 1.30  # hortum rafı dış dudağı (1,18–1,36); eğik arka uçta biraz yukarı
 SIDE_ZW = 1.273
-SIDE_X0, SIDE_X1, SIDE_N = -9.73, -0.96, 6  # ilk marker önden 2,68 m (braket), son arkadan 0,96 m (raf ucu)
-# braket bölgesi (raf başlamadan önce): marker kirişten dışa uzanan brakette; tesisat kolları ve iniş ayağı yasak
-SIDE_AVOID = [[-9.56, -9.44], [-8.81, -8.04], [-7.91, -7.79]]
-FB_X, FB_Y = -11.55, 1.40  # ön braket: kiriş (1,33–1,49) dış yüzünden dışa; tank burada dar (r ≈ 0,94)
-FB_Z0, FB_Z1 = BZ + 0.05, 1.19
-ARM_REAR = (-0.14, 1.08, 1.0)  # arka üst kuşağın ('rear_top' x −0,20…−0,08, y 1,04–1,12, z ±1,0) dış uç yüzü
+# revize 2026-10-20: markerlar YALNIZ hortum rafının (beyaz koruma) dudağında; rafın önündeki braketli markerlar kaldırıldı
+SIDE_X0, SIDE_X1, SIDE_N = TR_X0 + 0.35, -0.96, 5  # ilk marker raf önünden 0,35 m geride, son arkadan 0,96 m (raf ucu)
+ARM_FRONT_X = TR_X0 + 0.05  # ön lastik kol: rafın en ön noktası
+FRONT_X, FRONT_Z = PLATE_X0 - 0.004, 0.50  # ön pozisyon: soket plakasının (con_front, z ±0,56) iki dış kenarında, öne bakar
 WORK_Z = 0.60
-BEACON_X = RAIL_X1 - 0.09  # devrilme korkuluğu üst başlığının arka ucu
+BEACON_Z = 0.86  # tepe lambaları: üst kuşakta çalışma lambalarının dış yanında (dorse yanına doğru)
+LINE_Z, LINE_Y = 1.20, 1.215  # yan hat rafın içinde, taban (1,18–1,20) üstünde dış dudağın arkasında
 TRUNK_Z = BZ - 0.08  # kutu kirişin iç yüzü
 TRUNK_REAR = 0.80  # orta ve arkada: kiriş alt başlığı hizası, tankın en altının (0,85) altında
 MODULE_X = -0.80  # −1,16 ve −0,45 beşikleri arasında, tankın altında
@@ -180,39 +179,36 @@ def trunk_profile():
 
 
 def mounts_dict():
-    fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
-    yb = round(beam_bottom(SIDE_X0) + 0.08, 3)
     return {
         'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': BUMPER_Z, 'zInner': 0.30, 'faceX': XR},
         'plate': {'x': XR, 'y': round(PLATE_Y + PLATE_H / 2 + 0.03, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': [[-L, SIDE_Y], [TR_X1 - 0.35, SIDE_Y], [SIDE_X1, SIDE_Y_END], [XR, SIDE_Y_END]],
                  'z': SIDE_ZW, 'maxPerSide': SIDE_N, 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0},
-                 'avoid': SIDE_AVOID,
-                 # TR_X0'ın önündeki markerlar: kirişin dış yüzünden (y, z) marker sırtına (SIDE_Y, SIDE_ZW) L braket
-                 'brackets': {'x0': -L, 'x1': TR_X0 + 0.055, 'from': [yb, BZ + 0.05], 'to': [SIDE_Y, SIDE_ZW - 0.01]}},
-        'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.15, 'bracket': fb},
-        'armFront': {'x': FB_X + 0.03, 'y': FB_Y, 'z': FB_Z1, 'wallZ': FB_Z1, 'bracket': fb},
-        'armRear': {'x': ARM_REAR[0], 'y': ARM_REAR[1], 'z': ARM_REAR[2], 'wallZ': ARM_REAR[2], 'bracket': None},
-        'armRearAlt': {'x': -0.06, 'y': LAMP_Y, 'z': BUMPER_Z + 0.02, 'wallZ': BUMPER_Z + 0.02, 'bracket': None},
-        'work': [{'x': -0.08, 'y': 1.18, 'z': s * WORK_Z, 'dir': [1, -0.35, 0],
+                 'avoid': [], 'brackets': None,
+                 # yan hat: arka lambadan arka çerçevenin dış ucunda (x −0,14, z 1,06) rafın yüksekliğine çıkar, rafın içinde
+                 # düz öne gider; ön pozisyon için rafın ön kolu (TR_X0+0,2) altından kirişe girer
+                 'rail': {'z': LINE_Z, 'y': [[TR_X0, LINE_Y], [XR, LINE_Y]], 'rise': [-0.14, 1.06], 'exit': [TR_X0 + 0.2, 1.12]}},
+        'front': {'x': FRONT_X, 'y': SOCKET_Y, 'z': FRONT_Z, 'bracket': None},
+        'armFront': {'x': ARM_FRONT_X, 'y': SIDE_Y, 'z': SIDE_ZW, 'wallZ': SIDE_ZW, 'bracket': None},
+        'armRear': {'x': -0.06, 'y': LAMP_Y, 'z': BUMPER_Z + 0.02, 'wallZ': BUMPER_Z + 0.02, 'bracket': None},
+        'armRearAlt': {'x': -0.14, 'y': 1.08, 'z': 1.0, 'wallZ': 1.0, 'bracket': None},
+        # çalışma/tepe kablosu arka traversin (−0,30…−0,20) önünde yükselir, üst kuşağın üstünden lambaya
+        'work': [{'x': -0.08, 'y': 1.18, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'rise': [-0.33, WORK_Z],
                   'bracket': [[-0.14, 1.12, s * WORK_Z], [-0.10, 1.17, s * WORK_Z]]} for s in (1, -1)],
-        'beacon': [{'x': BEACON_X, 'y': RAIL_TOP, 'z': s * (RAIL_Z - 0.02),
-                    'bracket': [[BEACON_X - 0.08, RAIL_TOP, s * (RAIL_Z - 0.02)], [BEACON_X + 0.08, RAIL_TOP, s * (RAIL_Z - 0.02)]]}
-                   for s in (1, -1)],
+        'beacon': [{'x': -0.14, 'y': 1.12, 'z': s * BEACON_Z, 'bracket': None, 'rise': [-0.33, BEACON_Z]} for s in (1, -1)],
         'harness': {'trunkY': TRUNK_REAR, 'trunkZ': TRUNK_Z, 'profile': trunk_profile(), 'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
                     'notes': 'Yan hatlar kutu kirişin iç yüzünde. Önde king pin plakasının üstünde tank ile plaka arası dar: orta ana hat '
                              '(z ≈ 0) x < −9,75 bölgesinde tank kabuğunun altından geçer (bilinen sınırlama, tank tesisat görünümünde '
                              'gizli). Plaka bitince demet kiriş alt başlığına iner (0,80); modül tankın en alt noktasının (0,85) altında.'},
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
                     'armRear': 'chassis', 'armRearAlt': 'chassis', 'work': 'chassis', 'beacon': 'body', 'harness': 'chassis'},
-        'notes': 'Tank kabuğu lamba taşımaz. Eski ön pozisyon (ADR panosunda z 1,02) dış kenara 0,2 m kalıyordu; yeni yer kirişten dışa '
-                 'uzanan ön braket (x −11,55, y 1,40, uç z 1,19; tank burada r ≈ 0,94, braketin üstü boş). Eski ilk yan marker önden '
-                 '5,2 m gerideydi; hortum rafı −7,47\'de başladığı için ilk marker(lar) kirişten dışa L braketle (side.brackets) '
-                 'raf hizasına (y 1,27, z 1,273) taşınır; iniş ayağı ve tesisat kolları side.avoid. Yan markerlar raf dudağında y 1,27: '
-                 'tekerlek ve dolap nedeniyle 0,9 m altına inilemez (R48 6.18 üst sınır 1,5 m). Arka kol arka çerçevenin üst kuşağının '
-                 'uç yüzünde (y 1,08, dış kenara 0,275 m; alternatif tampon ucu y 0,56). Çalışma lambaları üst kuşağın üstünde, tepe '
-                 'lambaları devrilme korkuluğunun arka ucunda (en yüksek sabit yer, 360°).',
+        'notes': 'Tank kabuğu lamba taşımaz. Revize 2026-10-20 (kullanıcı kararı): ön pozisyon soket plakasının iki dış kenarında '
+                 '(x −12,004, y 1,36, z ±0,50), öne bakar, braket yok; dış kenara ~0,78 m (R48 6.9 ≤ 0,4 m, kural dışı). Yan markerlar '
+                 'yalnız hortum rafının dudağında (y 1,27, z 1,273), en çok 5/yan; rafın önündeki braketli markerlar kaldırıldı. İlk '
+                 'marker önden ~5,3 m, ön lastik kol rafın ön ucunda (~5,0 m; R48 6.18 ≤ 3 m, kural dışı). Yan hat rafın içinde tek '
+                 'düz hat. Arka lastik kol tamponun dış ucunda (stop lambaları hizası, y 0,56; eski üst kuşak ucu armRearAlt). Çalışma '
+                 'lambaları üst kuşağın üstünde, tepe lambaları aynı kuşakta onların dış yanında (z ±0,86).',
     }
 
 
@@ -475,9 +471,7 @@ for y0, y1 in ((0.50, 0.56), (0.64, 0.68)):
     box2(C, 'side_rail', CAB_X0, CAB_X1, y0, y1, -1.268, -1.24, M['alu'], 0.004)
 for x in (CAB_X0 + 0.05, CAB_X1 - 0.05):
     box2(C, 'side_post', x - 0.025, x + 0.025, 0.5, TR_Y0, -1.24, -1.2, P, 0.003)
-for col, dz in ((M['airRed'], 0.0), (M['airYellow'], 0.022)):
-    poly_tube(C, 'air_line', [(PLATE_X0 + 0.05, 1.32, -0.30 - dz), (PLATE_X0 + 0.3, 1.32, -0.42 - dz), (-9.6, 1.32, -0.42 - dz), (-9.0, 1.1, -0.68 - dz),
-                             (EBS[0] - 0.4, 1.1, -0.68 - dz), (EBS[0] - 0.16, 0.9, -0.74 - dz)], 0.007, col, 2)
+# (revize 2026-10-20: önden EBS'ye giden kırmızı/sarı hava hatları kaldırıldı; tesisat görünümünde demetle karışıyordu)
 poly_tube(C, 'air_tank_line', [(-6.55, 0.80, -0.92), (-6.3, 0.95, -0.9), (EBS[0] - 0.3, 0.95, -0.9), (EBS[0] - 0.15, 0.88, -0.84)], 0.008, M['air'], 2)
 for cx, cy_, cz in CHAMBERS:
     s = 1 if cz > 0 else -1

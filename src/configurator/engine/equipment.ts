@@ -15,20 +15,29 @@ import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
 import { emitterSpots, lampInstance, type LampFn } from './lampfx';
 
+/** Yanınca görünen ışık efekti: lens önünde hale (sprite) ya da zemine düşen renkli ışık (pool) */
 export interface Glow {
-  sprite: THREE.Sprite;
+  sprite: THREE.Object3D;
   fn: LampFn;
+}
+/** Sahnedeki gerçek ışıkların yerleşimi (Engine sabit sayıda ışığı buraya taşır: gölgelendirici yeniden derlenmez) */
+export interface LampLightAnchors {
+  rear: THREE.Vector3[];
+  work: { pos: THREE.Vector3; dir: THREE.Vector3 }[];
 }
 export interface EquipmentBuild {
   group: THREE.Group;
   glows: Glow[];
   harness: THREE.Group;
   lampsByCat: Record<CategoryId, THREE.Object3D[]>;
+  lights: LampLightAnchors;
   /** gerçek modeli henüz yüklenmemiş lamba var mı (Engine yüklenince yeniden kurar) */
   placeholders: number;
 }
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+/** art arda çakışan noktaları atar (kısa düz uçlarda iki nokta aynı yere düşebilir) */
+const dedupe = (pts: THREE.Vector3[]) => pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]) > 1e-4);
 function m(geo: THREE.BufferGeometry, mat: THREE.Material, cast = true) {
   const x = new THREE.Mesh(geo, mat);
   x.castShadow = cast;
@@ -42,13 +51,42 @@ type Bracket = [number, number, number][] | null | undefined;
 interface MountsLike {
   rear?: { x: number; y: number; zOuter: number; zInner?: number; faceX?: number };
   plate?: { x: number; y: number; z: number[]; plateY?: number };
-  side?: { x0: number; x1: number; y: [number, number][]; z: number; brackets?: { x0: number; x1: number; from: [number, number]; to: [number, number] } | null };
+  side?: {
+    x0: number;
+    x1: number;
+    y: [number, number][];
+    z: number;
+    brackets?: { x0: number; x1: number; from: [number, number]; to: [number, number] } | null;
+    /** sabit marker yuvaları [x, y], arkadan öne (ör. lastik ortaları); verilirse eşit aralık yerine bunlar kullanılır */
+    slots?: [number, number][];
+    /** yan hat rayın/rafın içinde tek düz hat: z (iç yüz), y profili, arkada yükselme [x, z|null], önde kirişe giriş [x, y] */
+    rail?: {
+      z: number;
+      y: [number, number][];
+      rise: [number, number | null];
+      pass?: number | null;
+      exit?: [number, number];
+      /** yükseldikten sonra raya kadar izlenen [|z|, y] noktaları (ör. damper kasa tabanının altı) */
+      bend?: [number, number][];
+      /** ön pozisyon ve ön kol raydan değil şasi demetinden (devrilen kasada kablo kasadan şasiye önde geçmez) */
+      frontFromChassis?: boolean;
+    };
+  };
   front?: P3 & { bracket?: Bracket };
   armRear?: P3 & { wallZ?: number; bracket?: Bracket };
   armFront?: P3 & { wallZ?: number; bracket?: Bracket };
-  work?: (P3 & { dir?: [number, number, number]; bracket?: Bracket })[];
-  beacon?: (P3 & { bracket?: Bracket })[];
-  harness?: { trunkY?: number; trunkZ?: number; profile?: [number, number][]; moduleX?: number; rearJunctionX?: number };
+  /** rise: kablonun dikey çıktığı [x, |z|, yanal geçiş y?] (dar kule/travers önü gibi; yoksa en yakın köşe) */
+  work?: (P3 & { dir?: [number, number, number]; bracket?: Bracket; rise?: number[] })[];
+  beacon?: (P3 & { bracket?: Bracket; rise?: number[] })[];
+  harness?: {
+    trunkY?: number;
+    trunkZ?: number;
+    profile?: [number, number][];
+    moduleX?: number;
+    rearJunctionX?: number;
+    /** arka 7×1 hattın lamba barına indiği yer (|z|) ve barın içinde yanal gittiği x: arkadan bakınca dikme kabloyu örter */
+    rearDrop?: { z: number; innerX: number };
+  };
 }
 
 // ---------- yer tutucu (model yüklenene kadar) ----------
@@ -177,6 +215,51 @@ function controlModule(mats: Mats) {
   return g;
 }
 
+// ---------- yanan lamba efektleri ----------
+/** hale boyu tavanı (m) */
+const HALO_MAX: Record<CategoryId, number> = { stop: 0.7, side: 0.32, plate: 0.26, front: 0.36, arm: 0.34, work: 0.9, beacon: 0.75 };
+/** zemine düşen ışığın boyu ve eni (m); plaka zemine düşmez */
+// tepe lambası zemine düşmez (kullanıcı isteği 2026-10-20); plaka da düşmez
+const POOL: Partial<Record<CategoryId, [number, number]>> = { stop: [3.2, 2.0], side: [1.2, 0.9], front: [1.8, 1.3], arm: [1.0, 0.8], work: [6.5, 4.2] };
+const POOL_GEO = markShared(new THREE.PlaneGeometry(1, 1));
+const haloMats = new Map<string, THREE.SpriteMaterial>();
+function haloMaterial(mats: Mats, c: THREE.Color) {
+  const k = c.getHexString();
+  let m = haloMats.get(k);
+  if (!m) {
+    m = new THREE.SpriteMaterial({ map: mats.glow.white.map, color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.95, toneMapped: false, fog: false });
+    haloMats.set(k, m);
+  }
+  return m;
+}
+const poolMats = new Map<string, THREE.MeshBasicMaterial>();
+let poolTex: THREE.CanvasTexture | null = null;
+function poolTexture() {
+  if (poolTex) return poolTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.7, 'rgba(255,255,255,0.15)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  poolTex = new THREE.CanvasTexture(c);
+  return poolTex;
+}
+function poolMaterial(c: THREE.Color, cat: CategoryId) {
+  const k = `${c.getHexString()}|${cat}`;
+  let m = poolMats.get(k);
+  if (!m) {
+    const op = cat === 'work' ? 0.7 : cat === 'stop' ? 0.5 : 0.42;
+    m = new THREE.MeshBasicMaterial({ map: poolTexture(), color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: op, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    poolMats.set(k, m);
+  }
+  return m;
+}
+
 /** Arka lambaların genişliği (lamba yerel X), dizilim için: modelden ölçülür, yoksa ürüne göre tahmin */
 const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2856: 0.451, lzd2423: 0.155, lzd2448: 0.145, lzd2877: 0.115, lzd2880: 0.115 };
 
@@ -207,15 +290,42 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const glowLater: THREE.Object3D[] = [];
   const makeGlows = () => {
     for (const obj of glowLater) {
+      const cat = obj.userData.category as CategoryId;
+      obj.updateMatrixWorld(true);
+      const facing = V(0, 0, 1).applyQuaternion(obj.getWorldQuaternion(new THREE.Quaternion())).normalize();
+      const pooled = new Set<string>();
       for (const sp of emitterSpots(obj)) {
-        const mat = new THREE.SpriteMaterial({ map: mats.glow.white.map, color: sp.color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1 });
-        const s = new THREE.Sprite(mat);
-        s.position.copy(sp.pos);
-        s.scale.setScalar(Math.min(0.34, Math.max(0.09, sp.size * 1.6)));
-        s.visible = false;
-        s.renderOrder = 10;
-        group.add(s);
-        glows.push({ sprite: s, fn: sp.fn });
+        // 1) hale: lensin hemen önünde, ton eşlemesiz; yanınca lambanın çevresi parlar
+        const halo = new THREE.Sprite(haloMaterial(mats, sp.color));
+        halo.position.copy(sp.pos).addScaledVector(facing, 0.02);
+        halo.scale.setScalar(Math.min(HALO_MAX[cat], Math.max(0.16, sp.size * 2.4)));
+        halo.visible = false;
+        halo.renderOrder = 10;
+        group.add(halo);
+        glows.push({ sprite: halo, fn: sp.fn });
+        // 2) zemine düşen ışık: lamba başına renk + işlev için bir tane
+        const key = `${sp.fn}|${sp.color.getHexString()}`;
+        if (pooled.has(key) || !POOL[cat]) continue;
+        pooled.add(key);
+        // lastik kolun yüzleri farklı yönlere bakar: beyaz öne, kırmızı arkaya, turuncu yana
+        let dir = facing.clone();
+        if (cat === 'arm') dir = sp.color.r > 0.9 && sp.color.g > 0.9 ? V(-1, 0, 0) : sp.color.g < 0.2 ? V(1, 0, 0) : V(0, 0, Math.sign(sp.pos.z) || 1);
+        const flat = V(dir.x, 0, dir.z);
+        if (cat !== 'beacon' && flat.lengthSq() < 1e-4) flat.set(1, 0, 0);
+        flat.normalize();
+        const [len, wid] = POOL[cat]!;
+        const pool = new THREE.Mesh(POOL_GEO, poolMaterial(sp.color, cat));
+        const hgt = Math.max(0, sp.pos.y);
+        // lamba yükseldikçe ışık zeminde uzağa düşer ve yayılır
+        const reach = cat === 'beacon' ? 0 : cat === 'work' ? 3.2 : len * 0.42 + hgt * 0.35;
+        pool.position.set(sp.pos.x + flat.x * reach, 0.013, sp.pos.z + flat.z * reach);
+        pool.scale.set(len * (1 + hgt * 0.15), wid * (1 + hgt * 0.1), 1);
+        pool.rotation.set(-Math.PI / 2, 0, cat === 'beacon' ? 0 : Math.atan2(-flat.z, flat.x));
+        pool.visible = false;
+        pool.renderOrder = 9;
+        pool.userData.noEdge = true;
+        group.add(pool);
+        glows.push({ sprite: pool, fn: sp.fn });
       }
     }
   };
@@ -288,19 +398,58 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       // AMP 7 pin fiş lambanın arkasında; 7×1 dalı arka dağıtımdan
       const back = V(rx - 0.05, ly, s * z);
       amps.push({ pos: back.clone().add(V(-0.02, 0, 0)), dir: V(1, 0, 0) });
-      wires.push({ kind: 'rear', r: 0.011, conn: undefined, pts: [V(xd, hy, s * z), V(xd, ly, s * z), V(rx - 0.075, ly, s * z)] });
+      const rd = M.harness?.rearDrop;
+      wires.push({
+        kind: 'rear',
+        r: 0.011,
+        conn: undefined,
+        // rearDrop: dikmenin arkasında iner, bar kolunun ve barın içinden lambaya (arkadan görünmez)
+        pts: rd
+          ? [V(xd, hy, s * rd.z), V(xd, ly, s * rd.z), V(rd.innerX, ly, s * rd.z), V(rd.innerX, ly, s * z), V(rx - 0.075, ly, s * z)]
+          : [V(xd, hy, s * z), V(xd, ly, s * z), V(rx - 0.075, ly, s * z)],
+      });
     }
   }
 
   // =========================== PLAKA ===========================
   const pl = c.lamps.plate;
   const P = M.plate;
-  const pzs = pl.qty === 0 ? [] : pl.qty === 1 ? [0] : (P?.z ?? [-0.17, 0.17]);
-  const plateLampY = P?.y ?? a.rear.plateY + 0.085;
-  const plateX = P?.x ?? rx + 0.01;
-  for (const z of pzs) {
-    mount('plate', pl.product, V(plateX, plateLampY, z), (o) => {
-      o.rotation.y = Math.PI / 2;
+  const plateCy = P?.plateY ?? a.rear.plateY; // plakanın merkez yüksekliği
+  const plateFace = a.rear.x + 0.006; // plakanın arka yüzü (trailer.ts ile aynı)
+  const PLATE_HALF_W = 0.26;
+  const PLATE_HALF_H = 0.055;
+  /** Her plaka lambası: konum, yönlendirme (lens plakaya bakar) ve kablonun girdiği nokta */
+  type PlateSpot = { pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3 };
+  const plateSpots: PlateSpot[] = [];
+  const qy = (r: number) => new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), r);
+  const qz = (r: number) => new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), r);
+  if (pl.qty > 0) {
+    if (pl.product === 'ltd229') {
+      // LTD 229: plakanın ÜSTÜNDE, pencere arkaya ve aşağıya (plakaya) bakar
+      const zs = pl.qty === 1 ? [0] : [-0.17, 0.17];
+      for (const z of zs) {
+        const base = V(plateFace + 0.02, plateCy + PLATE_HALF_H + 0.004, z);
+        plateSpots.push({ pos: base, q: qz(-0.95).multiply(qy(Math.PI / 2)), entry: V(base.x, base.y - 0.012, z) });
+      }
+    } else {
+      // LTD 2834 (ve diğerleri): plakanın İKİ YANINDA, TABANI taşıyıcının dikey arka yüzüne vidalı (civatalar öne,
+      // taşıyıcıya girer), difüzör plakanın ortasına bakar. Yerel eksenler: Y (taban → üst) = dünya +X (arkaya),
+      // Z (difüzör) = plakaya doğru (∓z), X = Y × Z.
+      const zs = pl.qty === 1 ? [PLATE_HALF_W + 0.04] : [PLATE_HALF_W + 0.04, -(PLATE_HALF_W + 0.04)];
+      for (const z of zs) {
+        const s = z > 0 ? 1 : -1;
+        const Yw = V(1, 0, 0);
+        const Zw = V(0, 0, -s);
+        const Xw = Yw.clone().cross(Zw);
+        const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(Xw, Yw, Zw));
+        const base = V(plateFace - 0.002, plateCy, z);
+        plateSpots.push({ pos: base, q, entry: V(base.x - 0.02, base.y, z) });
+      }
+    }
+  }
+  for (const sp of plateSpots) {
+    mount('plate', pl.product, sp.pos, (o) => {
+      o.quaternion.copy(sp.q);
     });
   }
 
@@ -313,9 +462,23 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const sideZ = S?.z ?? a.side.z;
   const per = Math.floor(sd.qty / 2);
   const sideXs: number[] = [];
-  for (let i = 0; i < per; i++) sideXs.push(per === 1 ? (sx0 + sx1) / 2 : sx0 + ((sx1 - sx0) * i) / (per - 1));
+  const slotY = new Map<number, number>();
+  const slots = S?.slots;
+  if (slots?.length) {
+    // sabit yuvalar (arkadan öne); az marker seçilince uçlar korunarak seyreltilir
+    const n = Math.min(per, slots.length);
+    const idx = n === 1 ? [Math.floor((slots.length - 1) / 2)] : Array.from({ length: n }, (_, i) => Math.round((i * (slots.length - 1)) / (n - 1)));
+    for (const i of idx) {
+      sideXs.push(slots[i][0]);
+      slotY.set(slots[i][0], slots[i][1]);
+    }
+    sideXs.sort((p, q) => p - q);
+  } else {
+    for (let i = 0; i < per; i++) sideXs.push(per === 1 ? (sx0 + sx1) / 2 : sx0 + ((sx1 - sx0) * i) / (per - 1));
+  }
+  const markerY = (x: number) => slotY.get(x) ?? sideY(x);
   for (const x of sideXs) {
-    const y = sideY(x);
+    const y = markerY(x);
     for (const s of [1, -1]) {
       mount('side', sd.product, V(x, y, s * sideZ), (o) => {
         if (s < 0) o.rotation.y = Math.PI;
@@ -426,8 +589,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     // 7×1 hat: modülden arka dağıtıma, orada dıştaki lambaya; birden çok lamba varsa dağıtım boyunca
     const line = [V(xp, hy, s * zPort), V(xp, hy, s * zr), V(xd, hy, s * zr)];
     wires.push({ kind: 'rear', r: 0.013, pts: line, conn: { d: Math.abs(xd - xp) * 0.5, fromEnd: false } });
-    const lo = Math.min(zi, zr);
-    const hi = Math.max(zo, zr);
+    const rdz = M.harness?.rearDrop?.z;
+    const lo = rdz !== undefined ? Math.min(rdz, zr) : Math.min(zi, zr);
+    const hi = rdz !== undefined ? Math.max(rdz, zr) : Math.max(zo, zr);
     if (hi - lo > 1e-3) wires.push({ kind: 'rear', r: 0.012, pts: [V(xd, hy, s * lo), V(xd, hy, s * hi)] });
   }
 
@@ -440,7 +604,69 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     const inner = rearLamps.filter((r) => r.s === s).sort((p, q) => p.z - q.z)[0];
     // --- yan hat (2×0,5): lambadan içe ve aşağı → yan güzergâh → öne ---
     const needSide = sideXs.length > 0 || fr.qty > 0 || ar.qty >= 4;
-    if (needSide) {
+    const RL = S?.rail;
+    if (needSide && RL) {
+      // Ray/raf içi yan hat: tek düz hat rayın iç yüzünde öne gider, markerlara ve ön kola kısa düz uç; dışarıda dal yok.
+      const rz = s * RL.z;
+      const ryAt = (x: number) => profileAt(RL.y, x);
+      const [xr, riseZ] = RL.rise;
+      // yükselişin sonu: bend varsa (ör. kasa tabanının altı) onu izler, yoksa doğrudan raya
+      const climb = (cz: number) =>
+        RL.bend?.length
+          ? [...RL.bend.map(([bz, by]) => V(xr, by, s * bz)), V(xr, ryAt(xr), rz)]
+          : [V(xr, ryAt(xr), cz), V(xr, ryAt(xr), rz)];
+      let start: THREE.Vector3[];
+      if (outer) {
+        const ss = supersealOf(outer);
+        conns.push({ pos: ss.clone().add(V(-0.03, 0, 0)), dir: V(-1, 0, 0) });
+        const cz = riseZ != null ? s * riseZ : ss.z;
+        // pass: lamba hizasında öne giderken engelin (çamurluk paçası) iç yanından geçilecek |z|
+        const via = RL.pass != null ? [V(ss.x, ss.y, s * RL.pass), V(xr, ss.y, s * RL.pass)] : [V(xr, ss.y, ss.z)];
+        start = [ss, ...via, V(xr, ss.y, cz), ...climb(cz)];
+      } else {
+        const cz = riseZ != null ? s * riseZ : s * tz;
+        start = [V(xm + PORTS[2], hy, s * zPort), V(xm + PORTS[2], hy, s * tz), V(xr, hy, s * tz), V(xr, hy, cz), ...climb(cz)];
+      }
+      const ex = RL.exit;
+      const viaChassis = !!RL.frontFromChassis;
+      const armOnRail = ar.qty >= 4 && !viaChassis;
+      const xEnd = Math.min(...sideXs, armOnRail ? AF.x : 0, fr.qty > 0 && ex && !viaChassis ? ex[0] : 0, xr);
+      const run = RL.y.map((p) => p[0]).filter((x) => x < xr - 1e-6 && x > xEnd + 1e-6).sort((p, q) => q - p);
+      wires.push({ kind: 'side', r: 0.010, pts: dedupe([...start, ...run.map((x) => V(x, ryAt(x), rz)), V(xEnd, ryAt(xEnd), rz)]) });
+      for (const x of sideXs) {
+        const y = markerY(x);
+        wires.push({ kind: 'side', r: 0.007, conn: toLamp, pts: dedupe([V(x, ryAt(x), rz), V(x, y, rz), V(x, y, s * (sideZ + 0.005))]) });
+      }
+      if (armOnRail) {
+        const wz = AF.wallZ ?? AF.z;
+        wires.push({ kind: 'marker', r: 0.008, conn: toLamp, pts: dedupe([V(AF.x, ryAt(AF.x), rz), V(AF.x, AF.y, rz), V(AF.x, AF.y, s * (wz - 0.01))]) });
+      }
+      if (viaChassis && (fr.qty > 0 || ar.qty >= 4)) {
+        // ön pozisyon ve ön kol: modülün yedek portundan kiriş içinden öne (kasa devrilir, kasadaki hatla bağlanmaz)
+        const fx = Math.min(fr.qty > 0 ? F.x + 0.12 : 0, ar.qty >= 4 ? AF.x + 0.05 : 0);
+        wires.push({ kind: 'side', r: 0.010, pts: [V(xm + PORTS[2], hy, s * zPort), V(xm + PORTS[2], hy, s * tz), V(fx, hy, s * tz)] });
+        if (fr.qty > 0) {
+          const fz = s * (F.z - 0.02);
+          wires.push({ kind: 'marker', r: 0.008, conn: toLamp, pts: [V(F.x + 0.5, hy, s * tz), V(F.x + 0.12, hy, s * tz), V(F.x + 0.12, hy, fz), V(F.x + 0.12, F.y, fz), V(F.x + 0.03, F.y, fz)] });
+        }
+        if (ar.qty >= 4) {
+          const wz = AF.wallZ ?? AF.z;
+          wires.push({ kind: 'marker', r: 0.008, conn: toLamp, pts: [V(AF.x + 0.5, hy, s * tz), V(AF.x + 0.05, hy, s * tz), V(AF.x + 0.05, hy, s * (wz - 0.04)), V(AF.x + 0.05, AF.y, s * (wz - 0.04)), V(AF.x, AF.y, s * (wz - 0.01))] });
+        }
+      }
+      // ön pozisyon: raydan kol boyunca kirişin dışına, kirişin içinden ana güzergâha (hy, tz) ve öne
+      if (fr.qty > 0 && ex && !viaChassis) {
+        const [exX, exY] = ex;
+        const zo = s * (tz + 0.18);
+        const fz = s * (F.z - 0.02);
+        wires.push({
+          kind: 'marker',
+          r: 0.008,
+          conn: toLamp,
+          pts: dedupe([V(exX, ryAt(exX), rz), V(exX, exY, rz), V(exX, exY, zo), V(exX, hy, zo), V(exX, hy, s * tz), V(F.x + 0.12, hy, s * tz), V(F.x + 0.12, hy, fz), V(F.x + 0.12, F.y, fz), V(F.x + 0.03, F.y, fz)]),
+        });
+      }
+    } else if (needSide) {
       const xs = xd - 0.18;
       let start: THREE.Vector3[];
       if (outer) {
@@ -456,7 +682,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       wires.push({ kind: 'side', r: 0.010, pts: trunk });
       // markerlar: 0,6 m dal
       for (const x of sideXs) {
-        const y = sideY(x);
+        const y = markerY(x);
         const zl = s * (sideZ - 0.03);
         wires.push({ kind: 'side', r: 0.007, conn: toLamp, pts: [V(x + 0.14, hy, s * tz), V(x, hy, s * tz), V(x, hy, zl), V(x, y, zl), V(x, y, s * (sideZ + 0.005))] });
       }
@@ -471,11 +697,12 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       }
     }
     // --- plaka (1,5 m): içteki lambanın Superseal'inden ---
-    const myPlates = pzs.filter((z) => (z < 0 ? -1 : 1) === s || (pzs.length === 1 && s === 1));
-    for (const z of myPlates) {
+    const myPlates = plateSpots.filter((sp) => (sp.entry.z < 0 ? -1 : 1) === s || (plateSpots.length === 1 && s === 1));
+    for (const sp of myPlates) {
       const from = inner ? V(rx - 0.035, ly - 0.03, s * (inner.z - inner.hw * 0.6)) : V(xm + PORTS[2], hy, s * zPort);
       const xb = rx - 0.06;
-      wires.push({ kind: 'plate', r: 0.008, conn: toLamp, pts: [from, V(xb, from.y, from.z), V(xb, from.y, z), V(xb, plateLampY + 0.04, z), V(plateX - 0.02, plateLampY + 0.04, z)] });
+      const z = sp.entry.z;
+      wires.push({ kind: 'plate', r: 0.008, conn: toLamp, pts: [from, V(xb, from.y, from.z), V(xb, from.y, z), V(xb, sp.entry.y, z), sp.entry.clone()] });
     }
     // --- arka lastik kol: dıştaki lambanın Superseal'inden ---
     if (ar.qty >= 2) {
@@ -487,11 +714,44 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   }
 
   // =========================== ÇALIŞMA / TEPE KABLOLARI (modül yedek portları) ===========================
-  const auxTo = (sp: P3, k: number) => {
+  const auxTo = (sp: P3 & { rise?: number[] }, k: number) => {
     const s = sp.z >= 0 ? 1 : -1;
     const xp = xm + PORTS[2 + (k % 2)];
     const zc = s * 0.2;
-    wires.push({ kind: 'aux', r: 0.008, conn: toLamp, pts: [V(xp, hy, s * zPort), V(xp, hy, zc), V(Math.max(sp.x - 0.15, xp), hy, zc), V(sp.x - 0.15, hy, sp.z), V(sp.x - 0.15, sp.y - 0.02, sp.z), V(sp.x - 0.02, sp.y - 0.02, sp.z)] });
+    const start = [V(xp, hy, s * zPort), V(xp, hy, zc)];
+    if (sp.rise && sp.rise[2] != null) {
+      // alçak geçiş: x'te y seviyesine iner, o seviyede yana ve lambanın altına gider (kiriş altı, levhanın arkası)
+      const [cx, rz, ry] = sp.rise;
+      const zd = s * Math.min(rz, 0.36); // iniş: lamba levhasının (z ≥ 0,30) arkasında, kirişlerin arasında
+      wires.push({
+        kind: 'aux',
+        r: 0.008,
+        conn: toLamp,
+        pts: dedupe([...start, V(cx, hy, zc), V(cx, hy, zd), V(cx, ry, zd), V(cx, ry, s * rz), V(sp.x - 0.04, ry, sp.z), V(sp.x - 0.04, sp.y + 0.01, sp.z), V(sp.x - 0.005, sp.y + 0.01, sp.z)]),
+      });
+      return;
+    }
+    if (sp.rise) {
+      // belirli dikey güzergâh (dar kulenin içi, travers önü): oradan yükselir, lambanın arkasına girer
+      const [cx, rz] = sp.rise;
+      const cz = s * rz;
+      const top = sp.y > hy + 0.6 ? sp.y - 0.04 : sp.y + 0.04;
+      const end = sp.y > hy + 0.6 ? V(sp.x - 0.01, sp.y + 0.005, sp.z) : V(sp.x - 0.02, top, sp.z);
+      wires.push({ kind: 'aux', r: 0.008, conn: toLamp, pts: dedupe([...start, V(cx, hy, zc), V(cx, hy, cz), V(cx, top, cz), V(cx, top, sp.z), end]) });
+      return;
+    }
+    if (sp.y > hy + 0.6) {
+      // yüksekteki lamba (kasa/başlık üstü): kablo kapıdan ya da ön panelden geçmez, en yakın uçtaki KÖŞE DİKMESİNİ izler.
+      // Arkada dikmenin içinden (kapı kanatları köşe dikmelerinin arasında), önde başlığın arkasından (önden görünmez).
+      const rearEnd = sp.x > -a.L / 2;
+      const cx = rearEnd ? Math.min(sp.x, rx) - 0.04 : sp.x + 0.09;
+      const cz = s * (W2 - 0.05);
+      const top = sp.y - 0.04;
+      wires.push({ kind: 'aux', r: 0.008, conn: toLamp, pts: [...start, V(cx, hy, zc), V(cx, hy, cz), V(cx, top, cz), V(cx, top, sp.z), V(sp.x - 0.01, sp.y + 0.005, sp.z)] });
+      return;
+    }
+    // alçaktaki lamba (ör. lowbed arka travers): arka dağıtımın arkasından yukarı, lambanın arkasına
+    wires.push({ kind: 'aux', r: 0.008, conn: toLamp, pts: [...start, V(Math.max(sp.x - 0.15, xp), hy, zc), V(sp.x - 0.15, hy, sp.z), V(sp.x - 0.15, sp.y + 0.04, sp.z), V(sp.x - 0.02, sp.y + 0.04, sp.z)] });
   };
   workSpots.forEach((sp) => auxTo(sp, 0));
   beaconSpots.forEach((sp) => auxTo(sp, 1));
@@ -591,15 +851,30 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     harness.add(b, g);
   }
 
-  return { group, glows, harness, lampsByCat, placeholders };
+  const lights: LampLightAnchors = {
+    rear: rearLamps.map((r) => V(rx + 0.25, ly, r.s * r.z)),
+    work: lampsByCat.work.map((o) => ({ pos: o.position.clone(), dir: V(0, 0, 1).applyQuaternion(o.quaternion).normalize() })),
+  };
+  return { group, glows, harness, lampsByCat, lights, placeholders };
 }
 
 let sealMat: THREE.MeshStandardMaterial | null = null;
 function ampSealMat() {
   return (sealMat ??= new THREE.MeshStandardMaterial({ color: '#2e7d32', roughness: 0.5 }));
 }
+let auxWire: THREE.Material | null = null;
 function wireMat(mats: Mats, kind: WireKind) {
   const w = mats.wire as Record<string, THREE.Material>;
+  if (kind === 'aux') {
+    // çalışma / tepe hatları: lejanttaki mor (diğer hatlarla aynı koruge dokusu)
+    if (!auxWire) {
+      const m = (mats.wire.marker as THREE.MeshStandardMaterial).clone();
+      m.color.set('#a855f7');
+      m.emissive.set('#a855f7');
+      auxWire = m;
+    }
+    return auxWire;
+  }
   return w[kind] ?? w.marker;
 }
 
@@ -623,10 +898,7 @@ export function setHarnessHighlight(h: THREE.Group, mats: Mats, on: boolean) {
 
 export function disposeEquipment(g: THREE.Object3D) {
   g.traverse((o) => {
-    if ((o as THREE.Sprite).isSprite) {
-      ((o as THREE.Sprite).material as THREE.Material).dispose();
-      return;
-    }
+    if ((o as THREE.Sprite).isSprite) return; // hale malzemeleri paylaşılır
     const mm = o as THREE.Mesh;
     if (o.userData.lamp) return; // lamba klonlarının geometrisi modelle paylaşılır
     if (mm.geometry && !isShared(mm.geometry)) mm.geometry.dispose();

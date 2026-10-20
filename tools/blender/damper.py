@@ -106,58 +106,78 @@ def ring_pts():
 
 def outline():
     """Kasanın dış çevresi (önden görünüş): dış sağ + üst + dış sol"""
+    # sol yarı üstten alta; yalnız alt orta nokta (z 0) tekrarı atılır. Eskiden [1:-1] sol üst köşeyi de atıyordu:
+    # tesisat çerçevesinde üstte eğik çizgi ve ön duvarda kesik köşe (revize 2026-10-20)
     right = OUTER
-    return right + [(-z, y) for z, y in reversed(right)][1:-1]
+    return right + [(-z, y) for z, y in reversed(right)][:-1]
+
+
+def open_u(ol):
+    """Üstü açık kasa kesiti: kapalı çizgi döngüsünde üst kenar çizilmesin diye U geri izlenir (aynı çizgiler)"""
+    return ol + ol[-2:0:-1]
 
 
 # ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
 # Kasa devrilir: lamba, kol ve braketler YALNIZ şasiye bağlanır (kirişler, ön travers, arka lamba levhası, lamba kolları, merdiven).
 LP_Z = 1.20  # box2 'lamp_plate' z 0,30–1,20, y 0,96–1,12, x −0,06…0
-REAR_LAMP_Y = 1.00  # M8 saplamalar levhada; gövde levhanın 34 mm altına taşar → sis kanalı üst kenarı 0,99 (≤ 1,0)
+# revize 2026-10-20: lamba levhanın ortasında (gövde 0,966–1,114 levhanın içinde kalır, alttan taşmaz). LZD 3194 sis
+# kanalının üst kenarı ~1,03 m olur (R48 ≤ 1,0; kullanıcı kararı, bilinçli)
+REAR_LAMP_Y = 1.04
 PLATE_W, PLATE_H = 0.52, 0.11
-PLATE_C = 0.865  # plaka tutucu (y 0,80–0,96) içinde; eski PLATE_Y 0,92'de plaka tutucunun üstünden taşıyordu
-SIDE_Y, SIDE_ZW = 1.25, 1.27  # marker braketi: çamurluk tepesinin (1,13) üstü, kasa altının (1,43) altı
+# plaka tutucu lamba levhasının hemen altında, arka yüzü levhayla aynı düzlemde (x 0): ikisi tek parça görünür
+PH_Y0, PH_Y1, PH_Z = 0.78, 0.96, 0.36
+PLATE_C = 0.87
+# yan markerlar kasanın alt kenar profilinin ('side_bottom', y 1,565–1,655) dış yüzünde: braket/çubuk yok
+SIDE_Y = 1.61
+SIDE_ZW = round(OUTER[4][0] + (OUTER[5][0] - OUTER[4][0]) * (1.62 - OUTER[4][1]) / (OUTER[5][1] - OUTER[4][1]) + 0.03, 3)
 SIDE_X0, SIDE_X1, SIDE_N = -6.19, -0.95, 5  # ilk marker önden 2,65 m, son arkadan 0,95 m
-SIDE_AVOID = [[-6.10, -5.26], [-5.35, -4.95]]  # alet kutusu (+z), iniş ayağı
 FB_X, FB_Y = CH_X0 + 0.05, 1.33  # ön braket: ön traversin (z ±0,64) ucundan dışa
 FB_Z0, FB_Z1 = BZ + 0.06, 1.19
 WORK = (-0.10, 1.20, 0.83)  # lamba kolunun (x −0,40…−0,06, y 1,10–1,14, z 0,80–0,86) arka ucunun üstü
-BEACON = (-8.60, 3.10, 0.78)  # merdiven direğinin (üstü 3,08) tepesi
+BEACON = (-0.12, 1.14, 1.03)  # tepe lambaları: lamba kolu ile levha arasındaki rafta, çalışma lambalarının dışında
 TRUNK_Z = BZ - 0.03
 REAR_Y = 1.25  # arkada demet menteşe kulaklarının (alt 1,33) altına iner
 MODULE_X = -1.3
-REAR_JX = -0.25
+REAR_JX = -0.50  # arka traversin (−0,45…−0,35) ÖNÜ: arkadan bakınca travers ve lamba levhası kabloları örter
+AUX_Y = 1.05  # çalışma/tepe kabloları kirişin altından, levhanın arkasından (arkadan görünmez)
+# yan hat: menteşe hizasında lamba kolu ve çalışma lambasının önünden (x −0,20, z 0,83; arkadan levha, kol ve lamba örter)
+# kasa altına çıkar, kasa tabanının altını izleyip alt kenar profiline girer
+HINGE_X, HINGE_Z = -0.20, 0.83
+UNDER = [[0.83, 1.503], [0.96, 1.523], [1.07, 1.563]]
 
 
 def mounts_dict():
     fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
     return {
         'rear': {'x': XR, 'y': REAR_LAMP_Y, 'zOuter': LP_Z, 'zInner': 0.30, 'faceX': XR},
-        'plate': {'x': -0.01, 'y': 0.945, 'z': [-0.17, 0.17], 'plateY': PLATE_C, 'plateW': PLATE_W, 'plateH': PLATE_H},
+        'plate': {'x': -0.01, 'y': round(PLATE_C + PLATE_H / 2 + 0.02, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_C, 'plateW': PLATE_W,
+                  'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': [[CH_X0, SIDE_Y], [XR, SIDE_Y]], 'z': SIDE_ZW, 'maxPerSide': SIDE_N,
-                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': SIDE_AVOID,
-                 # her marker: kirişin dış başlığından (y 1,30, z 0,64) marker sırtına L braket (kasa devrilir, kasaya bağlanmaz)
-                 'brackets': {'x0': CH_X0, 'x1': XR, 'from': [1.30, BZ + 0.06], 'to': [SIDE_Y, SIDE_ZW - 0.01]}},
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None,
+                 # yan hat kasanın alt kenar profilinin içinde tek düz hat; şasiden kasaya yalnız menteşe yanında geçer
+                 # (kasa devrilince kablo menteşe ekseninde kalır). Ön pozisyon ve ön kol şasi demetinden beslenir.
+                 'rail': {'z': round(SIDE_ZW - 0.026, 3), 'y': [[BX0 + 0.1, SIDE_Y], [HINGE_X, SIDE_Y]], 'rise': [HINGE_X, HINGE_Z],
+                          'pass': HINGE_Z, 'bend': UNDER, 'frontFromChassis': True}},
         'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.17, 'bracket': fb},
         'armFront': {'x': FB_X + 0.03, 'y': FB_Y, 'z': FB_Z1, 'wallZ': FB_Z1, 'bracket': fb},
-        'armRear': {'x': -0.03, 'y': 1.04, 'z': LP_Z, 'wallZ': LP_Z, 'bracket': None},
-        'work': [{'x': WORK[0], 'y': WORK[1], 'z': s * WORK[2], 'dir': [1, -0.35, 0],
+        'armRear': {'x': -0.03, 'y': REAR_LAMP_Y, 'z': LP_Z, 'wallZ': LP_Z, 'bracket': None},
+        'work': [{'x': WORK[0], 'y': WORK[1], 'z': s * WORK[2], 'dir': [1, -0.35, 0], 'rise': [REAR_JX, WORK[2], AUX_Y],
                   'bracket': [[WORK[0] - 0.04, 1.14, s * WORK[2]], [WORK[0], WORK[1] - 0.02, s * WORK[2]]]} for s in (1, -1)],
-        'beacon': [{'x': BEACON[0], 'y': BEACON[1], 'z': BEACON[2], 'bracket': [[BEACON[0], 3.08, BEACON[2]], [BEACON[0], BEACON[1], BEACON[2]]]}],
+        'beacon': [{'x': BEACON[0], 'y': BEACON[1], 'z': s * BEACON[2], 'bracket': None, 'rise': [REAR_JX, BEACON[2], AUX_Y]}
+                   for s in (1, -1)],
         'harness': {'trunkY': HY, 'trunkZ': TRUNK_Z, 'profile': [[CH_X0, HY], [-0.6, HY], [-0.45, REAR_Y], [XR, REAR_Y]],
-                    'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
-                    'notes': 'Demet I kirişin gövdesinin iç yanında (y 1,32), önde traverslerin altından, arkada üstünden geçer; '
-                             'arka uçta menteşe kulaklarının altına (1,25) iner, dallar lamba levhasına arka traversin arkasından ulaşır.'},
-        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
+                    'moduleX': MODULE_X, 'rearJunctionX': REAR_JX, 'rearDrop': {'z': 0.40, 'innerX': -0.08},
+                    'notes': 'Demet I kirişin gövdesinin iç yanında (y 1,32), önde traverslerin altından, arkada üstünden geçer. '
+                             'Arka 7×1 hatlar arka traversin ÖNÜNDE (x −0,50, z ±0,40) lamba yüksekliğine iner, levhanın '
+                             'arkasından lambalara gider: arkadan bakınca travers ve levha kabloyu örter.'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'body', 'front': 'chassis', 'armFront': 'chassis',
                     'armRear': 'chassis', 'work': 'chassis', 'beacon': 'chassis', 'harness': 'chassis'},
-        'notes': 'Kasa, kapak ve kasaya bağlı her şey devrilir; eski ön lamba ve kollar kasanın üst köşesindeydi (y 2,9), hepsi şasiye '
-                 'taşındı. Ön pozisyon ve ön lastik kol ön traversten dışa uzanan brakette (y 1,33, uç z 1,19; dış kenara 0,05 m). '
-                 'Arka kol lamba levhasının dış ucunda (Horpol şeması; arkada şasinin en yüksek sabit noktası). Yan markerlar '
-                 'kirişten uzanan braketlerde y 1,25 (çamurluk/tekerlek nedeniyle 0,9 m altı sürekli değil; R48 6.18 üst sınır 1,5 m). '
-                 'Arka lambalar y 1,00: LZD 3194 sis kanalının üst kenarı 0,99 m; sisi lambanın üst yarısında olan bir ürün seçilirse '
-                 'ayrı sis lambası gerekir. Çalışma lambaları lamba kollarının üstünde, devrilen kasanın altında kalır (kasa arka '
-                 'ucu devrilirken 1,37 m\'nin altına inmez). Tek tepe lambası merdiven direğinin üstünde: kasa üstünü 9 cm aşar, '
-                 'şasiye bağlı başka yüksek yer olmadığından ikinci tepe lambası yok.',
+        'notes': 'Kasa, kapak ve kasaya bağlı her şey devrilir. Ön pozisyon ve ön lastik kol ön traversten dışa uzanan brakette '
+                 '(y 1,33, uç z 1,19; dış kenara 0,05 m). Arka kol lamba levhasının dış ucunda. Revize 2026-10-20 (kullanıcı '
+                 'kararı): yan markerlar kasanın alt kenar profilinde (y 1,61, braketsiz; R48 6.18 üst sınır 1,5 m aşılır, kural '
+                 'dışı); kablosu menteşe yanından kasaya geçer. Arka lambalar levhanın ortasında y 1,04 (LZD 3194 sis kanalı üstü '
+                 '~1,03 m, R48 ≤ 1,0 aşılır). İki tepe lambası çalışma lambalarının dış yanında, lamba kolu ile levha arasındaki '
+                 'rafta (y 1,14, z ±1,03); devrilen kasanın altında kalır, çevre görünürlüğü kasa tarafından kısıtlanır.',
     }
 
 
@@ -165,8 +185,9 @@ def anchors_dict():
     """Sitenin okuyacağı bağlantı noktaları (three.js koordinatları; şema: src/configurator/engine/baked.ts)"""
     ol = outline()
     sections = []
-    for x in (BX0, -6.0, -4.0, -2.0):
-        sections.append([[x, y, z] for z, y in ol])
+    sections.append([[BX0, y, z] for z, y in ol])  # ön duvar: kapalı
+    for x in (-6.0, -4.0, -2.0):
+        sections.append([[x, y, z] for z, y in open_u(ol)])  # ara kesitler: üstü açık
     sections.append([[rear_x(y), y, z] for z, y in ol])
     for s in (-1, 1):
         sections.append([[BX0, BTOP, s * W2], [RX_TOP, BTOP, s * W2]])
@@ -303,7 +324,10 @@ y = 1.42
 while y < 2.6:
     box2(C, 'ladder_step', -8.66, -8.56, y - 0.015, y + 0.015, LZ0, LZ1, M['alu'], 0.003)
     y += 0.28
-cylinder(C, 'ladder_pole', 0.018, (-8.6, 2.66, LZ1), (-8.6, 3.08, LZ1), M['alu'], 12, 0.0)
+# iki ayak da aynı boyda tutamağa uzanır, üstte birleşir (eskiden yalnız bir ayak tepe lambası direği olarak 3,08'e çıkıyordu)
+for z in (LZ0, LZ1):
+    cylinder(C, 'ladder_pole', 0.018, (-8.6, 2.66, z), (-8.6, 2.94, z), M['alu'], 12, 0.0)
+cylinder(C, 'ladder_grab', 0.018, (-8.6, 2.94, LZ0 - 0.018), (-8.6, 2.94, LZ1 + 0.018), M['alu'], 12, 0.0)
 for y in (1.36, 1.9):
     beam(C, 'ladder_stay', (-8.58, y, (LZ0 + LZ1) / 2), (CH_X0 + 0.02, min(y, CH_TOP - 0.05), (LZ0 + LZ1) / 2), 0.04, 0.04, M['alu'], 0.003)
 
@@ -356,12 +380,14 @@ for s in (-1, 1):
     # lamba taşıyıcıları: traversten arkaya uzanan kollar, lamba levhası (x = 0)
     box2(C, 'lamp_arm', -0.40, -0.06, 1.10, 1.14, s * 0.80, s * 0.86, P, 0.004)
     box2(C, 'lamp_plate', -0.06, XR, 0.96, 1.12, s * 0.30, s * 1.20, P, 0.006)
+    # tepe lambası rafı: lamba kolundan levhanın üstüne uzanan sac (çalışma lambasının dış yanı)
+    box2(C, 'beacon_shelf', -0.20, XR, 1.12, 1.14, s * 0.86, s * 1.12, P, 0.004)
     # katlanır alt koruma: kirişten eğik kollar, bar
     beam(C, 'underrun_arm', (-0.62, DEEP_BOT + 0.05, s * (BZ + 0.08)), (-0.20, 0.52, s * (BZ + 0.08)), 0.07, 0.05, P, 0.005)
     cylinder(C, 'underrun_pivot', 0.035, (-0.62, DEEP_BOT + 0.05, s * (BZ + 0.02)), (-0.62, DEEP_BOT + 0.05, s * (BZ + 0.14)), M['dark'], 14, 0.002)
     box2(C, 'underrun_cap', -0.25, -0.13, 0.44, 0.56, s * 1.19, s * 1.215, M['rubber'], 0.005)
 box2(C, 'underrun_bar', -0.25, -0.13, 0.44, 0.56, -1.19, 1.19, M['alu'], 0.012)
-box2(C, 'plate_holder', -0.06, -0.01, 0.80, 0.96, -0.30, 0.30, P, 0.006)
+box2(C, 'plate_holder', -0.06, XR, PH_Y0, PH_Y1 + 0.004, -PH_Z, PH_Z, P, 0.006)  # levhayla aynı arka düzlem, altına bitişik
 for s in (-1, 1):
     box2(C, 'rear_refl', -0.13, -0.127, 0.47, 0.53, s * 0.5, s * 0.9, M['red'], 0.0)
 chassis_logos = decal_mesh('ChassisLogos', [side_quad((TB[0] + TB[1]) / 2, 1.22, 0.16 * 720 / 528, 0.16, 1.188, 1)], LOGO_W)
@@ -439,9 +465,18 @@ for s in (-1, 1):
     box2(B, 'gate_lock', rear_x(1.7) - 0.1, rear_x(1.7) + 0.02, 1.64, 1.76, s * 1.06, s * 1.16, MB['dark'], 0.008)
     beam(B, 'lock_lever', (rear_x(1.7) + 0.02, 1.7, s * 1.17), (rear_x(1.35) + 0.04, 1.35, s * 1.2), 0.03, 0.03, MB['dark'], 0.004)
 cylinder(B, 'gate_hinge', 0.045, (RX_TOP - 0.02, BTOP - 0.02, -1.18), (RX_TOP - 0.02, BTOP - 0.02, 1.18), MB['dark'], 20, 0.004)
-# arka kapak: iç U çevresinin eğik düzlemde kalınlıklı levhası + yatay takviyeler
-gate_out = INNER[::-1] + [(-z, y) for z, y in INNER[1:-1]]
-gate_out = [(z * 1.005, min(y, BTOP - 0.05)) for z, y in gate_out]
+# kabuğun arka ağzı: dış ve iç yüz arasındaki duvar kalınlığı kapatılır (arkadan bakınca kabuğun içi görünmesin)
+cm = bmesh.new()
+rim = cm.faces.new([cm.verts.new(bl((rear_x(y) - 0.012, y, z))) for z, y in ring])
+rim.normal_update()
+if rim.normal.x < 0:  # arkaya (+x; bl() x eksenini korur) baksın
+    rim.normal_flip()
+add_obj('shell_rim', cm, MB['paint'], 0.0, B)
+# arka kapak: iç U çevresinden duvar kalınlığının yarısı kadar dışa taşar (ağzı tam örter, revize 2026-10-20),
+# eğik düzlemde kalınlıklı levha + yatay takviyeler
+gate_out = INNER[::-1] + [(-z, y) for z, y in INNER[:-1]]  # eskiden [1:-1]: sol üst köşe kesikti
+gate_out = [(z * 1.03 + (0.03 if abs(z) > 0.3 else 0.0) * (1 if z >= 0 else -1), min(y, BTOP - 0.05) - (0.035 if y < 1.9 else 0.0))
+            for z, y in gate_out]
 gm = bmesh.new()
 fa = [gm.verts.new(bl((rear_x(y) - 0.03, y, z))) for z, y in gate_out]
 fb = [gm.verts.new(bl((rear_x(y) + 0.015, y, z))) for z, y in gate_out]

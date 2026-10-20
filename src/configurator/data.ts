@@ -154,7 +154,7 @@ export const CATEGORIES: CategoryDef[] = [
 ];
 
 /** Dorse başına yan marker tavanı (iki yan toplamı): yan rayda çakışmasız yuva sayısı (~1,5 m'de bir). */
-export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 18, lowbed: 18, silo: 10, tanker: 12, damper: 10 };
+export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 18, lowbed: 18, silo: 10, tanker: 10, damper: 10 };
 
 /** Dorse modellerinin boyu (m; tools/blender/<tip>.py). R48 yan marker hesabı için. */
 export const TRAILER_L: Partial<Record<TrailerId, number>> = { standart: 13.7, lowbed: 13.19, silo: 9.385, tanker: 12.41, damper: 8.84 };
@@ -163,14 +163,14 @@ export const TRAILER_L: Partial<Record<TrailerId, number>> = { standart: 13.7, l
  * Site markerları montaj haritasındaki yan rayın (x0 … x1) boyuna eşit aralıkla dizer; açıklık SIDE_SPAN (tools/check-lighting.mjs).
  * Döner: her yanda en az kaç adet (alt sınır DEĞİL: kullanıcı sıfıra inebilir, arayüz uyarı gösterir).
  */
-const SIDE_SPAN: Partial<Record<TrailerId, number>> = { standart: 12.4, lowbed: 10.4, silo: 5.52, tanker: 8.77, damper: 5.24 };
+const SIDE_SPAN: Partial<Record<TrailerId, number>> = { standart: 12.4, lowbed: 10.4, silo: 5.0, tanker: 6.16, damper: 5.24 };
 export function sideMinPerSide(t: TrailerId): number {
   const L = TRAILER_L[t] ?? 13.6;
   if (L <= 6) return 1;
   return Math.ceil((SIDE_SPAN[t] ?? L - 1.5) / 3) + 1;
 }
-/** Tepe lambası yuvası (montaj haritası): damperde tek sabit yatay yüzey var */
-const BEACON_MAX: Partial<Record<TrailerId, number>> = { damper: 1 };
+/** Tepe lambası yuvası (montaj haritası) kategori tavanından azsa dorseye özel tavan */
+const BEACON_MAX: Partial<Record<TrailerId, number>> = {};
 
 /** Kategorinin bu yapılandırmadaki tavanı (ürün ve dorse sınırları dahil) */
 export function maxQty(c: Pick<Config, 'trailer' | 'lamps'>, cat: CategoryId): number {

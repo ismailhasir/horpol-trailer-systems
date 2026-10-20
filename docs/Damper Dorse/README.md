@@ -164,3 +164,16 @@ Kasa ve kapak devrilir: her lamba, kol ve braket **yalnız şasiye** bağlanır.
 | Çalışma (2) | x −0,10; y 1,20; z ±0,83; yön (1, −0,35, 0) | Lamba kollarının üstü (braket) | Devrilen kasanın altında kalır; kasa arka ucu devrilirken ~1,37 m'nin altına inmez |
 | Tepe (1) | x −8,60; y 3,10; z 0,78 | Ön merdiven direğinin tepesi | Şasiye bağlı tek yüksek yer; kasa üstünü 9 cm aşar. İkinci yer yok |
 | Tesisat | y 1,32 (I kiriş gövdesinin iç yanı, z 0,55), arkada menteşe kulaklarının altına 1,25; modül x −1,3; arka dağıtım x −0,25 | Kiriş gövdesi | |
+
+## Revize (2026-10-20, kullanıcı isteği)
+
+Önceki montaj tablosunu geçersiz kılan değişiklikler (sayılar `tools/blender/damper.py`):
+- **Yan markerlar:** kirişten uzanan L braketler kaldırıldı. Markerlar kasanın alt kenar profilinin ('side_bottom') dış yüzünde (y 1,61, z 1,151), x −6,19 … −0,95, en çok 5/yan. Kasa devrilir: markerlar kasayla birlikte döner. R48 6.18 üst sınırı 1,5 m aşılır: **kural dışı, kullanıcı kararı**.
+- **Yan hat kablosu:** arka lambadan levhanın arkasından menteşe hizasına (x −0,20, z 0,83) gelir, lamba kolu ve çalışma lambasının önünden kasa altına çıkar, kasa tabanının altını izleyip alt kenar profilinin içinde tek düz hat olarak öne gider. Şasiden kasaya yalnız menteşe yanında geçer (devrilmede kopmaz). Ön pozisyon ve ön kol şasi demetinden (modülün yedek portu, kiriş içi) beslenir.
+- **Plaka:** plaka tutucu lamba levhasının hemen altında, arka yüzü levhayla aynı düzlemde (x −0,06…0, y 0,78–0,96, z ±0,36): ikisi tek parça. Plaka merkezi y 0,87.
+- **Stop lambaları:** levhanın ortasında y 1,04 (eskiden 1,00, gövde levhanın altından taşıyordu). LZD 3194 sis kanalı üstü ~1,03 m (R48 ≤ 1,0): bilinçli.
+- **Tepe lambaları (2):** çalışma lambalarının dış yanında, lamba kolu ile levha arasındaki yeni rafta (x −0,12, y 1,14, z ±1,03). Merdivendeki tek tepe lambası ve direği kaldırıldı.
+- **Arka kablolar:** arka dağıtım arka traversin önünde (x −0,50). 7×1 hatlar z ±0,40'ta lamba yüksekliğine iner ve levhanın arkasından lambalara gider; çalışma/tepe kabloları kirişin altından (y 1,05) levhanın arkasından gelir. Arkadan bakınca travers ve levha kabloları örter.
+- **Tesisat çerçevesi:** `outline()` sol üst köşeyi atlıyordu (üstte eğik çizgi, ön duvarda kesik köşe); düzeltildi. Ara kesitler üstü açık çizilir.
+- **Ön merdiven:** iki ayak da 2,94 m'ye uzanır ve üstte tutamakla birleşir.
+- **Arka kapak:** kabuğun arka ağzı (dış ve iç yüz arası) kapatıldı; kapak iç çevreden dışa taşacak kadar büyütüldü ve sol üst köşesindeki kesik (aynı `[1:-1]` hatası) giderildi.

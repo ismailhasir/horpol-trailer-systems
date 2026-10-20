@@ -20,9 +20,9 @@
     ]
   },
   "front": {
-    "x": -11.485,
+    "x": -12.009,
     "y": 1.8,
-    "z": 1.02
+    "z": 0.5
   },
   "armFront": {
     "x": -7.3,
@@ -467,7 +467,7 @@
       "plateH": 0.11
     },
     "side": {
-      "x0": -9.73,
+      "x0": -7.12,
       "x1": -0.96,
       "y": [
         [-12.41, 1.27],
@@ -476,55 +476,49 @@
         [0.0, 1.3]
       ],
       "z": 1.273,
-      "maxPerSide": 6,
+      "maxPerSide": 5,
       "rule": {
         "firstFromFront": 3.0,
         "lastFromRear": 1.0,
         "maxGap": 3.0
       },
-      "avoid": [
-        [-9.56, -9.44],
-        [-8.81, -8.04],
-        [-7.91, -7.79]
-      ],
-      "brackets": {
-        "x0": -12.41,
-        "x1": -7.415,
-        "from": [1.121, 0.55],
-        "to": [1.27, 1.263]
+      "avoid": [],
+      "brackets": null,
+      "rail": {
+        "z": 1.2,
+        "y": [
+          [-7.47, 1.215],
+          [0.0, 1.215]
+        ],
+        "rise": [-0.14, 1.06],
+        "exit": [-7.27, 1.12]
       }
     },
     "front": {
-      "x": -11.575,
-      "y": 1.4,
-      "z": 1.15,
-      "bracket": [
-        [-11.55, 1.4, 0.55],
-        [-11.55, 1.4, 1.19]
-      ]
-    },
-    "armFront": {
-      "x": -11.52,
-      "y": 1.4,
-      "z": 1.19,
-      "wallZ": 1.19,
-      "bracket": [
-        [-11.55, 1.4, 0.55],
-        [-11.55, 1.4, 1.19]
-      ]
-    },
-    "armRear": {
-      "x": -0.14,
-      "y": 1.08,
-      "z": 1.0,
-      "wallZ": 1.0,
+      "x": -12.004,
+      "y": 1.36,
+      "z": 0.5,
       "bracket": null
     },
-    "armRearAlt": {
+    "armFront": {
+      "x": -7.42,
+      "y": 1.27,
+      "z": 1.273,
+      "wallZ": 1.273,
+      "bracket": null
+    },
+    "armRear": {
       "x": -0.06,
       "y": 0.56,
       "z": 1.22,
       "wallZ": 1.22,
+      "bracket": null
+    },
+    "armRearAlt": {
+      "x": -0.14,
+      "y": 1.08,
+      "z": 1.0,
+      "wallZ": 1.0,
       "bracket": null
     },
     "work": [
@@ -533,6 +527,7 @@
         "y": 1.18,
         "z": 0.6,
         "dir": [1, -0.35, 0],
+        "rise": [-0.33, 0.6],
         "bracket": [
           [-0.14, 1.12, 0.6],
           [-0.1, 1.17, 0.6]
@@ -543,6 +538,7 @@
         "y": 1.18,
         "z": -0.6,
         "dir": [1, -0.35, 0],
+        "rise": [-0.33, 0.6],
         "bracket": [
           [-0.14, 1.12, -0.6],
           [-0.1, 1.17, -0.6]
@@ -551,22 +547,18 @@
     ],
     "beacon": [
       {
-        "x": -0.85,
-        "y": 3.33,
-        "z": 0.66,
-        "bracket": [
-          [-0.93, 3.33, 0.66],
-          [-0.77, 3.33, 0.66]
-        ]
+        "x": -0.14,
+        "y": 1.12,
+        "z": 0.86,
+        "bracket": null,
+        "rise": [-0.33, 0.86]
       },
       {
-        "x": -0.85,
-        "y": 3.33,
-        "z": -0.66,
-        "bracket": [
-          [-0.93, 3.33, -0.66],
-          [-0.77, 3.33, -0.66]
-        ]
+        "x": -0.14,
+        "y": 1.12,
+        "z": -0.86,
+        "bracket": null,
+        "rise": [-0.33, 0.86]
       }
     ],
     "harness": {
@@ -604,6 +596,6 @@
       "beacon": "body",
       "harness": "chassis"
     },
-    "notes": "Tank kabuğu lamba taşımaz. Eski ön pozisyon (ADR panosunda z 1,02) dış kenara 0,2 m kalıyordu; yeni yer kirişten dışa uzanan ön braket (x −11,55, y 1,40, uç z 1,19; tank burada r ≈ 0,94, braketin üstü boş). Eski ilk yan marker önden 5,2 m gerideydi; hortum rafı −7,47'de başladığı için ilk marker(lar) kirişten dışa L braketle (side.brackets) raf hizasına (y 1,27, z 1,273) taşınır; iniş ayağı ve tesisat kolları side.avoid. Yan markerlar raf dudağında y 1,27: tekerlek ve dolap nedeniyle 0,9 m altına inilemez (R48 6.18 üst sınır 1,5 m). Arka kol arka çerçevenin üst kuşağının uç yüzünde (y 1,08, dış kenara 0,275 m; alternatif tampon ucu y 0,56). Çalışma lambaları üst kuşağın üstünde, tepe lambaları devrilme korkuluğunun arka ucunda (en yüksek sabit yer, 360°)."
+    "notes": "Tank kabuğu lamba taşımaz. Revize 2026-10-20 (kullanıcı kararı): ön pozisyon soket plakasının iki dış kenarında (x −12,004, y 1,36, z ±0,50), öne bakar, braket yok; dış kenara ~0,78 m (R48 6.9 ≤ 0,4 m, kural dışı). Yan markerlar yalnız hortum rafının dudağında (y 1,27, z 1,273), en çok 5/yan; rafın önündeki braketli markerlar kaldırıldı. İlk marker önden ~5,3 m, ön lastik kol rafın ön ucunda (~5,0 m; R48 6.18 ≤ 3 m, kural dışı). Yan hat rafın içinde tek düz hat. Arka lastik kol tamponun dış ucunda (stop lambaları hizası, y 0,56; eski üst kuşak ucu armRearAlt). Çalışma lambaları üst kuşağın üstünde, tepe lambaları aynı kuşakta onların dış yanında (z ±0,86)."
   }
 }

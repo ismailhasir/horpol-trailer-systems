@@ -186,3 +186,13 @@ Tank kabuğu ince yüzey: lamba ve kol taşımaz.
 | Çalışma (2) | x −0,615; y 2,55; z ±0,50; yön (1, −0,35, 0) | Arka kulenin arka yüzü | Boşaltma dolabını aydınlatır |
 | Tepe (2) | (−7,35; 3,907; 0) ve (−1,82; 3,907; −0,12) | Yürüme yolunun ön ve arka ucu | Tankın üstündeki en yüksek sabit yatay yüzey; arka lamba merdivenin geldiği +z yarısını boş bırakır; ikisi birlikte 360° |
 | Tesisat | y 1,34 (kutu kirişin iç yüzü), z 0,47; modül x −0,95; arka dağıtım x −0,28 | Konsol içi, kiriş iç yüzü | Arka dallar arka traversin arka yüzünden lamba barına iner |
+
+## Revize (2026-10-20, kullanıcı isteği)
+
+Yukarıdaki tabloyu geçersiz kılan değişiklikler (sayılar `tools/blender/silo.py` → `mounts_dict`):
+- **Merdiven:** alt ucu lamba barının üst yüzünde biter (x −0,02; y 0,76). Eskiden barın önünden 0,55'e inip stop ve plaka yüzünün önüne taşıyordu. Model yeniden üretildi.
+- **Yan marker (en çok 10, 5/yan):** sabit yuvalar (`side.slots`), arkadan öne: üç aksın ortası (x −1,085 / −2,395 / −3,705; çamurluk rayı y 1,14), sonra yan koruma pencerelerinin ortası (x −5,015 / −6,085; üst ray y 1,025). Daha az marker seçilirse yuvalar uçlar korunarak seyreltilir. İlk marker önden ~3,3 m, sonuncu arkadan 1,085 m (R48 6.18: ≤ 3 m / ≤ 1 m): **kural dışı, kullanıcı kararı**.
+- **Lastik kol ön:** yan korumanın en ön üst ucu (x −6,57; y 1,025; duvar z 1,27); ön braket artık yalnız ön pozisyonu taşır.
+- **Yan hat kablosu:** dışarıda dal yok. Arka lambadan bar içinde paçanın iç yanına (z 0,785) gelir, paçanın önünde (x −0,425) yükselir (arkadan bakınca paça örter), rayların iç yüzünde (z 1,215) tek düz hat olarak öne gider; markerlara ve ön kola kısa düz uç. Ön pozisyon kablosu yan korumanın kolu (x −6,42) boyunca kirişe girer, kiriş içinden öne.
+- **Tepe lambaları:** arka kulenin düz üstü (x −0,79; y 2,78; z ±0,40), çalışma lambalarının üstünde. Çalışma ve tepe kabloları kulenin içinden (x −0,70 / −0,73) çıkar.
+- **Arka stop kabloları:** arka dağıtım arka traversin önüne alındı (x −0,50). 7×1 hatlar lamba barı dikmesinin hizasında (z ±0,73) iner, dikmenin ve bar kolunun içinden bara girer: arkadan bakınca travers ve dikme kabloyu örter (`harness.rearDrop`).

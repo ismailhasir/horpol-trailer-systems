@@ -175,45 +175,60 @@ PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y_GUARD = 1.025  # yan koruma üst rayı (0,99–1,06) ortası
 SIDE_Y_RAIL = 1.14  # çamurluk rayı (1,10–1,18) ortası
 SIDE_ZW = 1.272  # rayların dış yüzü
-SIDE_X0, SIDE_X1, SIDE_N = -6.50, -0.98, 5  # ilk marker yan korumanın önünde (önden 2,885 m), son çamurluk rayında (arkadan 0,98 m)
-SIDE_GAP = (SX1 - 0.055, FR0 + 0.055)  # yan koruma ile çamurluk rayı arası (marker merkezi giremez)
-FB_X, FB_Y = -7.20, 1.34  # ön braket: iniş ayağının (−6,81) önünde, kirişin (−7,35…) dış yüzünden dışa
+SIDE_N = 5
+# Revize 2026-10-20: arkadan öne ilk 3 marker lastiklerin (aksların) ortasında çamurluk rayında, sonraki 2 marker yan korumanın
+# iki penceresinin (dikmeler SX0+0,03 / orta / SX1−0,03) ortasında üst rayda. Daha az marker seçilirse yuvalar uçlar korunarak seyreltilir.
+_SX_MID = (SX0 + SX1) / 2
+SIDE_SLOTS = [[round(x, 3), SIDE_Y_RAIL] for x in reversed(AXLES)] + \
+             [[round((SX1 + _SX_MID) / 2, 3), SIDE_Y_GUARD], [round((SX0 + _SX_MID) / 2, 3), SIDE_Y_GUARD]]
+SIDE_X0, SIDE_X1 = SIDE_SLOTS[-1][0], SIDE_SLOTS[0][0]
+FB_X, FB_Y = -7.20, 1.34  # ön braket (yalnız ön pozisyon): iniş ayağının (−6,81) önünde, kirişin (−7,35…) dış yüzünden dışa
 FB_Z0, FB_Z1 = BZ + 0.05, 1.19
+ARM_FRONT_X = SX0 + 0.05  # ön lastik kol: yan korumanın en ön üst ucu (üst ray dış yüzü)
 WORK_Y, WORK_Z = 2.55, 0.50  # arka kulenin arka yüzü (x −0,62), üst köşe yuvarlağının içinde
+BEACON_X, BEACON_Z = RTW[1] - 0.17, 0.40  # tepe lambaları: arka kulenin düz üstünde, çalışma lambalarının üstünde
 TRUNK_Y, TRUNK_Z = 1.34, BZ - 0.08  # alüminyum kutu kirişin (y 1,27–1,41) iç yüzü
 MODULE_X = -0.95  # −1,775 ve −0,62 traversleri arasında
-REAR_JX = -0.28  # arka traversin (−0,42…−0,30) arka yüzü
+REAR_JX = -0.50  # arka traversin (−0,42…−0,30) ÖNÜ: arkadan bakınca kablo traversin arkasında kalır
+# yan hat rayın içinde (tek düz hat): çamurluk rayı (1,10–1,18) ve yan koruma üst rayı (0,99–1,06) iç yüzünde
+RAIL_Z = 1.215
+RAIL_PROFILE = [[SX0, 1.055], [SX1, 1.055], [FR0, 1.17], [-0.425, 1.17]]
 
 
 def mounts_dict():
     fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
-    walk_y = TOP + 0.02 + 0.022  # yürüme yolu üstü (WALK_Y + sac)
     return {
         'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': BAR_Z, 'zInner': 0.30, 'faceX': XR},
         'plate': {'x': XR, 'y': round(PLATE_Y + PLATE_H / 2 + 0.025, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
-        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y_profile(), 'z': SIDE_ZW, 'maxPerSide': SIDE_N,
-                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [list(SIDE_GAP)], 'brackets': None},
+        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y_profile(), 'z': SIDE_ZW, 'maxPerSide': SIDE_N, 'slots': SIDE_SLOTS,
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None,
+                 # yan hat: arka lambadan bar içinde içe (z 0,785, paçanın iç yanı) ve öne, paçanın ÖNÜNDE (x −0,425) yükselir:
+                 # arkadan bakınca paça örter. Rayın içinde düz öne gider; ön pozisyon için yan koruma kolu (SX0+0,2) boyunca kirişe girer
+                 'rail': {'z': RAIL_Z, 'y': RAIL_PROFILE, 'rise': [-0.425, None], 'pass': 0.785, 'exit': [SX0 + 0.2, 1.058]}},
         'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.17, 'bracket': fb},
-        'armFront': {'x': FB_X + 0.03, 'y': FB_Y, 'z': FB_Z1, 'wallZ': FB_Z1, 'bracket': fb},
+        'armFront': {'x': ARM_FRONT_X, 'y': SIDE_Y_GUARD, 'z': SIDE_ZW - 0.002, 'wallZ': SIDE_ZW - 0.002, 'bracket': None},
         'armRear': {'x': -0.07, 'y': LAMP_Y, 'z': BAR_Z, 'wallZ': BAR_Z, 'bracket': None},
         'armRearAlt': {'x': FR1 - 0.06, 'y': SIDE_Y_RAIL, 'z': SIDE_ZW, 'wallZ': SIDE_ZW, 'bracket': None},
-        'work': [{'x': RTW[1] + 0.005, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'bracket': None} for s in (1, -1)],
-        'beacon': [{'x': -7.35, 'y': walk_y, 'z': 0.0, 'bracket': None}, {'x': -1.82, 'y': walk_y, 'z': -0.12, 'bracket': None}],
+        # kablo arka kulenin içinden (x −0,70) yükselir: kule dar olduğu için dış köşeden gitmez
+        'work': [{'x': RTW[1] + 0.005, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'bracket': None, 'rise': [-0.70, WORK_Z]}
+                 for s in (1, -1)],
+        'beacon': [{'x': BEACON_X, 'y': RTW[3], 'z': s * BEACON_Z, 'bracket': None, 'rise': [BEACON_X + 0.06, BEACON_Z]} for s in (1, -1)],
         'harness': {'trunkY': TRUNK_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, TRUNK_Y], [XR, TRUNK_Y]], 'moduleX': MODULE_X,
-                    'rearJunctionX': REAR_JX,
+                    'rearJunctionX': REAR_JX, 'rearDrop': {'z': 0.73, 'innerX': -0.16},
                     'notes': 'Demet king pin konsolunun içinden ve kutu kirişlerin iç yüzünde (y 1,34) arkaya gider; traverslerin '
-                             'uçlarından geçer. Arka dallar arka traversin arka yüzünden lamba barına iner.'},
+                             'uçlarından geçer. Arka 7×1 hatlar arka traversin ÖNÜNDE (x −0,50) lamba barı dikmesinin hizasına '
+                             '(z ±0,73) iner, dikmenin ve bar kolunun içinden bara girer: arkadan bakınca travers ve dikme kabloyu örter.'},
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
                     'armRear': 'chassis', 'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
         'notes': 'Tank kabuğu ince yüzey olduğu için lamba ve kol taşımaz. Burun kulesi orta düzlemde dar (z ±0,42): ön pozisyon orada '
-                 'dış kenara ~0,9 m kalır; bu yüzden ön pozisyon ve ön lastik kol, kirişten dışa uzanan sabit ön brakette (x −7,20, '
-                 'y 1,34, uç z 1,19). Huni bu x\'te dar olduğundan braket tankın ~0,3 m altında kalır. Yan markerlar yan koruma üst '
-                 'rayında (1,025) ve çamurluk rayında (1,14): tekerlek ve hortum taşıyıcı nedeniyle 0,9 m altına inilemez (R48 6.18 '
-                 'üst sınır 1,5 m). Arka kule yarı genişliği 0,74: kontur için dış kenara 0,53 m, kural dışı; arka kol lamba barının '
-                 'dış ucunda (Horpol şeması; daha yüksek alternatif çamurluk rayı ucu y 1,14, armRearAlt, ama son markerla çakışmaması '
-                 'için marker x1 −0,98 kalır). Çalışma lambaları arka kulenin arka yüzünde. Tepe lambaları yürüme yolunun ön ucunda ve '
-                 'arka ucunda (merdiven +z yanından gelir, lamba −z yarısında); kapaklar düşük açıları kısmen keser, iki lamba birlikte 360°.',
+                 'dış kenara ~0,9 m kalır; bu yüzden ön pozisyon kirişten dışa uzanan sabit ön brakette (x −7,20, y 1,34, uç z 1,19). '
+                 'Ön lastik kol yan korumanın en ön üst ucunda (revize 2026-10-20). Yan markerlar (en çok 5/yan, revize): arkadan öne '
+                 '3 tanesi aksların ortasında çamurluk rayında (1,14), 2 tanesi yan koruma pencerelerinin ortasında üst rayda (1,025). '
+                 'İlk marker önden ~3,3 m (R48 6.18 ≤ 3 m, kullanıcı kararı; ön kolun turuncu yüzü önden ~2,8 m). Yan hat rayların '
+                 'içinde tek düz hat, markerlara kısa düz uç. Arka kule yarı genişliği 0,74: kontur için dış kenara 0,53 m, kural dışı; '
+                 'arka kol lamba barının dış ucunda. Çalışma lambaları arka kulenin arka yüzünde, tepe lambaları kulenin düz üstünde '
+                 '(çalışma lambalarının üstünde); kabloları kulenin içinden çıkar.',
     }
 
 
@@ -640,8 +655,9 @@ cylinder(B, 'rail_top', 0.021, (POSTS[0] - 0.15, ry, rz), (POSTS[-1] + 0.12, ry,
 mz, my = (hz + rz) / 2, (hy_ + 0.02 + ry) / 2
 cylinder(B, 'rail_knee', 0.017, (POSTS[0] - 0.1, my, mz), (POSTS[-1] + 0.1, my, mz), MB['alu'], 12, 0.0)
 cylinder(B, 'rail_cyl', 0.025, (POSTS[1] + 0.4, hy_ + 0.05, hz - 0.08), (POSTS[1] + 0.4, ry - 0.04, rz + 0.08), MB['dark'], 14, 0.004)
-# merdiven (sol arka, +z): arka kulenin yanında, tampondan tepeye; iki ray, basamaklar, üstte tutamak
-LAD = [(0.04, 0.55), (-0.22, 1.30), (-0.52, 2.25), (-0.80, 3.05), (-1.12, 3.65), (-1.45, TOP + 0.06)]
+# merdiven (sol arka, +z): arka kulenin yanında, lamba barının üstünden tepeye; iki ray, basamaklar, üstte tutamak.
+# Alt uç barın üst yüzünde biter (0,76): stop lambası ve plaka yüzüne inmez.
+LAD = [(-0.02, 0.76), (-0.22, 1.30), (-0.52, 2.25), (-0.80, 3.05), (-1.12, 3.65), (-1.45, TOP + 0.06)]
 for z in (0.82, 1.20):
     poly_tube(B, 'ladder_rail', [(x, y, z) for x, y in LAD], 0.02, MB['alu'], 2)
 for i in range(len(LAD) - 1):

@@ -160,3 +160,14 @@ Tank kabuğu lamba taşımaz.
 | Çalışma (2) | x −0,08; y 1,18; z ±0,60; yön (1, −0,35, 0) | Üst kuşağın üstü (braket) | Arka kapak bombesi (x ≈ −0,45) önde kalır |
 | Tepe (2) | x −0,85; y 3,33; z ±0,66 | Devrilme korkuluğu üst başlığının arka ucu + adaptör | En yüksek sabit yer, 360° |
 | Tesisat | önde king pin plakası üstü 1,30, plaka bitince kiriş alt başlığı hizası 0,80; yan hat z 0,42; modül x −0,80; arka dağıtım x −0,25 | Kutu kirişin iç yüzü | Modül tankın en alt noktasının (0,85) altında. Önde orta ana hat tank kabuğunun altından geçer (bilinen sınırlama) |
+
+## Revize (2026-10-20, kullanıcı isteği)
+
+Yukarıdaki tabloyu geçersiz kılan değişiklikler (sayılar `tools/blender/tanker.py` → `mounts_dict`):
+- **Yan marker (en çok 12 → 10, 5/yan):** yalnız hortum rafının (beyaz koruma) dış dudağında, x −7,12 … −0,96, y 1,27. Rafın önündeki braketli markerlar ve L braketleri kaldırıldı. İlk marker önden ~5,3 m, ön lastik kol ~5,0 m (R48 6.18 ≤ 3 m): **kural dışı, kullanıcı kararı**.
+- **Lastik kol ön:** rafın en ön noktası (x −7,42; y 1,27; duvar z 1,273), braket yok.
+- **Lastik kol arka:** stop lambalarının olduğu tamponun dış ucu (x −0,06; y 0,56; z 1,22). Eski üst kuşak ucu `armRearAlt` oldu.
+- **Ön pozisyon:** soket plakasının iki dış kenarı (x −12,004; y 1,36; z ±0,50), öne bakar; ön braket (metal çubuk) kaldırıldı. Dış kenara ~0,78 m (R48 6.9 ≤ 0,4 m): **kural dışı, kullanıcı kararı**.
+- **Tepe lambaları:** arka üst kuşakta çalışma lambalarının dış yanında (x −0,14; y 1,12; z ±0,86). Çalışma ve tepe kabloları arka traversin önünde (x −0,33) yükselir.
+- **Yan hat kablosu:** tekerleklerin içinden geçen 90° dallar kaldırıldı. Arka lambadan arka çerçevenin dış ucunda (x −0,14; z 1,06) rafın yüksekliğine çıkar, rafın içinde (y 1,215; z 1,20) tek düz hat olarak öne gider; markerlara ve ön kola kısa düz uç. Ön pozisyon kablosu rafın ön kolunun (x −7,27) altından kirişe girer, kiriş içinden öne.
+- **Hava hatları:** önden EBS'ye giden kırmızı/sarı hava hatları modelden kaldırıldı (tesisat görünümünde demetle karışıyordu). Model yeniden üretildi.

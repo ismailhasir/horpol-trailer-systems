@@ -164,22 +164,22 @@
     },
     "front": {
       "x": -13.19,
-      "y": 1.85,
+      "y": 1.92,
       "z": 1.215,
       "bracket": null
     },
     "armFront": {
       "x": -13.15,
-      "y": 1.88,
+      "y": 1.365,
       "z": 1.275,
       "wallZ": 1.275,
       "bracket": null
     },
     "armRear": {
-      "x": -0.4,
-      "y": 1.44,
-      "z": 1.265,
-      "wallZ": 1.265,
+      "x": -0.06,
+      "y": 0.756,
+      "z": 1.275,
+      "wallZ": 1.275,
       "bracket": null
     },
     "armRearAlt": {
@@ -191,24 +191,18 @@
     },
     "work": [
       {
-        "x": -0.38,
-        "y": 1.56,
-        "z": 1.18,
-        "dir": [1, -0.4, 0],
-        "bracket": [
-          [-0.4, 1.5, 1.24],
-          [-0.4, 1.53, 1.18]
-        ]
+        "x": 0.02,
+        "y": 0.565,
+        "z": 0.62,
+        "dir": [1, -0.15, 0],
+        "bracket": null
       },
       {
-        "x": -0.38,
-        "y": 1.56,
-        "z": -1.18,
-        "dir": [1, -0.4, 0],
-        "bracket": [
-          [-0.4, 1.5, -1.24],
-          [-0.4, 1.53, -1.18]
-        ]
+        "x": 0.02,
+        "y": 0.565,
+        "z": -0.62,
+        "dir": [1, -0.15, 0],
+        "bracket": null
       }
     ],
     "beacon": [
@@ -259,6 +253,6 @@
       "beacon": "body",
       "harness": "chassis"
     },
-    "notes": "Rampalar hareketli; lamba konmaz. Başlık ve arka uyarı direkleri kaynaklı sabit parçalar (GLB'de \"body\"). Arka lambalar alçak tutucularda y 0,45 (alt kenar 0,376 ≥ 0,35). Yan markerlar dış yan kiriş levhasında: boyunda y 1,39 (boyun altında yapı yok; R48 6.18 üst sınır 1,5 m), platformda 0,74, kemerlerin üstünde 0,835. Ön pozisyon ve ön lastik kol başlığın köşe dikmesinde (en yüksek sabit nokta), arka kol uyarı direğinin yan yüzünde y 1,44 (alternatif: lamba tutucunun dış ucu, armRearAlt). Çalışma lambaları uyarı direklerinin üstünde, rampalara bakar. Tepe lambaları başlık üst kuşağında (80 mm derinlik, adaptör levhası); dik duran rampalar arkadan görünürlüğü keser (yüklemede rampalar iner)."
+    "notes": "Rampalar hareketli; lamba konmaz. Arka köşe uyarı levhaları kaldırıldı (kullanıcı, 2026-10-20). Arka lambalar alçak tutucularda y 0,45. Yan markerlar dış yan kiriş levhasında. Ön pozisyon başlığın ön üst köşelerinde, öne bakar. Lastik kollar kasanın 4 alt köşesinde: arkada platform yan kirişinin alt köşesi, önde boyun yan kirişinin alt köşesi (2 adet seçilirse arka, 4 adette ön de). Çalışma lambaları arka travers yüzünde, plaka ile kırmızı kontur bandı arasında. Tepe lambaları başlık üst kuşağında; kabloları başlığın arkasından köşe dikmesini izler (önden görünmez)."
   }
 }

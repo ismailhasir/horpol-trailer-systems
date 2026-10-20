@@ -333,6 +333,14 @@ export class Engine {
     this.sun.shadow.normalBias = 0.02;
     this.sun.shadow.radius = this.low ? 2.5 : 4;
     this.scene.add(this.sun, this.sun.target);
+    // yanan lambaların gövdeye ve zemine düşen gerçek ışığı: sayı sabit (gölgesiz), yalnız şiddet ve konum değişir
+    for (let i = 0; i < 2; i++) {
+      const p = new THREE.PointLight('#ff2010', 0, 3.2, 1.6);
+      this.rearLights.push(p);
+      const s = new THREE.SpotLight('#f1f5ff', 0, 14, 0.62, 0.65, 1.3);
+      this.workLights.push(s);
+      this.scene.add(p, s, s.target);
+    }
     this.applyLook();
     this.resize();
   }
@@ -564,9 +572,41 @@ export class Engine {
     this.syncGlows();
   }
   private syncGlows() {
+    this.syncLampLights();
     for (const g of this.equip?.glows ?? []) {
       g.sprite.visible = this.lights && this.fns.includes(fnGroup(g.fn)) && (fnGroup(g.fn) !== 'turn' || this.blinkOn) && (fnGroup(g.fn) !== 'beacon' || this.flashOn);
     }
+  }
+  private rearLights: THREE.PointLight[] = [];
+  private workLights: THREE.SpotLight[] = [];
+  /** gerçek ışıkları ekipmanın lamba konumlarına taşır ve yanan işlevlere göre açar */
+  private syncLampLights() {
+    const L = this.equip?.lights;
+    const on = (f: FnToggle) => this.lights && this.fns.includes(f);
+    const red = on('stop') ? 4.2 : on('position') ? 1.4 : 0;
+    this.rearLights.forEach((p, i) => {
+      // görünürlük değişmez (ışık sayısı değişirse tüm gölgelendiriciler yeniden derlenir): kapalıyken şiddet 0
+      const at = L?.rear.find((v) => (i === 0 ? v.z > 0 : v.z < 0));
+      if (at) p.position.copy(at);
+      p.intensity = at ? red : 0;
+    });
+    this.workLights.forEach((s, i) => {
+      const w = L?.work[i];
+      if (!w) {
+        s.intensity = 0;
+        return;
+      }
+      s.position.copy(w.pos).addScaledVector(w.dir, 0.06);
+      // çalışma lambası dorsenin arkasındaki yükleme alanını aydınlatır: ışık zemine, ~3 m geriye düşer
+      const flat = new THREE.Vector3(w.dir.x, 0, w.dir.z);
+      if (flat.lengthSq() < 1e-4) flat.set(1, 0, 0);
+      flat.normalize();
+      s.target.position.set(w.pos.x + flat.x * 3.2, 0, w.pos.z + flat.z * 3.2);
+      s.target.updateMatrixWorld();
+      s.angle = 0.75;
+      s.distance = 16;
+      s.intensity = on('work') ? 115 : 0;
+    });
   }
   private blinkOn = true;
   private flashOn = true;
