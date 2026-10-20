@@ -1,5 +1,6 @@
 // Lamba modelleri (tools/blender/lamps.py → src/assets/models/lamp-<id>.glb) ve ışık işlevlerinin yakılması.
-// GLB sözleşmesi: düğümler BODY / INNER / LENS / EMIT.<işlev>; ışık veren malzemelerin adı "E.<işlev>.<renk>".
+// GLB sözleşmesi: düğümler BODY / INNER / LENS / EMIT.<işlev>; ışık veren malzemelerin adı "E.<işlev>.<renk>[.<etiket>]".
+// Birden çok işlevin paylaştığı kılavuz "E.position+stop.red": işlevlerden biri açıksa yanar (pozisyonda sönük, frende parlak).
 // Klonlar malzemeyi paylaşır: bir işlevin malzemesini değiştirmek o işlevi tüm lambalarda yakar (tek kaynak).
 import * as THREE from 'three';
 import { loadedModel, loadModel } from './models';
@@ -51,14 +52,19 @@ export function loadLamp(id: string): Promise<unknown> {
 
 interface EmitMat {
   mat: THREE.MeshStandardMaterial;
-  fn: LampFn;
+  fns: LampFn[];
   color: THREE.Color;
 }
 const emitMats: EmitMat[] = [];
 /** renkli dış lensler: yanan işlevin renginde hafif ışır (gerçek lambada lensin tamamı aydınlanır) */
-const lensMats: { mat: THREE.MeshStandardMaterial; color: string }[] = [];
+const lensMats: { mat: THREE.MeshStandardMaterial; color: string; gain: number }[] = [];
+/** "Lens.<renk>.cad": ışık kılavuzları lensin hemen ardında (üretici CAD modeli), lensin kendisi az parlar */
+const LENS_GAIN: Record<string, number> = { cad: 0.25 };
 const registered = new WeakSet<THREE.Object3D>();
-const GLOW: Record<string, string> = { red: '#ff1408', amber: '#ff7a00', white: '#f4f7ff' };
+// yanan ışık rengi: gerçek LED tayfına yakın (kırmızı ~625 nm biraz turuncuya, turuncu ~590 nm, soğuk beyaz)
+const GLOW: Record<string, string> = { red: '#ff3a18', amber: '#ff9010', white: '#eef3ff' };
+/** paylaşılan kılavuzda tam güç işlevler: yalnız pozisyon/kontur yanıyorsa kılavuz sönük */
+const STRONG = new Set<LampFn>(['stop', 'turn', 'reverse', 'fog', 'work', 'beacon']);
 
 /** Yüklenmiş lamba modelinin klonu (malzemeler paylaşılır); yüklenmemişse null */
 export function lampInstance(id: string): THREE.Object3D | null {
@@ -76,9 +82,9 @@ export function lampInstance(id: string): THREE.Object3D | null {
       for (const m of mats as THREE.MeshStandardMaterial[]) {
         const p = m.name.split('.');
         if (p[0] === 'E' && p.length >= 3 && !emitMats.some((e) => e.mat === m)) {
-          emitMats.push({ mat: m, fn: p[1] as LampFn, color: new THREE.Color(GLOW[p[2]] ?? '#ffffff') });
+          emitMats.push({ mat: m, fns: p[1].split('+') as LampFn[], color: new THREE.Color(GLOW[p[2]] ?? '#ffffff') });
         }
-        if ((p[0] === 'Lens' || p[0] === 'Dome') && !lensMats.some((l) => l.mat === m)) lensMats.push({ mat: m, color: p[1] });
+        if ((p[0] === 'Lens' || p[0] === 'Dome') && !lensMats.some((l) => l.mat === m)) lensMats.push({ mat: m, color: p[1], gain: LENS_GAIN[p[2]] ?? 1 });
         // lens: ince yüzey, iki yüzü de görünsün; gölge atmasın (ışığı kesmez)
         if (m.transparent) {
           m.depthWrite = false;
@@ -138,29 +144,38 @@ function isOn(fn: LampFn) {
   return true;
 }
 
-/** Ton eşlemesiz doygun ışık: yanan kırmızı beyaza kaçmasın, ürünün ışık deseni okunsun */
+/**
+ * Yanan parçanın HDR ışıması (Engine ışıklar modunda bloom ile çizer; ton eşleme sonda tek seferde). Işık yalnız yanan
+ * parçadan gelir: lensin kendisi ışımaz (eskiden lens de yanan işlevin renginde parlıyordu; işlevler birbirine karışıyordu).
+ * Şiddetler ürün föyündeki güç oranlarını izler (MAVIC: pozisyon 2 W, fren 10 W, sinyal 4/13 W, sis 4 W, geri vites 2/4,5 W).
+ */
+const FN_I: Record<LampFn, number> = {
+  position: 1.45,
+  marker: 2.6,
+  front: 2.4,
+  outline: 2.4,
+  plate: 1.8,
+  stop: 2.7,
+  turn: 2.6,
+  reverse: 2.5,
+  fog: 2.6,
+  work: 4.5,
+  beacon: 3.6,
+};
 function apply() {
-  const litColor = new Map<string, number>();
-  for (const e of emitMats) {
-    if (!isOn(e.fn)) continue;
-    const c = e.mat.name.split('.')[2];
-    const k = e.fn === 'stop' || e.fn === 'work' || e.fn === 'beacon' ? 1 : 0.55;
-    litColor.set(c, Math.max(litColor.get(c) ?? 0, k));
-  }
   for (const l of lensMats) {
-    const key = l.color === 'clear' ? 'white' : l.color;
-    const k = litColor.get(key) ?? 0;
-    // yanınca lens de aynı renkte ışır ve ton eşlemesiz çizilir: yarı saydam renkli lens arkadaki ışığı kısmasın
-    l.mat.emissive.set(k ? GLOW[key] ?? '#ffffff' : '#000000');
-    l.mat.emissiveIntensity = k * (key === 'white' ? 1.1 : 1.5);
-    l.mat.toneMapped = !k;
+    l.mat.emissive.set('#000000');
+    l.mat.emissiveIntensity = 0;
+    l.mat.toneMapped = true;
     l.mat.needsUpdate = true;
   }
   for (const e of emitMats) {
-    const o = isOn(e.fn);
+    const lit = e.fns.filter(isOn);
+    const o = lit.length > 0;
     e.mat.emissive.copy(o ? e.color : BLACK);
-    e.mat.emissiveIntensity = o ? (e.fn === 'work' ? 3.2 : 2.6) : 0;
-    e.mat.toneMapped = !o;
+    // paylaşılan kılavuz (pozisyon + fren) en güçlü yanan işlevin şiddetinde
+    e.mat.emissiveIntensity = o ? Math.max(...lit.map((f) => FN_I[f] ?? 3)) : 0;
+    e.mat.toneMapped = true;
     e.mat.needsUpdate = true;
   }
   for (const fn of listeners) fn();
@@ -172,20 +187,50 @@ export function onLampChange(fn: () => void) {
   return () => listeners.delete(fn);
 }
 
-/** Bir lamba nesnesinin yanan (EMIT) parçaları: parlama sprite'ları için konum, boyut, renk ve işlev */
+/**
+ * Bir lamba nesnesinin yanan (EMIT) parçaları: parlama sprite'ları için konum, boyut, renk ve işlev.
+ * Büyük ışık parçaları (neon kılavuz, sinyal kaması) 6 cm'lik ızgara hücrelerine bölünür: tek büyük hale lambayı kaplamasın.
+ * split: bölünmüş parça; weak: paylaşılan kılavuzun zayıf (pozisyon) işlevi.
+ */
 export function emitterSpots(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
-  const out: { pos: THREE.Vector3; size: number; color: THREE.Color; fn: LampFn }[] = [];
+  const out: { pos: THREE.Vector3; size: number; color: THREE.Color; fn: LampFn; split: boolean; weak: boolean }[] = [];
+  const CELL = 0.06;
   root.traverse((o) => {
     const mm = o as THREE.Mesh;
     if (!mm.isMesh || !o.name.startsWith('EMIT')) return;
     const m = (Array.isArray(mm.material) ? mm.material[0] : mm.material) as THREE.Material;
     const p = m.name.split('.');
     if (p[0] !== 'E') return;
+    const fns = p[1].split('+') as LampFn[];
+    const color = new THREE.Color(GLOW[p[2]] ?? '#fff');
     mm.geometry.computeBoundingBox();
     const bb = mm.geometry.boundingBox!.clone().applyMatrix4(mm.matrixWorld);
     const size = bb.getSize(new THREE.Vector3());
-    out.push({ pos: bb.getCenter(new THREE.Vector3()), size: Math.max(size.x, size.y, size.z), color: new THREE.Color(GLOW[p[2]] ?? '#fff'), fn: p[1] as LampFn });
+    const spots: { pos: THREE.Vector3; size: number }[] = [];
+    if (Math.max(size.x, size.y, size.z) <= CELL * 1.6) {
+      spots.push({ pos: bb.getCenter(new THREE.Vector3()), size: Math.max(size.x, size.y, size.z) });
+    } else {
+      // en büyük iki eksende ızgara; her dolu hücre bir hale
+      const ax = (['x', 'y', 'z'] as const).slice().sort((a, b) => size[b] - size[a]).slice(0, 2);
+      const pa = mm.geometry.attributes.position;
+      const v = new THREE.Vector3();
+      const cells = new Map<string, THREE.Box3>();
+      for (let i = 0; i < pa.count; i++) {
+        v.fromBufferAttribute(pa, i).applyMatrix4(mm.matrixWorld);
+        const key = `${Math.floor((v[ax[0]] - bb.min[ax[0]]) / CELL)}|${Math.floor((v[ax[1]] - bb.min[ax[1]]) / CELL)}`;
+        let b = cells.get(key);
+        if (!b) cells.set(key, (b = new THREE.Box3()));
+        b.expandByPoint(v);
+      }
+      for (const b of cells.values()) {
+        const s = b.getSize(new THREE.Vector3());
+        spots.push({ pos: b.getCenter(new THREE.Vector3()), size: Math.max(s.x, s.y, s.z) });
+      }
+    }
+    for (const sp of spots) {
+      for (const fn of fns) out.push({ ...sp, pos: sp.pos.clone(), color, fn, split: spots.length > 1, weak: fns.length > 1 && !STRONG.has(fn) });
+    }
   });
   return out;
 }

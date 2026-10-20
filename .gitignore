@@ -6,4 +6,6 @@ dist/
 .vscode/
 Thumbs.db
 tools/blender/out/
+# üretici CAD verisinden çıkarılan STL'ler (tools/cad/step_to_stl.py): büyük, repoya girmez
+tools/blender/cad/
 __pycache__/

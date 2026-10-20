@@ -261,6 +261,8 @@ function poolMaterial(c: THREE.Color, cat: CategoryId) {
 }
 
 /** Arka lambaların genişliği (lamba yerel X), dizilim için: modelden ölçülür, yoksa ürüne göre tahmin */
+/** Eski hale/zemin ışığı sprite'ları (bloom öncesi). Kapalı: yansıma efektleri yanıltmasın (kullanıcı, 2026-10-20) */
+const GLOW_SPRITES = false;
 const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2856: 0.451, lzd2423: 0.155, lzd2448: 0.145, lzd2877: 0.115, lzd2880: 0.115 };
 
 export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuild {
@@ -289,6 +291,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   // parlamalar lambalar son yerlerine oturduktan sonra (arka lambalar kurulduktan sonra kaydırılır)
   const glowLater: THREE.Object3D[] = [];
   const makeGlows = () => {
+    // hale ve zemin ışığı sprite'ları kapalı (2026-10-20): ışıma artık Engine'deki bloom ile yanan parçanın kendi biçiminden gelir
+    if (!GLOW_SPRITES) return;
     for (const obj of glowLater) {
       const cat = obj.userData.category as CategoryId;
       obj.updateMatrixWorld(true);
@@ -298,14 +302,16 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         // 1) hale: lensin hemen önünde, ton eşlemesiz; yanınca lambanın çevresi parlar
         const halo = new THREE.Sprite(haloMaterial(mats, sp.color));
         halo.position.copy(sp.pos).addScaledVector(facing, 0.02);
-        halo.scale.setScalar(Math.min(HALO_MAX[cat], Math.max(0.16, sp.size * 2.4)));
+        // bölünmüş büyük parça (neon kılavuz): küçük ve çok sayıda hale; paylaşılan kılavuzun pozisyon işlevi sönük
+        const hs = sp.split ? Math.min(HALO_MAX[cat], Math.max(0.13, sp.size * 2.2)) : Math.min(HALO_MAX[cat], Math.max(0.16, sp.size * 2.4));
+        halo.scale.setScalar(sp.weak ? hs * 0.55 : hs);
         halo.visible = false;
         halo.renderOrder = 10;
         group.add(halo);
         glows.push({ sprite: halo, fn: sp.fn });
         // 2) zemine düşen ışık: lamba başına renk + işlev için bir tane
         const key = `${sp.fn}|${sp.color.getHexString()}`;
-        if (pooled.has(key) || !POOL[cat]) continue;
+        if (pooled.has(key) || !POOL[cat] || sp.weak) continue; // sönük pozisyon zemine ışık düşürmez
         pooled.add(key);
         // lastik kolun yüzleri farklı yönlere bakar: beyaz öne, kırmızı arkaya, turuncu yana
         let dir = facing.clone();
@@ -331,7 +337,14 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   };
   const lampWidth = (id: string, obj?: THREE.Object3D) => {
     if (obj && !obj.userData.placeholder) {
-      const bb = new THREE.Box3().setFromObject(obj, true);
+      // montaj plakası (BRACKET, ör. lastik kol plakası) lambanın genişliğine sayılmaz: lamba kenara dayanır, plaka dışa taşar
+      const bb = new THREE.Box3();
+      obj.updateMatrixWorld(true);
+      obj.traverse((m) => {
+        if (!(m as THREE.Mesh).isMesh) return;
+        for (let q: THREE.Object3D | null = m; q && q !== obj; q = q.parent) if (q.name.startsWith('BRACKET')) return;
+        bb.expandByObject(m, true);
+      });
       const sz = bb.getSize(V(0, 0, 0));
       return Math.max(sz.z, 0.05); // dünyada yanal (arka lambalar +X'e döndürülür)
     }
@@ -383,6 +396,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const perSide = Math.floor(stop.qty / 2);
   // her yan: dıştan içe dizilen lambalar [z merkezi, yarı genişlik]
   const rearLamps: { s: number; z: number; hw: number }[] = [];
+  /** dıştaki arka lambanın lastik kol takma noktası (modelde MOUNT_arm varsa; ör. LZD 3194 MAVIC) */
+  const armMount: Record<number, THREE.Vector3> = {};
   for (const s of [1, -1]) {
     let edge = zEdge;
     for (let k = 0; k < perSide; k++) {
@@ -394,6 +409,11 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       const z = edge - w / 2;
       o.position.z = s * z;
       rearLamps.push({ s, z, hw: w / 2 });
+      const mp = k === 0 ? o.getObjectByName('MOUNT_arm') : undefined;
+      if (mp) {
+        o.updateMatrixWorld(true);
+        armMount[s] = mp.getWorldPosition(V(0, 0, 0)); // grup ekseni (grup henüz sahnede değil, birim dönüşüm)
+      }
       edge = z - w / 2 - 0.025;
       // AMP 7 pin fiş lambanın arkasında; 7×1 dalı arka dağıtımdan
       const back = V(rx - 0.05, ly, s * z);
@@ -528,7 +548,10 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   for (const sp of armSpots) {
     const wz = sp.wallZ ?? sp.z;
     for (const s of [1, -1]) {
-      mount('arm', ar.product, V(sp.x, sp.y, s * wz), (o) => {
+      // arka kol: lambada takma noktası (MOUNT_arm) varsa kol plakası lambanın ucundaki adaptöre DÖNDÜRMEDEN oturur (kolun
+      // kendi biçimi yukarı eğik; LZD 3194 STEP'indeki LDCC 2698 montajıyla aynı); yoksa montaj haritasındaki yerine (duvara dik)
+      const lm = sp === AR ? armMount[s] : undefined;
+      mount('arm', ar.product, lm ? lm.clone() : V(sp.x, sp.y, s * wz), (o) => {
         if (s < 0) o.scale.z = -1;
       });
     }
@@ -705,7 +728,12 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       wires.push({ kind: 'plate', r: 0.008, conn: toLamp, pts: [from, V(xb, from.y, from.z), V(xb, from.y, z), V(xb, sp.entry.y, z), sp.entry.clone()] });
     }
     // --- arka lastik kol: dıştaki lambanın Superseal'inden ---
-    if (ar.qty >= 2) {
+    if (ar.qty >= 2 && armMount[s] && outer) {
+      // lambaya takılı kol: kablosu lambanın Superseal'inden plakaya (kısa, lambanın arkasında)
+      const from = supersealOf(outer);
+      const mp = armMount[s];
+      wires.push({ kind: 'marker', r: 0.006, conn: toLamp, pts: [from, V(from.x - 0.012, from.y, from.z), V(from.x - 0.012, mp.y, mp.z - s * 0.008)] });
+    } else if (ar.qty >= 2) {
       const wz = AR.wallZ ?? AR.z;
       const from = outer ? supersealOf(outer) : V(xd, hy, s * zr);
       const xb = Math.min(AR.x, rx) - 0.08;

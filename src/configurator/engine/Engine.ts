@@ -2,6 +2,8 @@
 // UI'dan bağımsızdır: yalnızca Config alır, olaylarla (onPick) geri bildirir.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { CategoryId, Config, TrailerId } from '../data';
 import { createMaterials, fadeTexture, type Mats } from './materials';
 import { buildTrailer, disposeGroup, modelUrls, setGhost, type Anchors, type TrailerBuild } from './trailer';
@@ -27,6 +29,11 @@ export interface EngineOptions {
 // ---------- ortam ışığı (IBL) ----------
 // Dış dosya yok: küçük bir "ortam sahnesi" (gökyüzü/zemin gradyanı + yumuşak ışık panelleri) bir kez PMREM'e
 // çizilir. Metal (alüminyum, krom), lens ve boya yansımaları buradan gelir; yanında tek yönlü ışık (güneş/ay) gölge verir.
+/** Yanan lambaların gövdeye ve zemine düşen ışığı (nokta/spot ışık). Kullanıcı isteğiyle kapalı (2026-10-20): yanıltmasın. */
+const LAMP_SPILL = false;
+/** Işıklar modunda bloom: eşik HDR parlaklık (yalnız yanan ışık parçaları aşar), şiddet ve yayılım */
+const BLOOM = { threshold: 1.05, strength: 0.8, radius: 0.36 };
+
 type EnvKind = 'studioLight' | 'studioDark' | 'night';
 type RGB = [number, number, number];
 interface EnvDef {
@@ -555,6 +562,7 @@ export class Engine {
 
   setLights(on: boolean) {
     this.lights = on;
+    if (on) void this.ensureBloom();
     this.applyLights();
     this.applyLook();
     this.invalidate();
@@ -579,10 +587,10 @@ export class Engine {
   }
   private rearLights: THREE.PointLight[] = [];
   private workLights: THREE.SpotLight[] = [];
-  /** gerçek ışıkları ekipmanın lamba konumlarına taşır ve yanan işlevlere göre açar */
+  /** gerçek ışıkları ekipmanın lamba konumlarına taşır ve yanan işlevlere göre açar (LAMP_SPILL kapalıyken hep 0) */
   private syncLampLights() {
     const L = this.equip?.lights;
-    const on = (f: FnToggle) => this.lights && this.fns.includes(f);
+    const on = (f: FnToggle) => LAMP_SPILL && this.lights && this.fns.includes(f);
     const red = on('stop') ? 4.2 : on('position') ? 1.4 : 0;
     this.rearLights.forEach((p, i) => {
       // görünürlük değişmez (ışık sayısı değişirse tüm gölgelendiriciler yeniden derlenir): kapalıyken şiddet 0
@@ -720,10 +728,56 @@ export class Engine {
     }
     const moved = this.controls.update();
     this.controls.target.y = Math.max(0.2, this.controls.target.y);
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
     this.adapt(now, busy || moved);
     if (busy || moved) this.invalidate();
   };
+
+  /** Işıklar modunda sahne bloom ile çizilir: yanan parçaların ışıması kendi biçimini izler (şerit şerit, homojen) */
+  private draw() {
+    if (this.lights && this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
+  }
+  // ---------- ışıklar modu: parlama (bloom) ----------
+  private composer: EffectComposer | null = null;
+  private bloom: UnrealBloomPass | null = null;
+  private bloomLoading = false;
+  /** İlk kez ışıklar açılınca yüklenir (gündüz görünümünde ek paket ve çizim maliyeti yok) */
+  private async ensureBloom() {
+    if (this.composer || this.bloomLoading || this.disposed) return;
+    this.bloomLoading = true;
+    let mods;
+    try {
+      mods = await Promise.all([
+        import('three/examples/jsm/postprocessing/EffectComposer.js'),
+        import('three/examples/jsm/postprocessing/RenderPass.js'),
+        import('three/examples/jsm/postprocessing/UnrealBloomPass.js'),
+        import('three/examples/jsm/postprocessing/OutputPass.js'),
+      ]);
+    } catch (err) {
+      console.error(err); // ağ hatası: bloomsuz devam (sonraki açılışta yeniden denenir)
+      this.bloomLoading = false;
+      return;
+    }
+    const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = mods;
+    if (this.disposed) return;
+    // HDR ara görüntü + MSAA (kenar yumuşatma kaybolmasın); ton eşleme ve sRGB dönüşümü OutputPass'te
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: this.low ? 0 : 4 });
+    const c = new EffectComposer(this.renderer, rt);
+    c.addPass(new RenderPass(this.scene, this.camera));
+    const b = new UnrealBloomPass(new THREE.Vector2(256, 256), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
+    // eşik parlaklık (luma) yerine en parlak kanal: doygun kırmızı ışığın luması düşük, eşiği geçemiyordu. HDR > 1 yalnız
+    // yanan ışık parçalarında olur; gece sahnesinde aydınlanan yüzeyler (beyaz dorse) ışımaz.
+    const hp = b.materialHighPassFilter;
+    hp.fragmentShader = hp.fragmentShader.replace('float v = luminance( texel.xyz );', 'float v = max( texel.r, max( texel.g, texel.b ) );');
+    hp.needsUpdate = true;
+    c.addPass(b);
+    c.addPass(new OutputPass());
+    this.composer = c;
+    this.bloom = b;
+    this.resize();
+    this.invalidate();
+  }
 
   /** Yavaş cihazda çözünürlüğü kademeli düşür */
   private adapt(now: number, active: boolean) {
@@ -771,6 +825,10 @@ export class Engine {
     const h = el.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
+    if (this.composer) {
+      this.composer.setPixelRatio(this.renderer.getPixelRatio() * (this.low ? 0.75 : 1));
+      this.composer.setSize(w, h);
+    }
     this.camera.aspect = w / h;
     const { left, right, top, bottom } = this.insets;
     if (left || right || top || bottom) {
@@ -820,7 +878,7 @@ export class Engine {
   /** Geliştirme/test: anlık görüntü (PNG data URL) */
   snapshot(): string {
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
     return this.renderer.domElement.toDataURL('image/jpeg', 0.9);
   }
 
@@ -833,6 +891,7 @@ export class Engine {
     if (this.equip) disposeEquipment(this.equip.group);
     this.envRT?.dispose();
     this.envBaker?.dispose();
+    this.composer?.dispose();
     this.bgTex?.dispose();
     if (this.contact) {
       this.contact.geometry.dispose();

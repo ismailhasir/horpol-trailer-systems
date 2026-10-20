@@ -15,6 +15,7 @@ npm run models:pack -- lamp      # gltfpack; lambalarda -kn -km (düğüm ve mal
 - `tools/blender/lamps_rear.py`: LZD 2856, 2423, 2448, 2877, 2880.
 - `tools/blender/lamps_small.py`: LD 2774, 2773, 2765, 0128, 0127, LTD 2834, 229.
 - `tools/blender/lamps_aux.py`: LD 2994 Dragon, LDCC 2698, LRD 2679, LDO 2660.
+- `tools/blender/lamps_cad.py`: üretici CAD verisinden modeller: LZD 3194, LDCC 2698, LD 2994 (bkz. bölüm 7–8). CAD STL'leri yoksa el modeline düşer.
 - Çıktılar: `src/assets/models/lamp-<id>.glb` (sitede ilk kullanımda indirilir), `src/assets/lamps/<id>-off.webp` / `-on.webp` (ürün simgeleri).
 
 ## 2. GLB sözleşmesi (sitenin okuduğu)
@@ -23,8 +24,8 @@ npm run models:pack -- lamp      # gltfpack; lambalarda -kn -km (düğüm ve mal
 |---|---|
 | `BODY` | opak gövde, braket, vida, kablo, fiş |
 | `INNER` | opak iç parçalar: reflektör, LED kabı, köşe küp reflektör |
-| `EMIT.<işlev>` | ışık veren parçalar; malzeme adı `E.<işlev>.<renk>` |
-| `LENS` | şeffaf dış lens (`Lens.<renk>`), tepe lambası kubbesi (`Dome.amber`) |
+| `EMIT.<işlev>` | ışık veren parçalar; malzeme adı `E.<işlev>.<renk>[.<etiket>]`; paylaşılan kılavuz `E.position+stop.red` (işlevlerden biri açıksa yanar; yalnız pozisyonda sönük) |
+| `LENS` | şeffaf dış lens (`Lens.<renk>[.cad]`; `.cad`: lensin kendisi az parlar), tepe lambası kubbesi (`Dome.amber`) |
 
 İşlevler: position, stop, turn, reverse, fog, marker, front, outline, plate, work, beacon. Renkler: red, amber, white.
 Yerel eksenler (three.js, metre): lens +Z'ye bakar, X genişlik, Y yukarı, montaj yüzeyi z = 0. Sağ arka lamba sol lambanın aynasıdır.
@@ -32,8 +33,16 @@ Yerel eksenler (three.js, metre): lens +Z'ye bakar, X genişlik, Y yukarı, mont
 ## 3. Sitede ışıklar
 
 `src/configurator/engine/lampfx.ts`: lamba modellerinin kaydı ve işlevlerin yakılması. Işıklar modunda kullanıcı yanan işlevleri
-seçer (pozisyon, fren, sinyal, geri vites, sis, çalışma, tepe). Yanan malzeme ton eşlemesiz doygun renkte ışır, aynı renkteki dış
-lens de hafifçe aydınlanır; sinyal ~1,5 Hz yanıp söner, tepe lambası 2,1 Hz çift flaş. Zemine renkli ışık yansıması yok (kaldırıldı).
+seçer (pozisyon, fren, sinyal, geri vites, sis, çalışma, tepe); sinyal ~1,5 Hz yanıp söner, tepe lambası 2,1 Hz çift flaş.
+
+**Revize (2026-10-20 akşam, kullanıcı isteği: "videoda gösterilen şekle uygun olmalı"):**
+- **Işığı yalnız yanan parça verir.** Yanan malzeme HDR ışır; lensin kendisi artık ışımaz. Eskiden lens de yanan işlevin renginde parlıyordu, bu yüzden işlevler birbirine karışıyordu.
+- **Işıma bloom ile çizilir** (`Engine.ts`, yalnız ışıklar modunda, ilk açılışta ~19 KB dinamik yüklenir). Işıma yanan parçanın kendi biçimini izler: neon şerit homojen şerit, sinyal kaması tek parça yanar. Eski küre biçimli hale sprite'ları "arkada 4 LED var" görüntüsü veriyordu, kapatıldı (`GLOW_SPRITES`).
+- **Bloom eşiği en parlak renk kanalına göre ölçülür** (luma yerine). Doygun kırmızının luması düşük olduğu için eşiği geçemiyordu. HDR > 1 yalnız yanan ışıklarda olur, gece sahnesindeki beyaz dorse ışımaz.
+- **Yansıma efektleri kapalı:** zemin ışık halkaları, kırmızı nokta ışık ve çalışma lambası spotu (`LAMP_SPILL`, `GLOW_SPRITES`).
+- **Şiddetler** ürün föyündeki güç oranlarını izler (MAVIC: pozisyon 2 W, fren 10 W). Pozisyon 1,45, fren 2,7, sinyal 2,6, sis 2,6, geri vites 2,5; marker, ön ve kontur 2,4–2,6; çalışma 4,5, tepe 3,6.
+- **Paylaşılan kılavuz** (`E.position+stop`) en güçlü yanan işlevin şiddetinde yanar.
+- Videoyla karşılaştırma ışıklar modunda yakın planda yapıldı. Gerçek cihazda bloom maliyeti ölçülmedi; zayıf cihazda MSAA kapalı ve çözünürlük 0,75.
 
 ## 4. Tesisat (yeni Horpol şeması)
 
@@ -68,7 +77,7 @@ Boyutlar paketli GLB (Meshopt). Ölçüler teknik çizimlerden; "doğrulanmadı"
 
 | Ürün | Kategori | Ölçü (mm) | Işık işlevleri (EMIT) | Üçgen | GLB |
 |---|---|---|---|---|---|
-| LZD 3194/AMP MAVIC (sağ: 3195, ayna) | arka | 405 × 148 × 63; 2 × M8 (250), AMP 7 pin, 4 Superseal | position, stop, turn, reverse, fog | 9 652 | 110 KB |
+| LZD 3194/AMP MAVIC (sağ: 3195, ayna) | arka | 405 × 148 × 63; 2 × M8 (±75), 4 Superseal (±126), AMP 7 pin | position+stop (neon), stop (iç üçgen), turn, reverse, fog | 63 368 (CAD) | 523 KB |
 | LZD 2856 Heavy Duty (sağ: 2857) | arka | 451 × 139 × 74; 2 × M8 (152), 8 vida | turn, stop, position (neon şevron), reverse, fog | 6 494 | 100 KB |
 | LZD 2423 LUCY | arka | Ø121,4 × 33,5, paslanmaz halka Ø155 | turn, position (neon halka + 4 kol), stop | 7 128 | 96 KB |
 | LZD 2448 LUNA | arka | Ø121,4 × 36,2, krom halka Ø155,6 | position, turn (D modülü), stop | 7 338 | 97 KB |
@@ -95,3 +104,112 @@ Toplam: 17 ürün, 1,4 MB (gzip 0,9 MB); bir yapılandırmada yalnız seçilen �
 - Ürün verisi: set listelerinde LD 2773 yan marker, LD 2774 ön lamba diye geçiyor; ürün belgeleri tersini söylüyor (LD 2774 turuncu yan marker, LD 2773 beyaz ön). Sitede ürün belgesi esas.
 
 **MAVIC fotoğraflarından öğrenilen:** gerçek pozisyon deseni üstte uzun çubuk, dış uçta "<" kıvrımı ve altta çubuk; model yaklaşık, ileride hassaslaştırılabilir.
+
+## 7. Üretici CAD verisiyle modelleme (dal `lamp-3d-rework`, 2026-10-20)
+
+İlk örnek **LZD 3194/AMP MAVIC**. Kaynaklar (repoya girmez): vault kökü `Dideban Otomotiv/LZD-3194AMP.zip` (ürün föyü, teknik çizim,
+homologasyon, 5 işlev ayrı yanık fotoğraf, etiketli ürün videosu) ve `3d-files_2026-10-02_1139.zip` (`LZD 3194_H101_AMP_4SS.STEP`).
+
+```bash
+# 1) STEP → kabuk başına STL (FreeCAD 1.1; çıktı tools/blender/cad/lzd3194, .gitignore'da)
+STEP_IN="<…>/LZD 3194_H101_AMP_4SS.STEP" STEP_OUT=tools/blender/cad/lzd3194 "C:/Program Files/FreeCAD 1.1/bin/freecadcmd.exe" tools/cad/step_to_stl.py
+# 2) model + simgeler, 3) paketleme
+blender -b -P tools/blender/lamps.py -- --only lzd3194 --icons
+npm run models:pack -- lamp-lzd3194
+```
+
+**STEP'te ne var, ne yok:** STEP bir dış zarf modeli: 44 kabuk, 9 237 yüz. İçinde olanlar:
+- lens (dış ve iç kabuk; iç yüzde sis optiği ve kama kenarı işlenmiş)
+- gövde (altıgen nervürlü iç taban, Superseal yuvaları, M8 saplamalar, AMP rakoru, geniş uçta kablo kanalı)
+- 9 lens vidası
+
+Renk ve malzeme yok. İç optik parçalar da yok: ışık kılavuzları, LED'ler, reflektörler, geri vites yuvaları.
+
+**Yöntem (`lamps_cad.py`):**
+- CAD ekseni: x genişlik (geniş uç −x), **yukarı = −z**, lens = +y, arka düzlem y = −78 mm. Yukarı yönü arka fotoğraftaki havalandırma kapağı ile AMP rakorunun konumundan doğrulandı.
+- Üçgenler 26 yönde ışın testiyle dış/iç ayrılır. Dış yüzeyde flanşın önü (yerel z > 34,5 mm) **lens**, gerisi **gövde**.
+- İç yüzeyler atılır; kovuk, ölçülen lens iç kenarından kurulan taban ve duvarla kapatılır.
+- Lens fasetleri düzlemsel birleştirilir. Geri vites pencereleri renksiz, kama bölgesi turuncu (bölgeler kesilerek ayrılır).
+- Gövde 30 bin üçgene sadeleşir. 4SS kablo artıkları atılır.
+- İç parçalar ürün fotoğraflarından ölçülür. Fotoğraf → lamba koordinatı dönüşümü, lensin ardından görünen 9 vida başının CAD konumundan (x, y, z) kurulan **3B kamera matrisiyle** (DLT) yapılır. Vida hatası en çok 4,3 px (~1 mm). İlk sürümdeki düzlemsel homografi kavisli lens yüzünde ortada 7 mm'ye kadar kaydırıyordu (bkz. revize 2).
+- Parçaların derinliği lens dış yüzüne ışın atılarak bulunur, böylece kılavuzlar lensi izler.
+
+**İşlev haritası (videodaki etiketlerden; eski el modeli yanlıştı):**
+- Neon üst çubuk ile iç ve dış "<" kılavuzlar **pozisyon** (sönük) ve **fren** (parlak); aynı kılavuz.
+- Frende sol iç üçgen panel de yanar.
+- Sağ uçtaki 2 × 4 hücre **sis**. Eski modelde fren sanılmıştı.
+- Turuncu kama **sinyal**.
+- Sol üstte 2 pencere, ikişer LED: **geri vites**.
+- Büyük üçgen (üstünden neon çubuk geçer) ve alt şerit: reflektör.
+
+**Sitede:**
+- Büyük ışık parçalarının halesi 6 cm'lik hücrelere bölünür (`emitterSpots`). Paylaşılan kılavuzun pozisyon halesi küçük ve zemine ışık düşürmez.
+- `.cad` lens az parlar; kılavuz deseni okunur.
+
+**Ölçüm:**
+- 63 368 üçgen, paket 523 KB (gzip 379 KB). Eski el modeli: 9 652 üçgen, 110 KB.
+- Sahnede 2 arka lamba var. Gerçek cihazda FPS ölçülmedi.
+
+**Doğrulanmadı / açık:**
+- Fotoğraflar LZD 2650/2651 MAVIC'in. Ön yüz aynı kabul edildi.
+- İç parçaların derinlik ve kalınlıkları tahmin.
+- Fren ve pozisyon parlaklık oranı görsel.
+- Galeride fren fotoğrafı yok (72-dpi-3 eksik: 1 sis, 2 pozisyon, 4 sinyal, 5 pozisyon+sinyal, 6 geri vites). Fren davranışı yalnız videodan.
+
+**Revize (2026-10-20 akşam):**
+- Geri vites pencereleri lamba eksenine hizalı, simetrik biçimle yeniden kuruldu. Fotoğraftan dönüştürülen çokgen perspektif yüzünden eğiliyordu.
+- **Arka lastik kol lambaya takılı.** STEP'teki geniş uç bloğu aslında kol montajı: dış uca vidalı dikey plaka (x −230…−208 mm, 2 saplama ve somun) ve plakadan dışa, ~40° yukarı çıkan delikli kol ve kafa. CAD'deki ayrı parça p000, AMP fişi değil, bu kolun kafasıdır.
+- Lamba modeli plakayı ayrı `BRACKET` düğümünde ve takma noktasını boş `MOUNT_arm` düğümünde taşır.
+- Sitede (`equipment.ts`): dıştaki arka lambada `MOUNT_arm` varsa seçili arka lastik kol oraya takılır ve 40° yukarı eğilir (`ARM_TILT`). Kablosu lambanın Superseal'inden gelir. `MOUNT_arm` yoksa kol montaj haritasındaki yerinde kalır.
+- Lamba genişliği `BRACKET` hariç ölçülür; lamba kenara dayanır, plaka dışa taşar.
+- Model 70 186 üçgen, paket 569 KB.
+
+**Revize 2 (2026-10-20 gece): fren ve alt şeritler.** Kullanıcı bildirimi:
+- Frende şeritlerin tamamı yanmıyor, büyük üçgenin hizasından başlıyordu.
+- Alt iki şerit büyük üçgenin altında tek şeride dönüşüyor, sonra yeniden ikiye ayrılıyordu.
+
+Nedenler:
+- İç ve dış "<" kılavuzların alt kolları solda üst üste biniyordu: çokgenler göz kararı çizilmişti, aralarında boşluk yoktu.
+- Fren üçgeni gerçeğinin yaklaşık iki katıydı ve kılavuzların arasına uzanıyordu.
+- Kılavuzlar 12 mm'lik düz dilimlerden kuruluydu. Dilim sınırlarında basamak ve dikiş izi kalıyordu.
+- Düzlemsel homografi kavisli lenste parçaları ortada 7 mm'ye kadar kaydırıyordu.
+
+Düzeltme (`lamps_cad.py`):
+- Kılavuz, kama, ayırıcı ve fren üçgeni kenarları pozisyon (72-dpi-2) ve sinyal (72-dpi-4) fotoğraflarında sütun/satır parlaklık profilinden piksel olarak ölçüldü. Fren üçgeni sönük fotoğraflarda (72-dpi-1/6) koyu üçgen olarak görünüyor; biçimi oradan alındı.
+- Gerçek biçim kavisli: üst çubuk ve kama dar uca doğru aşağı kıvrılır, alt şeritler büyük üçgenin altında hafif eğimli gider, sağda düzleşir.
+- Alt iki şerit boydan boya ayrı (~9 mm genişlik):
+  - kollar arasında koyu yarık
+  - büyük üçgenin altında lensteki noktalı yazı şeridi (~1,4 mm aralık + koyu noktalar)
+  - sağda siyah ayırıcı (~2,5 mm)
+- Fotoğraf eşlemesi 3B kamera matrisine geçti (yukarıda).
+- Kılavuzlar `_drape`: kısıtlı Delaunay ile ≤3 mm üçgenlere bölünmüş, her köşesi lens yüzeyini kesintisiz izleyen ince plaka.
+- Fren: paylaşılan kılavuz (`E.position+stop`) üç kılavuzun tamamını kapsar; fren üçgeni kılavuzlarla aynı düzlemde. Video 0:26 (pozisyon) ve 0:28 (fren) kareleriyle karşılaştırıldı.
+
+Ölçüm: 78 335 üçgen, paket 586 KB (gzip 426 KB). Önceki sürüm 546 KB. Tarayıcıda yakın ve orta mesafede pozisyon, fren ve sinyal kontrol edildi. Gerçek cihazda FPS ölçülmedi.
+
+## 8. Lastik kollar CAD'den (LDCC 2698, LD 2994) ve lambaya montaj (2026-10-20 akşam)
+
+Kaynak: `3d-files_2026-10-02_1139.zip` (`LDCC 2698, 2699.STEP`, `LD 2994, LD 2995.STEP`), ürün arşivleri `LDCC-2698.zip`, `LD-2994.zip`
+(föy, fotoğraf, Dragon videosu). STL dönüşümü bölüm 7'deki gibi (`tools/blender/cad/<id>`).
+
+**İşlevler (föy ve videodaki etiketler):** üç işlev tek devrede (`outline`): arkaya kırmızı rear position, öne beyaz front position, uçta turuncu side marker.
+
+**LDCC 2698**
+- STEP 25 katı parça: gövde (kol, plaka, kafa), iki lens yarısı, 2 × 5 + 2 × 5 LED, 2 vida.
+- CAD ekseni: dışa +x, yukarı +y, lens yüzleri ±z.
+- Işık parçaları lensin kendi yüzeylerinden ayrıldı: z ±18,5 düzlemindeki halka bandı (pencereyi çevreleyen, LED'lerin oturduğu bant) ve LED'ler. İç pencere z ±17'de.
+- Uçtaki turuncu pencere, lens yarılarının x > 36 mm bölümü.
+
+**LD 2994 Dragon**
+- STEP tek kabuk.
+- CAD'de montaj yüzü yatay modellenmiş: dışa +z, yukarı −x, lens yüzleri ±y.
+- ">—<" kanallar kafa yüzündeki kendi kabarık yüzleri, uçtaki iki turuncu çubuk da kendi yüzleri; ikisi de orta çizgiye uzaklıkla ayrıldı. Kablo duvarın 40 mm ötesinde kesildi.
+
+**Ölçüler el modelleriyle tutarlı:** kafa merkezi LDCC'de plakadan 97 mm yukarıda ve 128,5 mm dışarıda, LD 2994'te 102 ve 169 mm. Model ve paket boyutları:
+- LDCC: 25 715 üçgen, 220 KB
+- LD 2994: 21 135 üçgen, 195 KB
+
+**LZD 3194'e montaj (düzeltme).** Önceki sürümde kol 40° döndürülüyordu; kolun kendi biçimi zaten eğik olduğu için taban yatıyor ve kol fazladan yukarı kalkıyordu.
+- STEP'teki LDCC 2698 vidaları LDCC'nin kendi CAD'iyle eşlendi. Buna göre kol plakasının duvar yüzü x −219,1 mm, merkezi y 0, z 20 mm.
+- Aradaki x −219…−203 bölgesi lambanın adaptör bloğu: lamba modelinde `BRACKET` düğümü, genişliğe sayılmaz.
+- Kol `MOUNT_arm` noktasına **döndürmeden** oturur (`equipment.ts`).

@@ -541,6 +541,13 @@ def finalize(L):
         ob = _join(g, 'EMIT.' + fn)
         if ob:
             out.append(ob)
+    # ürüne özel ek düğümler: BRACKET (montaj plakası), MOUNT_* boş nesneler (sitede takma noktası)
+    b = getattr(L, 'bracket', None)
+    if b is not None:
+        ob = _join(b, b.name)
+        if ob:
+            out.append(ob)
+    out += getattr(L, 'empties', [])
     return out
 
 
@@ -703,7 +710,7 @@ def build_lzd3194(L):
 # ---------------------------------------------------------------------
 def _load_modules():
     here = os.path.dirname(os.path.abspath(__file__))
-    for mod in ('lamps_rear', 'lamps_small', 'lamps_aux'):
+    for mod in ('lamps_rear', 'lamps_small', 'lamps_aux', 'lamps_cad'):  # lamps_cad: üretici CAD verisi varsa el modelinin yerine geçer
         p = os.path.join(here, mod + '.py')
         if os.path.exists(p):
             try:
@@ -767,11 +774,13 @@ def bounds(objs):
 
 def set_emission(objs, on, strength=6.0, fns=None):
     for o in objs:
+        if o.type != 'MESH':
+            continue
         for m in o.data.materials:
             if m and m.name.startswith('E.'):
-                fn = m.name.split('.')[1]
+                fn = m.name.split('.')[1].split('+')  # "position+stop": işlevlerden biri açıksa yanar
                 p = m.node_tree.nodes['Principled BSDF']
-                p.inputs['Emission Strength'].default_value = strength if (on and (fns is None or fn in fns)) else 0.0
+                p.inputs['Emission Strength'].default_value = strength if (on and (fns is None or any(f in fns for f in fn))) else 0.0
 
 
 def set_icon_glass(on):
