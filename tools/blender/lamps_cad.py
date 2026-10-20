@@ -220,6 +220,39 @@ def _emat(fn, color, off_hex, tag='mavic'):
     return MATS[key]
 
 
+def _refl(fn, color, gain):
+    """Işığı yansıtan krom (LED kabı): sönükken krom, işlev yanınca LED'in ışığını yansıtıp gain oranında ışır.
+    Ad: E.<işlev>.<renk>.g<yüzde> (site ve simge işlev şiddetini bu oranla çarpar)"""
+    key = f'E.{fn}.{color}.g{int(round(gain * 100))}'
+    if key not in MATS:
+        m = mat('Chrome').copy()
+        m.name = key
+        p = m.node_tree.nodes['Principled BSDF']
+        p.inputs['Emission Color'].default_value = (*GLOW[color], 1.0)
+        p.inputs['Emission Strength'].default_value = 0.0
+        m['fn'] = fn
+        m['gain'] = gain
+        MATS[key] = m
+    return MATS[key]
+
+
+def _cup_bands(group, x, y, z, r_front, r_back, depth, gains, fn, color):
+    """İçi önden görünen krom LED kabı, dipten ağza bantlara bölünmüş: her bant kendi oranında ışır (LED'e yakın dip parlak,
+    ağız sönük; yansıyan ışığın düşüşü). Normaller içe: sitede tek yüzlü çizim, dış yüz arkada kalır"""
+    n = len(gains)
+    for i, g in enumerate(gains):
+        z0 = z - depth + depth * i / n
+        z1 = z - depth + depth * (i + 1) / n
+        r0 = r_back + (r_front - r_back) * i / n
+        r1 = r_back + (r_front - r_back) * (i + 1) / n
+        ob = cyl(group, 'cup', r0, (x, y, z0), (x, y, z1), _refl(fn, color, g), 28, r2=r1, caps=False)
+        bm_ = bmesh.new()
+        bm_.from_mesh(ob.data)
+        bmesh.ops.reverse_faces(bm_, faces=bm_.faces[:])
+        bm_.to_mesh(ob.data)
+        bm_.free()
+
+
 def _lmat(color, tag='cad'):
     """Lens.<renk>.cad: sitede lens az parlar (kılavuzlar lensin hemen ardında, lensin kendisinin ışıması deseni örter)"""
     key = f'Lens.{color}.{tag}'
@@ -255,18 +288,6 @@ def _drop_small(bm, cond):
             kill += cur
     bmesh.ops.delete(bm, geom=kill, context='FACES')
     print('DROPPED', len(kill))
-
-
-def _cup_in(groupI, x, y, z, r_front, r_back, depth, material):
-    """Önden içi görünen krom kap: normaller içe (sitede tek yüzlü çizim; dış yüz arkada kalır)"""
-    ob = cyl(groupI, 'cup', r_back, (x, y, z - depth), (x, y, z), material, 28, r2=r_front, caps=False)
-    me = ob.data
-    bm_ = bmesh.new()
-    bm_.from_mesh(me)
-    bmesh.ops.reverse_faces(bm_, faces=bm_.faces[:])
-    bm_.to_mesh(me)
-    bm_.free()
-    return ob
 
 
 @product('lzd3194', 'LZD 3194/AMP', 'stop', 'MAVIC sol (sağ: LZD 3195/AMP, ayna) — üretici CAD + ürün fotoğrafları')
@@ -396,13 +417,16 @@ def build_lzd3194_cad(L):
         print('ZMIN', nm, round(zmin(poly), 1))
         prism(L.inner, nm, m_(poly), Z_FLOOR / 1000, (zmin(poly) - 4.0) / 1000, mat('Retro.red'), 0.0008)
         set_uv_planar(L.inner.objs[-1], 0.010)
-    # geri vites: iki pencere, ikişer LED; krom yuva + krom kaplar + koyu çerçeve
+    # geri vites: iki pencere, ikişer LED; krom yuva + krom kaplar + koyu çerçeve. Videoda (0:50) yanınca kapların tamamı LED'in
+    # ışığını yansıtıp beyaz parlar, LED ortada en parlak nokta: kaplar ve yuva geri viteste kendi oranlarında ışır (_refl).
+    # Oranlar bloom eşiğinin altında (sitede şiddet 3,0 × oran ≤ 1): kap yapısı okunur, haleyi yalnız LED verir
     for poly, leds in zip(REV, REV_LED):
         zf = zmin(poly) - 3.6
-        prism(L.inner, 'rev_bay', m_(offset(poly, 1.0)), Z_FLOOR / 1000, (Z_FLOOR + 2) / 1000, mat('Chrome'), 0.0)
+        prism(L.E('reverse'), 'rev_bay', m_(offset(poly, 1.0)), Z_FLOOR / 1000, (Z_FLOOR + 2) / 1000, _refl('reverse', 'white', 0.13), 0.0)
         frame(L.inner, 'rev_frame', m_(poly), m_(offset(poly, 1.6)), Z_FLOOR / 1000, zf / 1000, mat('HousingGloss'), 0.0)
         for (lx, ly) in leds:
-            _cup_in(L.inner, lx / 1000, ly / 1000, (zf - 1.0) / 1000, 0.0105, 0.0045, (zf - 1.0 - Z_FLOOR - 2) / 1000, mat('Chrome'))
+            _cup_bands(L.E('reverse'), lx / 1000, ly / 1000, (zf - 1.0) / 1000, 0.0105, 0.0045, (zf - 1.0 - Z_FLOOR - 2) / 1000,
+                       (0.33, 0.26, 0.19), 'reverse', 'white')
             box(L.E('reverse'), 'rev_led', (lx - 3.2) / 1000, (lx + 3.2) / 1000, (ly - 3.2) / 1000, (ly + 3.2) / 1000, (Z_FLOOR + 2.2) / 1000,
                 (Z_FLOOR + 3.8) / 1000, E('reverse', 'white'))
     # sis: 2 × 4 hücre — krom hücre, LED, önde tırtıklı optik

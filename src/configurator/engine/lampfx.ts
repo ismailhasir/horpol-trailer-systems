@@ -54,6 +54,8 @@ interface EmitMat {
   mat: THREE.MeshStandardMaterial;
   fns: LampFn[];
   color: THREE.Color;
+  /** "E.<işlev>.<renk>.g<yüzde>": LED'in ışığını yansıtan krom kap, işlev şiddetinin bu oranında ışır */
+  gain: number;
 }
 const emitMats: EmitMat[] = [];
 /** renkli dış lensler: yanan işlevin renginde hafif ışır (gerçek lambada lensin tamamı aydınlanır) */
@@ -82,7 +84,8 @@ export function lampInstance(id: string): THREE.Object3D | null {
       for (const m of mats as THREE.MeshStandardMaterial[]) {
         const p = m.name.split('.');
         if (p[0] === 'E' && p.length >= 3 && !emitMats.some((e) => e.mat === m)) {
-          emitMats.push({ mat: m, fns: p[1].split('+') as LampFn[], color: new THREE.Color(GLOW[p[2]] ?? '#ffffff') });
+          const g = /^g(\d+)$/.exec(p[3] ?? '');
+          emitMats.push({ mat: m, fns: p[1].split('+') as LampFn[], color: new THREE.Color(GLOW[p[2]] ?? '#ffffff'), gain: g ? Number(g[1]) / 100 : 1 });
         }
         if ((p[0] === 'Lens' || p[0] === 'Dome') && !lensMats.some((l) => l.mat === m)) lensMats.push({ mat: m, color: p[1], gain: LENS_GAIN[p[2]] ?? 1 });
         // lens: ince yüzey, iki yüzü de görünsün; gölge atmasın (ışığı kesmez)
@@ -157,7 +160,8 @@ const FN_I: Record<LampFn, number> = {
   plate: 1.8,
   stop: 2.7,
   turn: 2.6,
-  reverse: 2.5,
+  // geri vites: beyaz LED kırmızı kılavuzların yanında sönük kalıyordu (kullanıcı, 2026-10-20); LED kabı .g oranlarıyla ışır
+  reverse: 3.0,
   fog: 2.6,
   work: 4.5,
   beacon: 3.6,
@@ -174,7 +178,7 @@ function apply() {
     const o = lit.length > 0;
     e.mat.emissive.copy(o ? e.color : BLACK);
     // paylaşılan kılavuz (pozisyon + fren) en güçlü yanan işlevin şiddetinde
-    e.mat.emissiveIntensity = o ? Math.max(...lit.map((f) => FN_I[f] ?? 3)) : 0;
+    e.mat.emissiveIntensity = o ? Math.max(...lit.map((f) => FN_I[f] ?? 3)) * e.gain : 0;
     e.mat.toneMapped = true;
     e.mat.needsUpdate = true;
   }

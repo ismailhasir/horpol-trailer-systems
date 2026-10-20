@@ -780,7 +780,8 @@ def set_emission(objs, on, strength=6.0, fns=None):
             if m and m.name.startswith('E.'):
                 fn = m.name.split('.')[1].split('+')  # "position+stop": işlevlerden biri açıksa yanar
                 p = m.node_tree.nodes['Principled BSDF']
-                p.inputs['Emission Strength'].default_value = strength if (on and (fns is None or any(f in fns for f in fn))) else 0.0
+                lit = on and (fns is None or any(f in fns for f in fn))
+                p.inputs['Emission Strength'].default_value = strength * m.get('gain', 1.0) if lit else 0.0  # gain: yansıtıcı krom (.g<yüzde>)
 
 
 def set_icon_glass(on):

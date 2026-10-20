@@ -24,7 +24,7 @@ npm run models:pack -- lamp      # gltfpack; lambalarda -kn -km (düğüm ve mal
 |---|---|
 | `BODY` | opak gövde, braket, vida, kablo, fiş |
 | `INNER` | opak iç parçalar: reflektör, LED kabı, köşe küp reflektör |
-| `EMIT.<işlev>` | ışık veren parçalar; malzeme adı `E.<işlev>.<renk>[.<etiket>]`; paylaşılan kılavuz `E.position+stop.red` (işlevlerden biri açıksa yanar; yalnız pozisyonda sönük) |
+| `EMIT.<işlev>` | ışık veren parçalar; malzeme adı `E.<işlev>.<renk>[.<etiket>]`; paylaşılan kılavuz `E.position+stop.red` (işlevlerden biri açıksa yanar; yalnız pozisyonda sönük); `.g<yüzde>` etiketi: LED'in ışığını yansıtan krom kap, işlev şiddetinin bu oranında ışır (ör. `E.reverse.white.g33` = ×0,33) |
 | `LENS` | şeffaf dış lens (`Lens.<renk>[.cad]`; `.cad`: lensin kendisi az parlar), tepe lambası kubbesi (`Dome.amber`) |
 
 İşlevler: position, stop, turn, reverse, fog, marker, front, outline, plate, work, beacon. Renkler: red, amber, white.
@@ -40,8 +40,9 @@ seçer (pozisyon, fren, sinyal, geri vites, sis, çalışma, tepe); sinyal ~1,5 
 - **Işıma bloom ile çizilir** (`Engine.ts`, yalnız ışıklar modunda, ilk açılışta ~19 KB dinamik yüklenir). Işıma yanan parçanın kendi biçimini izler: neon şerit homojen şerit, sinyal kaması tek parça yanar. Eski küre biçimli hale sprite'ları "arkada 4 LED var" görüntüsü veriyordu, kapatıldı (`GLOW_SPRITES`).
 - **Bloom eşiği en parlak renk kanalına göre ölçülür** (luma yerine). Doygun kırmızının luması düşük olduğu için eşiği geçemiyordu. HDR > 1 yalnız yanan ışıklarda olur, gece sahnesindeki beyaz dorse ışımaz.
 - **Yansıma efektleri kapalı:** zemin ışık halkaları, kırmızı nokta ışık ve çalışma lambası spotu (`LAMP_SPILL`, `GLOW_SPRITES`).
-- **Şiddetler** ürün föyündeki güç oranlarını izler (MAVIC: pozisyon 2 W, fren 10 W). Pozisyon 1,45, fren 2,7, sinyal 2,6, sis 2,6, geri vites 2,5; marker, ön ve kontur 2,4–2,6; çalışma 4,5, tepe 3,6.
+- **Şiddetler** ürün föyündeki güç oranlarını izler (MAVIC: pozisyon 2 W, fren 10 W). Pozisyon 1,45, fren 2,7, sinyal 2,6, sis 2,6, geri vites 3,0 (önce 2,5; kırmızı kılavuzların yanında sönük kalıyordu); marker, ön ve kontur 2,4–2,6; çalışma 4,5, tepe 3,6.
 - **Paylaşılan kılavuz** (`E.position+stop`) en güçlü yanan işlevin şiddetinde yanar.
+- **Yansıtıcı kaplar** (`.g<yüzde>`): şiddet × oran. Oranlar bloom eşiğinin altında tutulur: kap parlak ama yapısı okunur, haleyi yalnız LED verir.
 - Videoyla karşılaştırma ışıklar modunda yakın planda yapıldı. Gerçek cihazda bloom maliyeti ölçülmedi; zayıf cihazda MSAA kapalı ve çözünürlük 0,75.
 
 ## 4. Tesisat (yeni Horpol şeması)
@@ -187,7 +188,18 @@ Düzeltme (`lamps_cad.py`):
 - Fren üçgeni kılavuzlarla aynı düzlemde.
 - **Fren bölgesi (kullanıcı düzeltmesi, aynı gece):** fren, kılavuzların tamamını değil, yalnız büyük üçgenin sağ kenarı doğrultusunun solunu yakar (`BRAKE_CUT`, `_clip_line`). Sağ bölüm yalnız pozisyon. Video karelerinde pozlama doygun olduğu için bu ayrım videodan okunamamıştı.
 
-Ölçüm: 78 431 üçgen, paket 588 KB (gzip 428 KB). Önceki sürüm 546 KB. Tarayıcıda yakın ve orta mesafede pozisyon, fren ve sinyal kontrol edildi. Gerçek cihazda FPS ölçülmedi.
+Ölçüm: 78 431 üçgen, paket 588 KB (gzip 428 KB). Önceki sürüm 546 KB.
+
+**Revize 3 (2026-10-20 gece): geri vites.** Kullanıcı: geri vites diğer ışıklara göre sönük.
+- Neden: ışığı yalnız dört küçük LED kutusu (6,4 mm) veriyordu. 21 mm'lik krom kaplar ve pencere tabanı karanlık kalıyordu.
+- Videoda (0:50) yanınca kapların tamamı LED'in ışığını yansıtıp beyaz parlıyor, en parlak nokta ortadaki LED.
+- Düzeltme:
+  - Kaplar dipten ağza üç banda bölündü, her bant yansıtıcı krom (`_refl`, `_cup_bands`): ×0,33 / 0,26 / 0,19.
+  - Pencere tabanı ×0,13.
+  - Sönükken krom görünürler.
+  - Geri vites şiddeti 2,5 → 3,0.
+- İlk denemede oranlar yüksekti (×0,85…). Pencere bloom ile tek beyaz lekeye dönüşüyordu; oranlar eşiğin altına çekildi.
+- 78 879 üçgen, paket 593 KB. Tarayıcıda yakın ve orta mesafede geri vites açık/kapalı kontrol edildi. LZD 2856'nın 24 LED'lik geri vitesi yalnız şiddet artışından etkilenir, kontrol edildi. Tarayıcıda yakın ve orta mesafede pozisyon, fren ve sinyal kontrol edildi. Gerçek cihazda FPS ölçülmedi.
 
 ## 8. Lastik kollar CAD'den (LDCC 2698, LD 2994) ve lambaya montaj (2026-10-20 akşam)
 
