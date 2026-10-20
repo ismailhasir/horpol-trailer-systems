@@ -55,6 +55,10 @@ export interface TrailerBuild {
   /** sistem (tesisat) görünümünde açılan gövde çizgileri + zemin plakası */
   outline: THREE.Group;
   anchors: Anchors;
+  /** plaka (plaka çerçevesi seçilince ekipman onu çerçevenin yuvasına öne alır; plaka ışığı plateLight.ts) */
+  plate: THREE.Mesh;
+  /** plakanın taşıyıcıdaki yeri (x: yüzey) */
+  plateBase: THREE.Vector3;
 }
 
 /** Profil üzerinde x'teki yükseklik (doğrusal ara değer) */
@@ -103,9 +107,11 @@ const PLATE_GEO = markShared(new THREE.PlaneGeometry(0.52, 0.11));
 function plate(g: THREE.Group, y: number, x = -0.015) {
   plateMat ??= new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.35, metalness: 0.1 });
   const p = mesh(PLATE_GEO, plateMat, false);
+  p.name = 'plate';
   p.rotation.y = Math.PI / 2;
   p.position.set(x, y, 0);
   g.add(p);
+  return p;
 }
 
 export function buildTrailer(type: TrailerId, m: Mats): TrailerBuild {
@@ -125,7 +131,7 @@ export function buildTrailer(type: TrailerId, m: Mats): TrailerBuild {
   for (const mm of mergedFromModel(rig)) chassisG.add(mm);
   // plaka: montaj haritasındaki tutucu yüksekliği (yoksa eski nokta)
   const mp = (S as { mounts?: { plate?: { plateY?: number } } }).mounts?.plate;
-  plate(group, mp?.plateY ?? S.rear.plateY, S.rear.x + 0.006);
+  const plateMesh = plate(group, mp?.plateY ?? S.rear.plateY, S.rear.x + 0.006);
 
   const edgePos: number[] = [];
   for (const loop of bakedSections(S)) {
@@ -159,7 +165,7 @@ export function buildTrailer(type: TrailerId, m: Mats): TrailerBuild {
     center: new THREE.Vector3(-L / 2, topY / 2, 0),
     size: new THREE.Vector3(L, topY, W),
   };
-  return { group, body, outline: sys, anchors };
+  return { group, body, outline: sys, anchors, plate: plateMesh, plateBase: plateMesh.position.clone() };
 }
 
 /**

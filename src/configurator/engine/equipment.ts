@@ -14,6 +14,7 @@ import type { Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
 import { emitterSpots, lampInstance, type LampFn } from './lampfx';
+import type { PlateLight } from './plateLight';
 
 /** Yanınca görünen ışık efekti: lens önünde hale (sprite) ya da zemine düşen renkli ışık (pool) */
 export interface Glow {
@@ -33,7 +34,12 @@ export interface EquipmentBuild {
   lights: LampLightAnchors;
   /** gerçek modeli henüz yüklenmemiş lamba var mı (Engine yüklenince yeniden kurar) */
   placeholders: number;
+  /** plaka: çerçeve seçiliyse plakanın yeni yeri (null: taşıyıcıdaki yerinde) ve plakaya düşen ışığın yerleşimi */
+  plate: { pos: THREE.Vector3 | null; light: PlateLight };
 }
+
+/** RTR 3366 plaka yuvası, çerçeve yerelinde (m): tools/blender/lamps_cad.py RTR_SEAT ile aynı; model yüklenince MOUNT_plate esas */
+const RTR_SEAT = { y: 0.00385, z: 0.0184 };
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** art arda çakışan noktaları atar (kısa düz uçlarda iki nokta aynı yere düşebilir) */
@@ -437,40 +443,46 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const plateCy = P?.plateY ?? a.rear.plateY; // plakanın merkez yüksekliği
   const plateFace = a.rear.x + 0.006; // plakanın arka yüzü (trailer.ts ile aynı)
   const PLATE_HALF_W = 0.26;
-  const PLATE_HALF_H = 0.055;
   /** Her plaka lambası: konum, yönlendirme (lens plakaya bakar) ve kablonun girdiği nokta */
   type PlateSpot = { pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3 };
   const plateSpots: PlateSpot[] = [];
-  const qy = (r: number) => new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), r);
-  const qz = (r: number) => new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), r);
+  let plateLight: PlateLight = null;
+  /** plaka çerçevesinde plakanın yeni yeri (yoksa taşıyıcıdaki yerinde kalır) */
+  let platePos: THREE.Vector3 | null = null;
+  const basis = (x: THREE.Vector3, y: THREE.Vector3, z: THREE.Vector3) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
   if (pl.qty > 0) {
-    if (pl.product === 'ltd229') {
-      // LTD 229: plakanın ÜSTÜNDE, pencere arkaya ve aşağıya (plakaya) bakar
-      const zs = pl.qty === 1 ? [0] : [-0.17, 0.17];
-      for (const z of zs) {
-        const base = V(plateFace + 0.02, plateCy + PLATE_HALF_H + 0.004, z);
-        plateSpots.push({ pos: base, q: qz(-0.95).multiply(qy(Math.PI / 2)), entry: V(base.x, base.y - 0.012, z) });
-      }
+    if (pl.product === 'rtr3366') {
+      // RTR 3366 (HOR 160): LED aydınlatmalı plaka çerçevesi, plakanın yerine taşıyıcıya vidalanır; plaka çerçevenin yuvasına
+      // oturur, saçağın altındaki 3 modül plakaya aşağı ışık verir. Yerel: Z dışa (dünya +X), Y yukarı, X = dünya −Z.
+      // Kablo alt kenarın ortasından çıkar.
+      const base = V(plateFace - 0.001, plateCy - RTR_SEAT.y, 0);
+      plateSpots.push({ pos: base, q: basis(V(0, 0, -1), V(0, 1, 0), V(1, 0, 0)), entry: V(base.x + 0.002, base.y - 0.115, 0) });
+      plateLight = { kind: 'top', z: [-0.171, 0, 0.171] };
     } else {
-      // LTD 2834 (ve diğerleri): plakanın İKİ YANINDA, TABANI taşıyıcının dikey arka yüzüne vidalı (civatalar öne,
-      // taşıyıcıya girer), difüzör plakanın ortasına bakar. Yerel eksenler: Y (taban → üst) = dünya +X (arkaya),
-      // Z (difüzör) = plakaya doğru (∓z), X = Y × Z.
+      // LTD 2834 ve LTD 229: plakanın İKİ YANINDA (çizim HOR 47: lamba ekseni plaka kenarından 40–80 mm), TABANI taşıyıcının
+      // dikey arka yüzüne vidalı (civatalar öne, taşıyıcıya girer), ışık penceresi plakanın ortasına bakar. Yerel eksenler:
+      // Y (taban → üst) = dünya +X (arkaya), Z (pencere) = plakaya doğru (∓z), X = Y × Z.
       const zs = pl.qty === 1 ? [PLATE_HALF_W + 0.04] : [PLATE_HALF_W + 0.04, -(PLATE_HALF_W + 0.04)];
       for (const z of zs) {
         const s = z > 0 ? 1 : -1;
         const Yw = V(1, 0, 0);
         const Zw = V(0, 0, -s);
-        const Xw = Yw.clone().cross(Zw);
-        const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(Xw, Yw, Zw));
         const base = V(plateFace - 0.002, plateCy, z);
-        plateSpots.push({ pos: base, q, entry: V(base.x - 0.02, base.y, z) });
+        plateSpots.push({ pos: base, q: basis(Yw.clone().cross(Zw), Yw, Zw), entry: V(base.x - 0.02, base.y, z) });
       }
+      // ışık penceresi lambanın derinlik ortasından ~31 mm plakaya doğru
+      plateLight = { kind: 'side', z: zs.map((z) => z - Math.sign(z) * 0.031) };
     }
   }
   for (const sp of plateSpots) {
-    mount('plate', pl.product, sp.pos, (o) => {
-      o.quaternion.copy(sp.q);
+    const o = mount('plate', pl.product, sp.pos, (obj) => {
+      obj.quaternion.copy(sp.q);
     });
+    if (pl.product === 'rtr3366') {
+      const mp = o.getObjectByName('MOUNT_plate');
+      o.updateMatrixWorld(true);
+      platePos = mp ? mp.getWorldPosition(V(0, 0, 0)) : V(sp.pos.x + RTR_SEAT.z, plateCy, 0);
+    }
   }
 
   // =========================== YAN MARKERLAR ===========================
@@ -883,7 +895,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     rear: rearLamps.map((r) => V(rx + 0.25, ly, r.s * r.z)),
     work: lampsByCat.work.map((o) => ({ pos: o.position.clone(), dir: V(0, 0, 1).applyQuaternion(o.quaternion).normalize() })),
   };
-  return { group, glows, harness, lampsByCat, lights, placeholders };
+  return { group, glows, harness, lampsByCat, lights, placeholders, plate: { pos: platePos, light: plateLight } };
 }
 
 let sealMat: THREE.MeshStandardMaterial | null = null;

@@ -855,7 +855,9 @@ if __name__ == '__main__':
             continue
         clear_scene()
         L = Lamp(pid)
-        CATALOG[pid]['fn'](L)
+        if CATALOG[pid]['fn'](L) == 'skip':  # yalnız CAD'den kurulan ürün, CAD verisi bu makinede yok
+            print('SKIP', pid)
+            continue
         objs = finalize(L)
         export(pid, objs)
         if PREVIEW:

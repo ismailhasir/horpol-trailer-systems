@@ -248,7 +248,9 @@ export default function Configurator({ lang, t, ui }: Props) {
   const step = (cat: CategoryId, dir: 1 | -1) => {
     const def = CATEGORIES.find((c) => c.id === cat)!;
     update((c) => {
-      c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), c.lamps[cat].qty + dir * def.step));
+      // sabit adetli ürünlerde (plaka lambası çifti, plaka çerçevesi) adım ürünün adedi: 0 ↔ sabit adet
+      const d = productById(cat, c.lamps[cat].product).fixed ?? def.step;
+      c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), c.lamps[cat].qty + dir * d));
       return c;
     });
     engineRef.current?.focusCategory(cat);
@@ -256,7 +258,7 @@ export default function Configurator({ lang, t, ui }: Props) {
   const pickProduct = (cat: CategoryId, id: string) => {
     update((c) => {
       c.lamps[cat].product = id;
-      if (c.lamps[cat].qty === 0) c.lamps[cat].qty = CATEGORIES.find((x) => x.id === cat)!.step;
+      if (c.lamps[cat].qty === 0) c.lamps[cat].qty = productById(cat, id).fixed ?? CATEGORIES.find((x) => x.id === cat)!.step;
       return c;
     });
     engineRef.current?.focusCategory(cat);

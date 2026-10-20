@@ -619,3 +619,198 @@ def build_ld2994_cad(L):
         _simplify(b, 1.0)
         _mesh_obj('neon_' + key, _xf(b, LD_M), [_emat('outline', key, off[key], 'cad')], L.E('outline'), 40, decimate=None if FAST else 2500)
     raw.free()
+
+
+# =====================================================================
+# Plaka aydınlatması — üretici STEP'lerinden (3d-files_2026-10-02_1139.zip) ve ürün paketlerinden (vault LTD-229.zip,
+# LTD-2834.zip, RTR-3366.zip: föy, teknik çizim, fotoğraf, video).
+# Lamba sözleşmesi (site equipment.ts): taban y = 0 (civatalar −y, taşıyıcının dikey yüzüne girer), +Y tabandan yukarı (sitede
+# arkaya bakar), ışık penceresi +Z'ye (sitede plakanın ortasına) bakar, orijin lambanın derinlik ortasında. Çizim HOR 47:
+# lambalar plakanın iki yanında, kenardan 40–80 mm, ışık içe.
+# RTR 3366 çerçeve: arka yüz z = 0 (taşıyıcıya), +Z dışa, Y yukarı, X genişlik; plaka yuvası MOUNT_plate boşluğunda.
+# =====================================================================
+def _cad_parts(cad, M, names, angle=0.5):
+    """Var olan STL parçaları → {ad: bmesh} (Blender yerel, düzlemsel yüzler birleştirilmiş)"""
+    out = {}
+    for nm in names:
+        p = os.path.join(cad, nm + '.stl')
+        if os.path.exists(p):
+            b = _stl(p, M)
+            if angle:
+                _simplify(b, angle)
+            out[nm] = b
+    return out
+
+
+def _assembly_exterior(parts):
+    """Parçalar birlikte: her parçanın dışarıdan görünen yüzleri {ad: [bool]} (öbür parçalar ışını keser)"""
+    big = bmesh.new()
+    me = bpy.data.meshes.new('_asm')
+    spans = {}
+    for nm, b in parts.items():
+        b.faces.index_update()
+        n0 = len(big.faces)
+        b.to_mesh(me)
+        big.from_mesh(me)
+        spans[nm] = (n0, len(big.faces))
+    bpy.data.meshes.remove(me)
+    flags = _exterior(big)
+    big.free()
+    return {nm: flags[a:b] for nm, (a, b) in spans.items()}
+
+
+def _loc(f):
+    """Yüz merkezi, three yerel mm"""
+    return _three(f.calc_center_median())
+
+
+def _glow(fn, color, off_hex, gain):
+    """Işık geçiren buzlu/optik yüzey: sönükken off_hex, işlev yanınca şiddetin gain oranında ışır (E.<işlev>.<renk>.g<yüzde>)"""
+    m = _emat(fn, color, off_hex, f'g{int(round(gain * 100))}')
+    m['gain'] = gain
+    return m
+
+
+def _plate_parts(L, parts, ext, spec, prefix):
+    """spec: {ad: (malzemeler, grup, üçgen hedefi)}; dış yüzler alınır, sadeleştirilir"""
+    for nm, b in parts.items():
+        if nm not in spec:
+            b.free()
+            continue
+        mats_, grp, dec = spec[nm]
+        sb = _subset(b, lambda f: ext[nm][f.index])
+        b.free()
+        _mesh_obj(f'{prefix}_{nm}', sb, mats_, grp, 35, decimate=None if FAST else dec)
+
+
+# LTD 229 (HOR 47) CAD: x genişlik, +y yukarı (taban y −33,5), lens +z (z −42,25…19,95; derinlik ortası −11,15)
+LTD229_M = Matrix(((1, 0, 0, 0), (0, 0, -1, -0.01115), (0, 1, 0, 0.0335), (0, 0, 0, 1)))
+
+
+@product('ltd229', 'LTD 229', 'plate', 'LED plaka lambası (HOR 47), 3 LED — üretici CAD')
+def build_ltd229_cad(L):
+    cad = os.path.join(CAD_ROOT, 'ltd229')
+    if not os.path.exists(os.path.join(cad, 'p009.stl')):
+        print('CAD YOK, eski el modeli:', cad)
+        return build_ltd229(L)
+    parts = _cad_parts(cad, LTD229_M, [f'p{i:03d}' for i in range(13)])
+    # lens sadeleştirilmez: kavisli ön yüzde birleştirilen uzun üçgenlerin merkezi yüzeyin altına düşüyor, ön yüz testi şaşıyordu
+    parts['p009'].free()
+    parts['p009'] = _stl(os.path.join(cad, 'p009.stl'), LTD229_M)
+    # kapakta (p008) gövdeden kopuk küçük artıklar var (sınır kutusu ±70 mm): lamba zarfı dışındakiler atılır
+    _drop_small(parts['p008'], lambda mn, mx, n: n < 500 and (mn[0] < -49.5 or mx[0] > 49.5 or mn[2] < -32.0 or mx[2] > 32.5))
+    # kablo: tabandan 30 mm (gerisini site çizer)
+    cab = parts['p012']
+    parts['p012'] = _subset(cab, lambda f: _loc(f)[1] > -30.0)
+    cab.free()
+    ext = _assembly_exterior(parts)
+    lens = parts.pop('p009')
+    zinc, steel = mat('Zinc'), mat('Stainless')
+    _plate_parts(L, parts, ext, {
+        'p000': ([mat('Housing')], L.body, 2500), 'p008': ([mat('Housing')], L.body, 6000), 'p001': ([mat('Rubber')], L.body, 300),
+        'p002': ([zinc], L.body, 300), 'p003': ([zinc], L.body, 300), 'p004': ([zinc], L.body, 200), 'p005': ([zinc], L.body, 200),
+        'p006': ([zinc], L.body, 120), 'p007': ([zinc], L.body, 120), 'p010': ([steel], L.body, 300), 'p011': ([steel], L.body, 300),
+        'p012': ([mat('Cable')], L.body, 400)}, 'ltd229')
+
+    # lens: buzlu ön panel (fotoğrafta açık gri, yanınca bütünü ışır), ortada şeffaf pencere, pencerenin iç yüzünde nervürlü
+    # silindirik optik + 3 LED konisi (CAD'de var), arkasında 3 LED
+    cs = [_loc(f) for f in lens.faces]
+    zfront = max(c[2] for c in cs)
+    tun = [c for c in cs if c[2] < zfront - 6.0]  # pencerenin ardındaki tünel duvarları (lensin parçası)
+    wx0, wx1 = min(c[0] for c in tun), max(c[0] for c in tun)
+    wy0, wy1 = min(c[1] for c in tun), max(c[1] for c in tun)
+    zback = min(c[2] for c in tun)
+    print(f'LTD229 window x {wx0:.1f}..{wx1:.1f} y {wy0:.1f}..{wy1:.1f} zfront {zfront:.1f} zback {zback:.1f}')
+    # ön yüz neredeyse düz: CAD tessellasyonu büyük üçgenler, pencere sınırını kesiyor. Lens pencere kenarlarından bölünür
+    for co, no in (((wx0, 0, 0), (1, 0, 0)), ((wx1, 0, 0), (1, 0, 0)), ((0, 0, wy0), (0, 0, 1)), ((0, 0, wy1), (0, 0, 1))):
+        geom = lens.verts[:] + lens.edges[:] + lens.faces[:]
+        bmesh.ops.bisect_plane(lens, geom=geom, plane_co=Vector(co) / 1000, plane_no=Vector(no))
+    bmesh.ops.triangulate(lens, faces=lens.faces[:], quad_method='BEAUTY', ngon_method='EAR_CLIP')
+    lens.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(lens)
+    out = Vector((0, -1, 0))  # yerel +Z (Blender −Y)
+    inwin = lambda c: wx0 - 0.05 <= c[0] <= wx1 + 0.05 and wy0 - 0.05 <= c[1] <= wy1 + 0.05
+    for f in lens.faces:
+        c = _loc(f)
+        if not inwin(c):
+            f.material_index = 0  # buzlu panel (kabartma yazılar dahil)
+        elif tree.ray_cast(f.calc_center_median() + f.normal * 0.0002, out, 1.0)[0] is None:
+            f.material_index = 1  # pencerenin ön yüzü: şeffaf
+        elif c[2] > zfront - 4.5:
+            f.material_index = 2  # pencerenin iç yüzündeki optik
+        else:
+            f.material_index = 1  # tünel duvarları
+    # LED konilerinin tepeleri (lens CAD'inin iç yüzünden ölçüldü, simetrik): üst orta, alt sol ve sağ; optik yüzü z ≈ 29,6
+    leds = [(0.0, 43.4, 29.6), (16.4, 27.5, 29.6), (-16.4, 27.5, 29.6)]
+    _mesh_obj('ltd229_lens', lens, [_glow('plate', 'white', '#c9cdd2', 0.45), _lmat('clear'), _glow('plate', 'white', '#eef0f2', 0.7)], L.lens, 40,
+              decimate=None if FAST else 12000)
+    # LED sıcak noktaları (koni tepesinin 0,4 mm önünde) ve arkada LED kartı
+    bmd = bmesh.new()
+    for x, y, z in leds:
+        ring_ = [bmd.verts.new(bl(((x + 1.5 * math.cos(a * math.pi / 6)) / 1000, (y + 1.5 * math.sin(a * math.pi / 6)) / 1000, (z + 0.4) / 1000)))
+                 for a in range(12)]
+        bmd.faces.new(ring_)
+    _obj('led', bmd, E('plate', 'white'), L.E('plate'), 0.0)
+    box(L.inner, 'pcb', (wx0 + 0.6) / 1000, (wx1 - 0.6) / 1000, (wy0 + 0.6) / 1000, (wy1 - 0.6) / 1000, (zback - 1.2) / 1000, zback / 1000, mat('Pcb'))
+
+
+# LTD 2834 (HOR 127) CAD: x genişlik, taban z −52 (civatalar −z), +z yukarı (Π neon tepede), difüzör −y (y merkezi −3,66)
+LTD2834_M = Matrix(((1, 0, 0, 0), (0, 1, 0, 0.00366), (0, 0, 1, 0.052), (0, 0, 0, 1)))
+
+
+@product('ltd2834', 'LTD 2834', 'plate', 'Plaka lambası + kırmızı neon pozisyon (HOR 127), 12 LED — üretici CAD')
+def build_ltd2834_cad(L):
+    cad = os.path.join(CAD_ROOT, 'ltd2834')
+    if not os.path.exists(os.path.join(cad, 'p005.stl')):
+        print('CAD YOK, eski el modeli:', cad)
+        return build_ltd2834(L)
+    parts = _cad_parts(cad, LTD2834_M, [f'p{i:03d}' for i in range(7)])
+    ext = _assembly_exterior(parts)
+    zinc = mat('Zinc')
+    # süt beyazı difüzör yanınca homojen ışır (video); Π ışık kılavuzu kırmızı (sönükken parlak koyu kırmızı, fotoğraf)
+    _plate_parts(L, parts, ext, {
+        'p000': ([mat('Rubber')], L.body, 300), 'p001': ([mat('Housing')], L.body, 3000), 'p002': ([zinc], L.body, 300),
+        'p003': ([zinc], L.body, 300), 'p004': ([mat('Housing')], L.body, 8000),
+        'p005': ([_emat('plate', 'white', '#eef1f4', 'cad')], L.E('plate'), 2500),
+        'p006': ([_emat('position', 'red', '#a8121b', 'cad')], L.E('position'), 3000)}, 'ltd2834')
+    # kablo: tabandan taşıyıcıya (gerisini site çizer)
+    tube(L.body, 'cable', [(0.0, 0.003, -0.020), (0.0, -0.012, -0.021), (0.0, -0.030, -0.026)], 0.0028, mat('Cable'), 3, smooth=True)
+
+
+# RTR 3366 (HOR 160) CAD: x genişlik (merkez −48,86), y yukarı (merkez 20,78), +z dışa (arka yüz z 984,86); 530,6 × 158,7 × 42,9
+RTR_M = Matrix(((1, 0, 0, 0.048855), (0, 0, -1, 0.98486), (0, 1, 0, -0.02078), (0, 0, 0, 1)))
+# plaka yuvası (mm, yerel; plakanın ön yüzü): taşıyıcı yüzü z 14,7, üzerinde 6 yaylı tırnak z 17,2'ye çıkar ve plakayı üst
+# dudağa (z 18,7…20,2, plakanın üst kenarını 5 mm örter) bastırır: plaka 17,2…18,4 arasında. Alt bandın üst kenarı y −53,0 ile
+# ışık modüllerinin alt yüzü y 60,7 arası 113,7 mm açıklık, 110 mm'lik plaka ortada
+RTR_SEAT = (0.0, 3.85, 18.4)
+
+
+@product('rtr3366', 'RTR 3366', 'plate', 'LED aydınlatmalı plaka çerçevesi (HOR 160), 12 LED — üretici CAD')
+def build_rtr3366_cad(L):
+    cad = os.path.join(CAD_ROOT, 'rtr3366')
+    if not os.path.exists(os.path.join(cad, 'p002.stl')):
+        print('CAD YOK (RTR 3366 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    parts = _cad_parts(cad, RTR_M, [f'p{i:03d}' for i in range(10)])
+    ext = _assembly_exterior(parts)
+    # ışık modülleri (üst saçağın altında 3 adet, 4'er LED): alta bakan pencere ışır, gerisi siyah gövde
+    for nm in ('p004', 'p005', 'p006'):
+        b = parts.pop(nm)
+        sb = _subset(b, lambda f: ext[nm][f.index])
+        b.free()
+        ys = [_loc(f)[1] for f in sb.faces]
+        ylo = min(ys)
+        for f, y in zip(sb.faces, ys):
+            f.material_index = 1 if (f.normal.z < -0.7 and y < ylo + 1.0) else 0  # Blender −Z = yerel −Y (aşağı)
+        print('RTR module', nm, 'window faces', sum(1 for f in sb.faces if f.material_index == 1), 'y', round(ylo, 1))
+        _mesh_obj('rtr_' + nm, sb, [mat('Housing'), _emat('plate', 'white', '#e3e7ea', 'cad')], L.E('plate'), 35, decimate=None if FAST else 1200)
+    _plate_parts(L, parts, ext, {
+        'p002': ([mat('Housing')], L.body, 26000), 'p003': ([mat('Housing')], L.body, 2500),
+        'p007': ([mat('HousingGloss')], L.body, 1000), 'p008': ([mat('HousingGloss')], L.body, 1000)}, 'rtr')
+    # plaka yuvası (MOUNT_plate): plakanın arka yüzünün merkezi
+    mnt = bpy.data.objects.new('MOUNT_plate', None)
+    mnt.location = bl(tuple(v / 1000 for v in RTR_SEAT))
+    scene.collection.objects.link(mnt)
+    L.empties = [mnt]
+    # kablo: alt kenarın ortasından aşağı (çizim), arka yüze yakın
+    tube(L.body, 'cable', [(0.0, -0.0790, 0.0045), (0.0, -0.1000, 0.0045), (0.0, -0.1150, 0.0020)], 0.0030, mat('Cable'), 3, smooth=True)

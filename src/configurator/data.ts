@@ -52,12 +52,14 @@ export const lengthMeters = (l: LengthId) => Number(l);
 /**
  * Lamba ürünü. 3D modeli tools/blender/lamps.py üretir (src/assets/models/lamp-<id>.glb); simgesi src/assets/lamps/<id>-off|on.webp.
  * pair: sol/sağ çift (sağdaki ayna; kodu `codeR`). max: ürünün fiziksel tavanı (kategori tavanından küçükse geçerli).
+ * fixed: sabit adet (seçilince bu adet; − / + yalnız 0 ile bu adet arasında geçer). Ör. plaka lambaları çift, plaka çerçevesi tek.
  */
 export interface LampProduct {
   id: string;
   code: string;
   codeR?: string;
   max?: number;
+  fixed?: number;
 }
 
 export interface CategoryDef {
@@ -109,8 +111,10 @@ export const CATEGORIES: CategoryDef[] = [
     step: 1,
     color: '#f4f7ff',
     products: [
-      { id: 'ltd2834', code: 'LTD 2834' },
-      { id: 'ltd229', code: 'LTD 229' },
+      // plaka lambaları plakanın iki yanında çift (çizim HOR 47); LED aydınlatmalı plaka çerçevesi (HOR 160) plakanın yerine tek
+      { id: 'ltd2834', code: 'LTD 2834', fixed: 2 },
+      { id: 'ltd229', code: 'LTD 229', fixed: 2 },
+      { id: 'rtr3366', code: 'RTR 3366', fixed: 1 },
     ],
   },
   {
@@ -176,7 +180,7 @@ const BEACON_MAX: Partial<Record<TrailerId, number>> = {};
 export function maxQty(c: Pick<Config, 'trailer' | 'lamps'>, cat: CategoryId): number {
   const def = categoryById(cat);
   const prod = productById(cat, c.lamps[cat]?.product ?? def.products[0].id);
-  let m = Math.min(def.max, prod.max ?? def.max);
+  let m = Math.min(def.max, prod.fixed ?? prod.max ?? def.max);
   if (cat === 'side') m = Math.min(m, SIDE_MAX[c.trailer] ?? def.max);
   if (cat === 'beacon') m = Math.min(m, BEACON_MAX[c.trailer] ?? def.max);
   return m;
@@ -223,8 +227,13 @@ export function normalize(c: Config): Config {
     const cur = c.lamps[cat.id] ?? DEFAULT_CONFIG.lamps[cat.id];
     const product = cat.products.some((p) => p.id === cur.product) ? cur.product : cat.products[0].id;
     let qty = Math.round(Number(cur.qty) || 0);
-    qty = Math.max(cat.min, Math.min(maxQty({ trailer: t.id, lamps: { ...c.lamps, [cat.id]: { product, qty } } }, cat.id), qty));
-    qty = cat.min + Math.round((qty - cat.min) / cat.step) * cat.step;
+    const fixed = productById(cat.id, product).fixed;
+    if (fixed) {
+      qty = qty > 0 ? fixed : 0; // sabit adetli ürün: ürün değişince de adet ürüne oturur (RTR 3366 → LTD 2834: 1 → 2)
+    } else {
+      qty = Math.max(cat.min, Math.min(maxQty({ trailer: t.id, lamps: { ...c.lamps, [cat.id]: { product, qty } } }, cat.id), qty));
+      qty = cat.min + Math.round((qty - cat.min) / cat.step) * cat.step;
+    }
     lamps[cat.id] = { product, qty };
   }
   return { trailer: t.id, socket, length, lamps };

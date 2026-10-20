@@ -10,6 +10,7 @@ import { buildTrailer, disposeGroup, modelUrls, setGhost, type Anchors, type Tra
 import { loadedModel, loadModel } from './models';
 import { buildEquipment, disposeEquipment, lampIds, setHarnessHighlight, type EquipmentBuild } from './equipment';
 import { fnGroup, lampFailed, lampReady, lampUrl, loadLamp, needsAnimation, setLampState, tickLamps, type FnToggle } from './lampfx';
+import { setPlateLight } from './plateLight';
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
@@ -414,6 +415,9 @@ export class Engine {
     }
     this.equip = buildEquipment(c, this.trailer!.anchors, this.mats);
     this.scene.add(this.equip.group);
+    // plaka: çerçeve (RTR 3366) seçiliyse yuvasına öne alınır; plakaya düşen ışık lamba yerleşimine göre
+    this.trailer!.plate.position.copy(this.equip.plate.pos ?? this.trailer!.plateBase);
+    setPlateLight(this.trailer!.plate, this.equip.plate.light);
     this.cfg = c;
     // lamba modelleri ilk kullanımda indirilir; o ana kadar yer tutucu görünür, gelince ekipman yeniden kurulur
     // yalnız modeli VAR olup henüz yüklenmemiş lambalar için (modeli olmayan ürünler yer tutucuyla kalır; döngü yok)

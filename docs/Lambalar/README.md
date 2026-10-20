@@ -63,7 +63,7 @@ Kablo renkleri tesisat görünümünde eğitsel koddur, gerçek kablo renkleri d
 |---|---|
 | Arka lamba | çift; MAVIC / LZD 2856: 2, CUBE: 4, LUCY / LUNA: 8 |
 | Yan marker | dorseye göre (iki yan toplamı): standart 18, lowbed 18, tanker 12, silo 10, damper 10 |
-| Plaka | 2 |
+| Plaka | sabit adet (`fixed`, `data.ts`): LTD 2834 ve LTD 229 çift (2), RTR 3366 çerçevesi tek (1); − / + yalnız 0 ile bu adet arasında. Ürün değişince adet ürüne oturur (eskiden RTR'den lambaya geçince 1'de kalıyordu) |
 | Ön pozisyon | 2 |
 | Lastik kol | 4 (önde ve arkada birer çift) |
 | Çalışma lambası | 2 |
@@ -87,8 +87,9 @@ Boyutlar paketli GLB (Meshopt). Ölçüler teknik çizimlerden; "doğrulanmadı"
 | LD 2773 | ön pozisyon | LD 2774 ile aynı gövde, beyaz | front | 5 002 | 74 KB |
 | LD 2765 | yan marker | 110,8 × 52,2 × 20,65; tutucu 71,8 | marker (neon çerçeve halka) | 4 698 | 75 KB |
 | LD 0128 / LD 0127 | yan / ön | 132 × 33 × 13, delik arası 115 | marker / front (3 LED) | 3 484 | 73 KB |
-| LTD 2834 | plaka | 93,5 × 70 × 58; 2 × M5 (46) | plate (difüzör), position (kırmızı Π neon) | 2 364 | 46 KB |
-| LTD 229 | plaka | 97 × 64,7 × 62,3; 2 × M5 (46) | plate (3 LED) | 3 042 | 54 KB |
+| LTD 2834 | plaka | 93,5 × 70 × 58; 2 × M5 (46) | plate (difüzör), position (kırmızı Π neon) | 17 714 (CAD, bölüm 9) | 147 KB |
+| LTD 229 | plaka | 97 × 64,7 × 62,3; 2 × M5 (46) | plate (3 LED) | 21 232 (CAD, bölüm 9) | 195 KB |
+| RTR 3366 | plaka çerçevesi | 530,6 × 158,7 × 42,9 | plate (3 modül, 12 LED) | 28 566 (CAD, bölüm 9) | 282 KB |
 | LD 2994 Dragon | lastik kol | uzanım 200,8, yük. 179; plaka 35 × 105 | outline: beyaz öne, kırmızı arkaya, turuncu yana | 4 272 | 71 KB |
 | LDCC 2698 | lastik kol | uzanım 168,8, yük. 177, gen. 37 | outline: beyaz / kırmızı neon halka, turuncu yan | 6 176 | 90 KB |
 | LRD 2679 | çalışma | 101 × 100 × 50,5; U braket, M8 | work (12 küçük + 3 büyük LED) | 7 044 | 92 KB |
@@ -227,3 +228,47 @@ Kaynak: `3d-files_2026-10-02_1139.zip` (`LDCC 2698, 2699.STEP`, `LD 2994, LD 299
 - STEP'teki LDCC 2698 vidaları LDCC'nin kendi CAD'iyle eşlendi. Buna göre kol plakasının duvar yüzü x −219,1 mm, merkezi y 0, z 20 mm.
 - Aradaki x −219…−203 bölgesi lambanın adaptör bloğu: lamba modelinde `BRACKET` düğümü, genişliğe sayılmaz.
 - Kol `MOUNT_arm` noktasına **döndürmeden** oturur (`equipment.ts`).
+
+## 9. Plaka aydınlatması CAD'den (LTD 229, LTD 2834, yeni RTR 3366) ve plakaya düşen ışık (2026-10-20 gece)
+
+Kaynak: `3d-files_2026-10-02_1139.zip` (`LTD 229.STEP`, `LTD 2834.STEP`, `RTR 3366.STEP`), ürün arşivleri vault kökünde `LTD-229.zip`,
+`LTD-2834.zip`, `RTR-3366.zip` (föy, teknik çizim, onay belgesi, fotoğraf, video). STL dönüşümü bölüm 7'deki gibi.
+`step_to_stl.py`: kabuk bütün olarak üçgenlenemezse yüz yüz üçgenler (LTD 2834'te difüzörün çevresindeki kapak kabuğu; 419 yüzün 4'ü atlandı).
+
+**Yerleşim (çizim HOR 47, 2. sayfa).** Plaka lambaları plakanın iki yanında, lamba ekseni plaka kenarından 40–80 mm. Tabanları
+taşıyıcının dikey yüzüne vidalı, ışık penceresi plakanın ortasına bakar. LTD 229 eskiden plakanın üstündeydi (yanlış); artık
+LTD 2834 ile aynı yerleşimde. Yerel sözleşme ikisinde ortak: taban y = 0, +Y tabandan yukarı (sitede arkaya), pencere +Z.
+
+**LTD 229 (HOR 47; 3 LED, 0,25/0,5 W)**
+- CAD: x genişlik, +y yukarı, lens +z. 13 parça: kapak, taban bandı, lens, kablo rakoru, 2 civata + somun + pul, 2 kapak vidası, kablo (30 mm'de kesildi).
+- Lensin CAD'inde iç yüzde nervürlü silindirik optik ve 3 LED konisi (üst orta, alt sol/sağ), ön yüzde kabartma onay yazıları var.
+- Lens üçe ayrıldı: buzlu ön panel (fotoğrafta açık gri, `E.plate.white.g45`), şeffaf pencere ve pencerenin iç yüzündeki optik (`E.plate.white.g70`).
+  - Ön yüz neredeyse düz, CAD tessellasyonu büyük üçgenler. Lens pencere kenarlarından bölündü; yoksa üçgenler pencere sınırını kesip leke bırakıyordu.
+- Arkada 3 LED (koni tepeleri) ve LED kartı. Yanınca bütün ön yüz ışır (video 0:11).
+- 21 232 üçgen, 195 KB.
+
+**LTD 2834 (HOR 127; 12 LED, plaka 1/2 W, pozisyon 0,1/0,2 W)**
+- CAD: x genişlik, taban −z, +z yukarı, difüzör −y.
+- Parçalar: taban, kapak (tepede Π yarık, yanda difüzör açıklığı), süt beyazı difüzör (`plate`), Π ışık kılavuzu (`position`, kırmızı), civatalar, rakor.
+- Dış yüzler tüm parçalar birlikte ışınla seçildi (`_assembly_exterior`).
+- 17 714 üçgen, 147 KB.
+
+**RTR 3366 (HOR 160; LED aydınlatmalı plaka çerçevesi, 12 LED, 0,8/1,5 W, IP68, R148) — yeni ürün**
+- 530,6 × 158,7 × 42,9 mm siyah çerçeve. Üst bant 42,9 mm dışa taşan saçak; altında 3 ışık modülü (4'er LED) plakaya aşağı ışık verir.
+- Saçağın üstünde 2 opsiyonel lamba kapağı var. Alt bant kablo kanalının kapağı; föye göre müşteri baskısı alır, modelde düz siyah. Kablo alttan, ortadan çıkar.
+- Plaka yuvası (`MOUNT_plate`): plaka 6 yaylı tırnak (taşıyıcıdan 2,5 mm öne) ile üst dudak (plakanın üst kenarını 5 mm örter) arasında; plaka ön yüzü taşıyıcıdan 18,4 mm önde.
+  - Alt bandın üst kenarı ile modüllerin alt yüzü arası 113,7 mm; 110 mm'lik plaka ortada.
+- Sitede çerçeve plakanın yerine taşıyıcıya oturur, plaka yuvasına öne alınır (`Engine.setConfig` → `trailer.plate`).
+- Konfigüratörde plaka kategorisinde, ürün tavanı 1 (`data.ts`). 28 566 üçgen, 282 KB.
+
+**Plakaya düşen ışık (`plateLight.ts`).** Önceki revizyonda yansıma ışıkları kapatılınca plaka hiç aydınlanmıyordu.
+- Lamba yerleşimine göre bir aydınlatma haritası (`lightMap`) üretilir: plakanın kendi yüzeyi aydınlanır, harfler koyu kalır.
+- Yandaki lambalarda lambaya yakın kenar parlak, ortaya doğru azalır; RTR 3366'da üst kenar parlak, aşağı doğru azalır.
+- Yalnız ışıklar modunda ve pozisyon yanınca. Tepe değer bloom eşiğinin altında.
+- Düşüş eğrileri görseldir, fotometrik ölçüm yok.
+
+**Doğrulanmadı / açık:**
+- LED konumları lens optiğinden ölçüldü, LED kartı CAD'de yok.
+- LTD 2834'ün kablo çıkışı yaklaşık.
+- RTR 3366 simgesi boş çerçeveyi gösterir (ışık saçağın altında, üstten görünmez).
+- Plaka yuvası ölçüsü 520 × 110 TR plakasına göre; 520 × 114 AB plakası doğrulanmadı.
