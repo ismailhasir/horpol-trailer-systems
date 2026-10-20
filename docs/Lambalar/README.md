@@ -135,8 +135,9 @@ Renk ve malzeme yok. İç optik parçalar da yok: ışık kılavuzları, LED'ler
 - Parçaların derinliği lens dış yüzüne ışın atılarak bulunur, böylece kılavuzlar lensi izler.
 
 **İşlev haritası (videodaki etiketlerden; eski el modeli yanlıştı):**
-- Neon üst çubuk ile iç ve dış "<" kılavuzlar **pozisyon** (sönük) ve **fren** (parlak); aynı kılavuz.
-- Frende sol iç üçgen panel de yanar.
+- Neon üst çubuk ile iç ve dış "<" kılavuzlar **pozisyonda** boydan boya sönük yanar.
+- **Frende** yalnız büyük üçgenin sağ kenarı doğrultusunun solundaki (geniş uç) bölüm parlar; sağı (sinyal tarafı) pozisyonda kalır. Kılavuz o doğrudan ikiye bölünür: sol `E.position+stop`, sağ `E.position`.
+- Frende sol iç (ters) üçgen panel de yanar.
 - Sağ uçtaki 2 × 4 hücre **sis**. Eski modelde fren sanılmıştı.
 - Turuncu kama **sinyal**.
 - Sol üstte 2 pencere, ikişer LED: **geri vites**.
@@ -183,9 +184,10 @@ Düzeltme (`lamps_cad.py`):
   - sağda siyah ayırıcı (~2,5 mm)
 - Fotoğraf eşlemesi 3B kamera matrisine geçti (yukarıda).
 - Kılavuzlar `_drape`: kısıtlı Delaunay ile ≤3 mm üçgenlere bölünmüş, her köşesi lens yüzeyini kesintisiz izleyen ince plaka.
-- Fren: paylaşılan kılavuz (`E.position+stop`) üç kılavuzun tamamını kapsar; fren üçgeni kılavuzlarla aynı düzlemde. Video 0:26 (pozisyon) ve 0:28 (fren) kareleriyle karşılaştırıldı.
+- Fren üçgeni kılavuzlarla aynı düzlemde.
+- **Fren bölgesi (kullanıcı düzeltmesi, aynı gece):** fren, kılavuzların tamamını değil, yalnız büyük üçgenin sağ kenarı doğrultusunun solunu yakar (`BRAKE_CUT`, `_clip_line`). Sağ bölüm yalnız pozisyon. Video karelerinde pozlama doygun olduğu için bu ayrım videodan okunamamıştı.
 
-Ölçüm: 78 335 üçgen, paket 586 KB (gzip 426 KB). Önceki sürüm 546 KB. Tarayıcıda yakın ve orta mesafede pozisyon, fren ve sinyal kontrol edildi. Gerçek cihazda FPS ölçülmedi.
+Ölçüm: 78 431 üçgen, paket 588 KB (gzip 428 KB). Önceki sürüm 546 KB. Tarayıcıda yakın ve orta mesafede pozisyon, fren ve sinyal kontrol edildi. Gerçek cihazda FPS ölçülmedi.
 
 ## 8. Lastik kollar CAD'den (LDCC 2698, LD 2994) ve lambaya montaj (2026-10-20 akşam)
 

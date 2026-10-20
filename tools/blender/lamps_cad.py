@@ -7,8 +7,8 @@
 #   - Bu yüzden: lens dış yüzeyi ve gövde CAD'den; iç parçalar ürün fotoğraflarından (lzd-2650-lzd-2651-mavic-horpol-72-dpi-*.jpg)
 #     ölçülür. Fotoğraf → lamba koordinatı dönüşümü: lensin ardından görünen 9 vida (CAD'de ayrı parçalar) kontrol noktası,
 #     3B kamera matrisi (DLT; kavisli lens yüzünde düzlemsel homografi yetmiyor). İç parçalar lens dış yüzeyini izler.
-#   - İşlev haritası ürün videosundaki etiketlerden: neon kılavuzlar pozisyonda sönük, frende parlak (aynı kılavuz:
-#     malzeme "E.position+stop.red"); frende ayrıca sol iç üçgen; sağ uçta 2 × 4 hücre SİS; turuncu kama SİNYAL;
+#   - İşlev haritası ürün videosundaki etiketlerden: neon kılavuzlar pozisyonda boydan boya sönük; frende büyük üçgenin sağ
+#     kenarının solundaki bölüm parlak (aynı kılavuz: malzeme "E.position+stop.red", sağı "E.position.red"); frende ayrıca sol iç üçgen; sağ uçta 2 × 4 hücre SİS; turuncu kama SİNYAL;
 #     sol üstte 2 pencere GERİ VİTES; büyük üçgen ve alt şerit reflektör.
 # CAD ekseni (mm): x genişlik (geniş uç −x), yukarı = −z, lens yönü = +y, arka montaj düzlemi y = −78.
 import os
@@ -175,6 +175,23 @@ def _poly_clip_x(poly, x0, x1):
     if p:
         p = clip(p, lambda p: p[0] <= x1, lambda a, b: ix(a, b, x1))
     return p
+
+
+def _clip_line(poly, a, b, ref, same):
+    """Çokgeni a–b doğrusuyla kırp: same=True → ref noktasının bulunduğu yarı düzlem, False → öbür yarı (Sutherland–Hodgman;
+    doğruyu bir kez kesen içbükey çokgenlerde de doğru)"""
+    side = lambda p: (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+    s = (1 if side(ref) > 0 else -1) * (1 if same else -1)
+    out = []
+    for i in range(len(poly)):
+        p, q = poly[i - 1], poly[i]
+        sp, sq = s * side(p), s * side(q)
+        if (sp >= 0) != (sq >= 0):
+            t = sp / (sp - sq)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+        if sq >= 0:
+            out.append(q)
+    return out
 
 
 def _inside(poly, x, y):
@@ -398,10 +415,14 @@ def build_lzd3194_cad(L):
         set_uv_planar(L.E('fog').objs[-1], 0.006)
     # sinyal: turuncu ışık kılavuzu (kama), lensin 4,5 mm gerisinde
     follow(L.E('turn'), 'turn_guide', WEDGE, 4.5, 4.0, _emat('turn', 'amber', '#f39a3a'))
-    # neon pozisyon + fren: üst çubuk, iç ve dış "<" kılavuzlar boydan boya (aynı kılavuz: pozisyonda sönük, frende parlak; video
-    # 0:26 pozisyon, 0:28 fren karelerinde üç kılavuzun tamamı yanar)
+    # neon üst çubuk, iç ve dış "<" kılavuzlar: pozisyonda boydan boya sönük yanar. Frende yalnız büyük üçgenin sağ kenarı
+    # doğrultusunun solundaki (geniş uç) bölüm parlar; sağı (sinyal tarafı) pozisyonda kalır (kullanıcı, 2026-10-20)
+    BRAKE_CUT = (TRI[0], TRI[1])  # üçgenin tepesi → sağ alt köşesi
     for nm, poly in (('neon_top', TOPBAR), ('neon_in', CHEV_IN), ('neon_out', CHEV_OUT)):
-        follow(L.E('position+stop'), nm, poly, 4.2, 3.5, _emat('position+stop', 'red', '#d98f8a'))
+        follow(L.E('position+stop'), nm, _clip_line(poly, *BRAKE_CUT, (-200.0, 0.0), True), 4.2, 3.5,
+               _emat('position+stop', 'red', '#d98f8a'))
+        follow(L.E('position'), nm + '_r', _clip_line(poly, *BRAKE_CUT, (-200.0, 0.0), False), 4.2, 3.5,
+               _emat('position', 'red', '#d98f8a'))
     # frende ayrıca sol iç üçgen panel yanar (kılavuzlarla aynı düzlemde)
     follow(L.E('stop'), 'stop_tri', STOP_TRI, 4.4, 2.0, _emat('stop', 'red', '#9c2a27'))
     # alt şeritler arası ayırıcılar: kollar arasında koyu yarık, sağda siyah ayırıcı, büyük üçgenin altında lensteki noktalı yazı
