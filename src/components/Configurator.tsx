@@ -33,6 +33,25 @@ import TrailerIcon from './TrailerIcon';
 import type { Engine, View } from '../configurator/engine/Engine';
 import type { FnToggle } from '../configurator/engine/lampfx';
 
+/**
+ * Radyo grubunda ok tuşlarıyla gezinme (WAI-ARIA radio deseni): grupta yalnız seçili düğme sekme durağıdır, oklar seçimi
+ * odakla birlikte taşır (Arapçada sağ/sol yer değiştirir); devre dışı seçenek atlanır.
+ */
+function onRadioKey(e: KeyboardEvent) {
+  const group = e.currentTarget as HTMLElement;
+  const items = [...group.querySelectorAll<HTMLButtonElement>('[role="radio"]:not([disabled])')];
+  const i = items.indexOf(document.activeElement as HTMLButtonElement);
+  if (i < 0) return;
+  const rtl = getComputedStyle(group).direction === 'rtl';
+  const next = e.key === 'ArrowDown' || e.key === (rtl ? 'ArrowLeft' : 'ArrowRight');
+  const prev = e.key === 'ArrowUp' || e.key === (rtl ? 'ArrowRight' : 'ArrowLeft');
+  const n = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : next ? (i + 1) % items.length : prev ? (i - 1 + items.length) % items.length : -1;
+  if (n < 0) return;
+  e.preventDefault();
+  items[n].focus();
+  if (n !== i) items[n].click();
+}
+
 /** {anahtar} yer tutucularını doldurur */
 const fmtT = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ''));
 
@@ -530,9 +549,9 @@ export default function Configurator({ lang, t, ui }: Props) {
 
         <div class="cfg-field">
           <span class="cfg-label">{t.socket_label}</span>
-          <div class="cfg-seg" role="radiogroup" aria-label={t.socket_label}>
+          <div class="cfg-seg" role="radiogroup" aria-label={t.socket_label} onKeyDown={onRadioKey}>
             {SOCKETS.map((s) => (
-              <button type="button" role="radio" aria-checked={cfg.socket === s} onClick={() => update((c) => ({ ...c, socket: s }))}>
+              <button type="button" role="radio" aria-checked={cfg.socket === s} tabIndex={cfg.socket === s ? 0 : -1} onClick={() => update((c) => ({ ...c, socket: s }))}>
                 <span class="ltr">{socketName(t, s)}</span>
               </button>
             ))}
@@ -541,7 +560,7 @@ export default function Configurator({ lang, t, ui }: Props) {
 
         <div class="cfg-field">
           <span class="cfg-label">{t.length_label}</span>
-          <div class="cfg-seg" role="radiogroup" aria-label={t.length_label}>
+          <div class="cfg-seg" role="radiogroup" aria-label={t.length_label} onKeyDown={onRadioKey}>
             {LENGTHS.map((l) => {
               const ok = trailerDef.lengths.includes(l);
               return (
@@ -549,6 +568,7 @@ export default function Configurator({ lang, t, ui }: Props) {
                   type="button"
                   role="radio"
                   aria-checked={cfg.length === l}
+                  tabIndex={cfg.length === l ? 0 : -1}
                   disabled={!ok}
                   title={ok ? undefined : t.not_for_trailer}
                   onClick={() => update((c) => ({ ...c, length: l }))}
@@ -603,7 +623,7 @@ export default function Configurator({ lang, t, ui }: Props) {
                   </div>
                 </div>
                 {open && !auto && (
-                  <div class="lc-opts" role="radiogroup" aria-label={`${categoryName(t, cat.id)}: ${t.model}`}>
+                  <div class="lc-opts" role="radiogroup" aria-label={`${categoryName(t, cat.id)}: ${t.model}`} onKeyDown={onRadioKey}>
                     {frame && (
                       <div class="lpc fixed" aria-label={`${frameCode}: ${t.included}`}>
                         <LampIcon id={frame} lit={lights} size="card" />
@@ -614,7 +634,7 @@ export default function Configurator({ lang, t, ui }: Props) {
                     {productsFor(cfg.trailer, cat.id).map((p) => {
                       const on = p.id === ch.product;
                       return (
-                        <button type="button" role="radio" class="lpc" aria-checked={on} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
+                        <button type="button" role="radio" class="lpc" aria-checked={on} tabIndex={on ? 0 : -1} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
                           <LampIcon id={p.set ?? p.id} lit={lights} size="card" />
                           {/* set kodu dar kartta kesilmesin: bileşen kodları arasından alt satıra geçer, kodun içinden bölünmez */}
                           {p.setCodes ? (
