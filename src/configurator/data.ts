@@ -63,6 +63,14 @@ export interface LampProduct {
   fixed?: number;
   /** yan marker: eşleşen ön pozisyon lambası (dorse kuralı frontFromSide ise ön lamba bundan seçilir) */
   front?: string;
+  /**
+   * set: birlikte takılan lambalar (her yanda dıştan içe bu sırayla yinelenir); setCodes: özetteki kodları. Ör. LUNA: LZD 2448
+   * (pozisyon + fren + sinyal) ile LZD 2452 (pozisyon + sis + geri vites) tek başına eksik işlevli, çift olarak tam set.
+   */
+  set?: string[];
+  setCodes?: string[];
+  /** adet adımı (kategorininkinden farklıysa; ör. set: her yanda bir set = 4 lamba) */
+  step?: number;
 }
 
 export interface CategoryDef {
@@ -91,8 +99,9 @@ export const CATEGORIES: CategoryDef[] = [
       // yanda 2. LZD 2854'ün sağ eşi LZD 2855 (ürün sayfası: "Side right").
       { id: 'lzd3194', code: 'LZD 3194/AMP', codeR: 'LZD 3195/AMP', max: 2 },
       { id: 'lzd2854', code: 'LZD 2854', codeR: 'LZD 2855', max: 2 },
-      { id: 'lzd2448', code: 'LZD 2448', max: 8 },
-      { id: 'lzd2452', code: 'LZD 2452', max: 8 },
+      // LUNA seti (kullanıcı 2026-10-21): her yanda dışta LZD 2448 (sinyal dış kenara yakın, R48), içte LZD 2452; sağda aynaları
+      // LZD 2449 / LZD 2453. Adet = toplam lamba; her yanda en çok iki set
+      { id: 'luna', code: 'LZD 2448 + LZD 2452', codeR: 'LZD 2449 + LZD 2453', set: ['lzd2448', 'lzd2452'], setCodes: ['LZD 2448', 'LZD 2452'], step: 4, max: 8 },
       { id: 'lzd2875', code: 'LZD 2875/GRAPHITE', max: 4 },
       { id: 'lzd2876', code: 'LZD 2876', max: 4 },
     ],
@@ -272,8 +281,9 @@ export function normalize(c: Config): Config {
     if (fixed) {
       qty = qty > 0 ? fixed : 0; // sabit adetli ürün: ürün değişince de adet ürüne oturur (RTR 3366 → LTD 2834: 1 → 2)
     } else {
+      const step = productById(cat.id, product).step ?? cat.step;
       qty = Math.max(cat.min, Math.min(maxQty({ trailer: t.id, lamps: { ...c.lamps, [cat.id]: { product, qty } } }, cat.id), qty));
-      qty = cat.min + Math.round((qty - cat.min) / cat.step) * cat.step;
+      qty = qty > 0 ? Math.max(step, cat.min + Math.round((qty - cat.min) / step) * step) : qty;
     }
     lamps[cat.id] = { product, qty };
   }

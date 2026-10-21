@@ -67,7 +67,24 @@ function iconSrc(id: string, state: 'off' | 'on') {
 }
 /** Ürün simgesi: sönük hâl; üzerine gelince ya da ışıklar açıkken yanık hâl */
 /** Ürün görseli (512 px render): size 'card' = seçenek kartında büyük, 'thumb' = kategori başlığında küçük. Üzerine gelince ya da ışıklar modunda yanık hâli */
-function LampIcon({ id, lit, size = 'thumb' }: { id: string; lit: boolean; size?: 'card' | 'thumb' }) {
+function LampIcon({ id, lit, size = 'thumb' }: { id: string | string[]; lit: boolean; size?: 'card' | 'thumb' }) {
+  // set (ör. LUNA: LZD 2448 + LZD 2452): bileşenler yan yana
+  if (Array.isArray(id)) {
+    return (
+      <span class={`lglyph ${size} set${lit ? ' lit' : ''}`} aria-hidden="true">
+        {id.map((one) => {
+          const off1 = iconSrc(one, 'off');
+          const on1 = iconSrc(one, 'on');
+          return (
+            <span class="set-item">
+              {off1 && <img src={off1} alt="" width={256} height={256} loading="lazy" decoding="async" />}
+              {on1 && <img class="on" src={on1} alt="" width={256} height={256} loading="lazy" decoding="async" />}
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
   const off = iconSrc(id, 'off');
   const on = iconSrc(id, 'on');
   const px = size === 'card' ? 512 : 96;
@@ -254,7 +271,8 @@ export default function Configurator({ lang, t, ui }: Props) {
     const def = CATEGORIES.find((c) => c.id === cat)!;
     update((c) => {
       // sabit adetli ürünlerde (plaka lambası çifti, plaka çerçevesi) adım ürünün adedi: 0 ↔ sabit adet
-      const d = productById(cat, c.lamps[cat].product).fixed ?? def.step;
+      const pr = productById(cat, c.lamps[cat].product);
+      const d = pr.fixed ?? pr.step ?? def.step;
       c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), c.lamps[cat].qty + dir * d));
       return c;
     });
@@ -263,7 +281,8 @@ export default function Configurator({ lang, t, ui }: Props) {
   const pickProduct = (cat: CategoryId, id: string) => {
     update((c) => {
       c.lamps[cat].product = id;
-      if (c.lamps[cat].qty === 0) c.lamps[cat].qty = productById(cat, id).fixed ?? CATEGORIES.find((x) => x.id === cat)!.step;
+      const pr = productById(cat, id);
+      if (c.lamps[cat].qty === 0) c.lamps[cat].qty = pr.fixed ?? pr.step ?? CATEGORIES.find((x) => x.id === cat)!.step;
       return c;
     });
     engineRef.current?.focusCategory(cat);
@@ -532,7 +551,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             const auto = cat.id === 'front' && !!rules.frontFromSide;
             const frame = cat.id === 'plate' ? rules.plateFrame : undefined;
             const frameCode = frame ? productById('plate', frame).code : '';
-            const thumb = frame && !ch.qty ? frame : prod.id;
+            const thumb = frame && !ch.qty ? frame : (prod.set ?? prod.id);
             const code = frame ? (ch.qty ? `${frameCode} + ${prod.code}` : frameCode) : ch.qty ? prod.code : t.none;
             return (
               <section class={`lc ${open && !auto ? 'open' : ''} ${ch.qty === 0 && !frame ? 'off' : ''}`} key={cat.id}>
@@ -572,7 +591,7 @@ export default function Configurator({ lang, t, ui }: Props) {
                       const on = p.id === ch.product;
                       return (
                         <button type="button" role="radio" class="lpc" aria-checked={on} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
-                          <LampIcon id={p.id} lit={lights} size="card" />
+                          <LampIcon id={p.set ?? p.id} lit={lights} size="card" />
                           <span class="lpc-code mono ltr">{p.code}</span>
                           {p.codeR && <small class="lpc-pair mono ltr">{p.codeR}</small>}
                           {on && ch.qty > 0 && (

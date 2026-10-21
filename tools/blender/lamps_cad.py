@@ -59,6 +59,18 @@ def _exterior(bm):
     return out
 
 
+def _front_faces(bm):
+    """Önden (yerel +Z yarı küre, Blender −Y) görünen yüzler: saydam lensin arka yüzü atılır (iki kat renk koyulaşmasın)"""
+    bm.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(bm)
+    dirs = [Vector((x, y, z)).normalized() for x in (-1, -0.5, 0, 0.5, 1) for y in (-1, -0.5) for z in (-1, -0.5, 0, 0.5, 1)]
+    out = []
+    for f in bm.faces:
+        c, n = f.calc_center_median(), f.normal
+        out.append(any(d.dot(n) > 0.15 and tree.ray_cast(c + d * 0.0003, d, 2.0)[0] is None for d in dirs))
+    return out
+
+
 def _subset(bm, keep):
     """keep(face) doğru olan yüzlerden yeni bmesh"""
     b = bm.copy()
@@ -252,9 +264,10 @@ def _refl_tint(fn, color, gain, tint, rough):
     return MATS[key]
 
 
-def _cup_bands(group, x, y, z, r_front, r_back, depth, gains, fn, color, tint=None, rough=0.3):
+def _cup_bands(group, x, y, z, r_front, r_back, depth, gains, fn, color, tint=None, rough=0.3, seg=28):
     """İçi önden görünen krom LED kabı, dipten ağza bantlara bölünmüş: her bant kendi oranında ışır (LED'e yakın dip parlak,
-    ağız sönük; yansıyan ışığın düşüşü). Normaller içe: sitede tek yüzlü çizim, dış yüz arkada kalır. tint: lens renginde krom"""
+    ağız sönük; yansıyan ışığın düşüşü). Normaller içe: sitede tek yüzlü çizim, dış yüz arkada kalır. tint: lens renginde krom.
+    seg: az kenar (ör. 8) fasetli reflektör (yaprak biçimli yüzeyler)"""
     n = len(gains)
     for i, g in enumerate(gains):
         z0 = z - depth + depth * i / n
@@ -262,7 +275,7 @@ def _cup_bands(group, x, y, z, r_front, r_back, depth, gains, fn, color, tint=No
         r0 = r_back + (r_front - r_back) * i / n
         r1 = r_back + (r_front - r_back) * (i + 1) / n
         mt = _refl_tint(fn, color, g, tint, rough) if tint else _refl(fn, color, g)
-        ob = cyl(group, 'cup', r0, (x, y, z0), (x, y, z1), mt, 28, r2=r1, caps=False)
+        ob = cyl(group, 'cup', r0, (x, y, z0), (x, y, z1), mt, seg, r2=r1, caps=False)
         bm_ = bmesh.new()
         bm_.from_mesh(ob.data)
         bmesh.ops.reverse_faces(bm_, faces=bm_.faces[:])
@@ -1155,3 +1168,150 @@ def build_lzd2854_cad(L):
     L.empties = [mnt]
     # kablo: arkadaki rakordan 6 × 0,5 kablo (sitede tesisat sürer)
     tube(L.body, 'cable', [(0.0, 0.0, -0.004), (0.0, 0.0, -0.020), (0.0, -0.010, -0.034)], 0.0040, mat('Cable'), 3, smooth=True)
+
+
+# =====================================================================
+# LUNA — LZD 2448 (HOR 96A: pozisyon + sinyal + fren) / LZD 2452 (HOR 96B: pozisyon + sis + geri vites), sol (sağ: 2449 /
+# 2453, ayna). Kaynaklar: üretici STEP "LZD 2448, 2449, 2452, 2453" (ortak gövde), ürün paketleri (Downloads/LZD-2448.zip,
+# LZD-2452.zip: föy, teknik çizim, 7 + 6 fotoğraf).
+# STEP'te: kırmızı lens (p000, ortası D delikli kubbe), D penceresi (p001: lens + 9 mm derin ışık kutusu duvarları), krom çerçeve
+# (p003, Ø167,6; çizimde Ø155: eski sürüm, CAD esas), gövde (p004), kablo rakoru (p002). İç parçalar YOK: fotoğraflardan.
+#   Fotoğraf → lamba: lens kenarının elipsi (görünen yarıçap 56,3 mm) ve D penceresi (çizim: X −44…19, Y ±19; fotoğrafta
+#   genişlik 64 mm, birebir). Kaplar fren / sis fotoğrafındaki LED noktalarından: 7 kap, merkezden 34,5 mm, 40° arayla
+#   (0, ±40, ±80, ±120; fotoğrafın ~4° dönmesi simetriden düzeltildi), ağız Ø18,5, fasetli. Föy: 41 LED = 7 kap + D'de 12
+#   (üstte 6 ışık kılavuzunun ardında + ortada 6 SMD) + halkada 22 (kılavuzun ardında, görünmez).
+#   Kenarda kırmızı ışık kılavuzu halkası (pozisyon). D: üstte 6 dikey kılavuz dilimi (7 koyu ayraç), ortada beyaz devre
+#   bandı + 6 SMD, altta eğik koyu reflektör, sağ yuvarlak uçta krom çanak. 2448'de turuncu lens içi turuncuya boyar.
+#   Arkada siyah montaj halkası (fotoğraf; CAD'de yok): Ø167 / Ø113, 21 mm, gövdeyi örter (yüzey montajı).
+# CAD ekseni (mm): lens +y, önden bakınca sağ = −x, yukarı +z. Yerel: X = −x, Y = z, Z = y + 21,7 (montaj halkasının arka yüzü
+# z = 0). Lastik kol: tampona monte (kullanıcı kuralı, Revizeler/Standart Dorse md. 14), lambada bağlantı yok.
+# =====================================================================
+LUNA_M = Matrix(((-1, 0, 0, 0), (0, -1, 0, -0.0217), (0, 0, 1, 0), (0, 0, 0, 1)))
+
+
+def _luna_D(d=0.0, n=10):
+    """D penceresi (yerel mm), d kadar içeri: sol kenar hafif yay (X −44,9 + 4,6 (Y/20)²), sağ uç R13 köşeli"""
+    h = 20.0 - d
+    pts = []
+    for i in range(n + 1):  # sol kenar, aşağıdan yukarı
+        y = -h + 2 * h * i / n
+        pts.append((-44.9 + d + 4.6 * (y / 20.0) ** 2, y))
+    r = 13.0 - d
+    for a in range(90, -91, -15):  # sağ üst köşe → sağ alt köşe
+        t = math.radians(a)
+        cy = 7.0 if a >= 0 else -7.0
+        pts.append((6.0 + r * math.cos(t), cy + r * math.sin(t)))
+    return _s_ccw(pts)
+
+
+def _quad(group, name, pts, material, toward):
+    """Tek dörtgen yüz (yerel mm köşeler), normali toward yönüne çevrilir"""
+    bm = bmesh.new()
+    f = bm.faces.new([bm.verts.new(bl(tuple(c / 1000 for c in p))) for p in pts])
+    f.normal_update()
+    if f.normal.dot(bl(toward)) < 0:
+        f.normal_flip()
+    return _obj(name, bm, material, group, 0.0)
+
+
+def _luna(L, var):
+    cad = os.path.join(CAD_ROOT, 'lzd2448')
+    if not os.path.exists(os.path.join(cad, 'p004.stl')):
+        print('CAD YOK, eski el modeli:', cad)
+        return build_lzd2448(L) if var == '2448' else 'skip'
+    amb = var == '2448'
+    dfn, dcol = ('turn', 'amber') if amb else ('reverse', 'white')
+    cfn = 'stop' if amb else 'fog'
+    m_ = lambda pts: [(x / 1000, y / 1000) for x, y in pts]
+    Zm = lambda z: z / 1000
+
+    # ===== 1) CAD: çerçeve, gövde, rakor (dış yüzler; lensler ışını kesmez), lensler =====
+    parts = _cad_parts(cad, LUNA_M, ['p002', 'p003', 'p004'], angle=0.5)
+    _drop_small(parts['p004'], lambda mn, mx, n: mx[0] > 80.0 or mn[0] < -80.0)  # gövdeden kopuk artık (sınır kutusu ±109)
+    ext = _assembly_exterior(parts)
+    _plate_parts(L, parts, ext, {'p003': ([mat('Chrome')], L.body, 5000), 'p004': ([mat('Housing')], L.body, 9000),
+                                 'p002': ([mat('Rubber')], L.body, 400)}, 'luna')
+    # lensler: yalnız dışarıdan görünen yüzler (arka yüz de çizilince kırmızı iki kat koyulaşıyor, kaplar seçilmiyordu)
+    for nm, key, col, dec in (('p000', 'luna_lens', 'red', 9000), ('p001', 'luna_dlens', 'amber' if amb else 'clear', 4000)):
+        b = _stl(os.path.join(cad, nm + '.stl'), LUNA_M)
+        _simplify(b, 0.4)
+        ex = _front_faces(b)
+        sb = _subset(b, lambda f: ex[f.index])
+        b.free()
+        _mesh_obj(key, sb, [_lmat(col)], L.lens, 40, decimate=None if FAST else dec)
+
+    # ===== 2) montaj halkası (yüzey montajı; ürün fotoğrafları) =====
+    frame(L.body, 'mount_ring', m_(circle(83.4, 72)), m_(circle(56.6, 72)), 0.0, Zm(20.9), mat('Housing'), 0.0012, 2)
+
+    # ===== 3) kaplar (fren / sis): fasetli kırmızı krom, LED dipte =====
+    ZP = 22.4  # kapların ve reflektör tabanının dibi (gövde iç tabanının önü)
+    prism(L.inner, 'luna_floor', m_(circle(49.2, 64)), Zm(ZP - 0.6), Zm(ZP), mat('ReflectorRed'), 0.0)
+    set_uv_planar(L.inner.objs[-1], 0.03)
+    frame(L.inner, 'luna_wall', m_(circle(50.2, 64)), m_(circle(49.2, 64)), Zm(ZP - 0.6), Zm(30.4), mat('ReflectorRed'), 0.0)
+    core = _emat(cfn, 'red', '#c83a30', 'core')
+    for k in range(7):
+        a = math.radians(-120 + 40 * k)
+        x, y = 34.5 * math.cos(a), 34.5 * math.sin(a)
+        _cup_bands(L.E(cfn), x / 1000, y / 1000, Zm(31.2), 0.00925, 0.0030, Zm(31.2 - ZP - 0.2), (0.62, 0.46, 0.32), cfn, 'red',
+                   '#b8483e', 0.3, seg=12)
+        # kap ağzının çemberi (fotoğrafta kaplar belirgin daireler)
+        frame(L.inner, 'cup_rim', m_(circle(9.9, 24, x, y)), m_(circle(9.2, 24, x, y)), Zm(30.6), Zm(31.3), mat('ReflectorRed'), 0.0)
+        box(L.E(cfn), 'led', (x - 1.3) / 1000, (x + 1.3) / 1000, (y - 1.3) / 1000, (y + 1.3) / 1000, Zm(ZP), Zm(ZP + 0.8), E(cfn, 'red'))
+        cyl(L.E(cfn), 'optic_core', 0.0019, (x / 1000, y / 1000, Zm(ZP + 0.8)), (x / 1000, y / 1000, Zm(ZP + 1.4)), core, 16)
+
+    # ===== 4) pozisyon: kenardaki ışık kılavuzu halkası (lensin iç yüzünün hemen gerisinde) =====
+    frame(L.E('position'), 'luna_ring', m_(circle(55.4, 96)), m_(circle(49.8, 96)), Zm(28.6), Zm(30.6),
+          _emat('position', 'red', '#d98f8a', 'luna'), 0.0006, 2)
+
+    # ===== 5) D modülü: ışık kutusu (Z 27,6 … 35,8; D lensinin iç yüzü Z 36,3) =====
+    ZD0, ZD1 = 27.6, 35.8
+    light = '#e6b26a' if amb else '#e9e8e3'   # beyaz devre bandı / kılavuz (turuncu lensin ardında turuncu görünür)
+    chrome_t = '#d6a35a' if amb else '#c3c8ce'
+    dark_t = '#7a4a1c' if amb else '#5b5f66'
+    Dw = _luna_D(2.2)
+    frame(L.inner, 'd_liner', m_(Dw), m_(offset(Dw, 0.6)), Zm(ZD0), Zm(ZD1), mat('Reflector'), 0.0)
+    prism(L.inner, 'd_back', m_(_luna_D(2.4)), Zm(ZD0 - 0.4), Zm(ZD0), mat('Reflector'), 0.0)
+    X0, X1, XC, P = -40.0, 2.5, -19.0, 5.3
+    smd = _emat(dfn, dcol, '#f0b45a' if amb else '#e8d58a', 'smd')  # sönükken SMD'nin fosfor / lens rengi (fotoğraf 6, 7)
+    # orta bant: beyaz devre kartı, 6 SMD (yanınca bant da LED ışığıyla aydınlanır)
+    box(L.E(dfn), 'd_band', X0 / 1000, X1 / 1000, -0.0065, 0.0080, Zm(ZD0), Zm(ZD0 + 0.4), _glow(dfn, dcol, light, 0.45))
+    for i in range(6):
+        x = XC + (i - 2.5) * P
+        box(L.E(dfn), 'd_led', (x - 1.7) / 1000, (x + 1.7) / 1000, -0.0007, 0.0027, Zm(ZD0 + 0.4), Zm(ZD0 + 1.2), smd)
+    # üst bant: 6 dikey ışık kılavuzu dilimi (ardında 6 LED), arada 7 koyu ayraç
+    prism(L.E(dfn), 'd_guides', [(X0 / 1000, 0.0095), (X1 / 1000, 0.0095), (X1 / 1000, 0.0172), (X0 / 1000, 0.0172)], Zm(ZD0), Zm(ZD1 - 0.6),
+          _glow(dfn, dcol, light, 0.85), 0.0)
+    for i in range(7):
+        x = XC + (i - 3) * P
+        box(L.inner, 'd_sep', (x - 0.35) / 1000, (x + 0.35) / 1000, 0.0095, 0.0172, Zm(ZD1 - 3.5), Zm(ZD1 - 0.5), mat('HousingGloss'))
+    # alt: eğik koyu reflektör (bandın altından lense doğru), önden-yukarıdan görülür
+    _quad(L.E(dfn), 'd_floor', [(X0, -6.5, ZD0 + 0.4), (X1, -6.5, ZD0 + 0.4), (X1, -17.6, ZD1 - 0.8), (X0, -17.6, ZD1 - 0.8)],
+          _refl_tint(dfn, dcol, 0.35, dark_t, 0.35), (0, 0.7, 0.7))
+    # sağ uç: krom çanak (D'nin yuvarlak ucunu izleyen, dipte daralan yüzey; yanınca LED'in ışığını yansıtır)
+    rim = [p for p in _luna_D(2.4, 16) if p[0] >= X1 - 0.01]
+    rim.sort(key=lambda p: -math.atan2(p[1], p[0] - X1))  # üstten alta
+    bm = bmesh.new()
+    top = [bm.verts.new(bl((x / 1000, y / 1000, Zm(ZD1)))) for x, y in rim]
+    bot = [bm.verts.new(bl(((X1 + (x - X1) * 0.35) / 1000, y * 0.62 / 1000, Zm(ZD0 + 0.4)))) for x, y in rim]
+    for i in range(len(rim) - 1):
+        bm.faces.new([top[i], top[i + 1], bot[i + 1], bot[i]])
+    for f in bm.faces:
+        f.normal_update()
+        c = f.calc_center_median()
+        # iç yüz D'nin içine (merkeze ve öne) bakar
+        if f.normal.dot(bl((X1 / 1000, 0, Zm(ZD1 + 6))) - c) < 0:
+            f.normal_flip()
+    _obj('d_scoop', bm, _refl_tint(dfn, dcol, 0.45, chrome_t, 0.25), L.E(dfn), 0.0)
+
+    # ===== 6) kablo: rakordan arkaya (sitede tesisat sürer) =====
+    tube(L.body, 'cable', [(0.0, -0.0320, -0.0010), (0.0, -0.0320, -0.0120), (0.0, -0.0400, -0.0220)], 0.0028, mat('Cable'), 3, smooth=True)
+
+
+@product('lzd2448', 'LZD 2448', 'stop', 'LUNA sol (sağ: LZD 2449, ayna), HOR 96A: pozisyon, sinyal, fren — üretici CAD + fotoğraflar')
+def build_lzd2448_cad(L):
+    return _luna(L, '2448')
+
+
+@product('lzd2452', 'LZD 2452', 'stop', 'LUNA sol (sağ: LZD 2453, ayna), HOR 96B: pozisyon, sis, geri vites — üretici CAD + fotoğraflar')
+def build_lzd2452_cad(L):
+    return _luna(L, '2452')

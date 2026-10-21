@@ -545,6 +545,21 @@ html[lang='ar'] .cfg-label {
 .lglyph img.on {
   opacity: 0;
 }
+/* set: bileşen lambalar yan yana (ör. LUNA seti) */
+.lglyph.set {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+}
+.lglyph.set .set-item {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.lglyph.set .set-item img {
+  transform: scale(1.12);
+}
 .lpc:hover .lglyph img.on,
 .lglyph.lit img.on {
   opacity: 1;

@@ -23,7 +23,10 @@ export function summaryRows(c: Config, t: CUi, lang: Lang, setQty = 1): SummaryR
     // sabit plaka çerçevesi (ör. standart dorsede RTR 3366): her zaman 1 adet, ek plaka lambalarından önce
     if (cat.id === 'plate' && frame) rows.push({ label: t.sum_plate_frame, value: `1 × ${productById('plate', frame).code}`, mono: true });
     if (!ch.qty) continue;
-    rows.push({ label: summaryLabel(t, cat.id), value: `${ch.qty} × ${productById(cat.id, ch.product).code}`, mono: true });
+    const pr = productById(cat.id, ch.product);
+    // set: bileşenler ayrı ayrı (ör. 2 × LZD 2448 + 2 × LZD 2452)
+    const value = pr.setCodes ? pr.setCodes.map((code) => `${ch.qty / pr.setCodes!.length} × ${code}`).join(' + ') : `${ch.qty} × ${pr.code}`;
+    rows.push({ label: summaryLabel(t, cat.id), value, mono: true });
   }
   if (setQty > 1) rows.push({ label: t.set_qty, value: String(setQty) });
   return rows;

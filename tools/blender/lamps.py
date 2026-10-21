@@ -859,6 +859,7 @@ ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan i
     'work': ('work',),
     'beacon': ('beacon',),
 }
+ICON_LIT_P = {'lzd2452': ('position', 'fog', 'reverse')}  # kategorinin imzası ürüne uymuyorsa (LUNA 2452: sis + geri vites)
 ICON_DIR_VEC = {'arm': (0.55, 0.25, 0.8), 'beacon': (0.45, 0.45, 1.0), 'plate': (-0.35, 0.55, 1.0)}
 
 
@@ -920,7 +921,7 @@ def icons(pid, objs, cat):
     extra = icon_plate() if pid == 'rtr3366' else []
     # plaka çerçevesi: plakadaki yazı okunsun diye öne yakın açı
     d = (-0.2, 0.18, 1.0) if extra else ICON_DIR_VEC.get(cat, (-0.45, 0.28, 1.0))
-    render_views(pid, objs, ICON_DIR, [('off', d, False), ('on', d, True)], size=384 if FAST else 512, lit_fns=ICON_LIT.get(cat), fmt='WEBP')
+    render_views(pid, objs, ICON_DIR, [('off', d, False), ('on', d, True)], size=384 if FAST else 512, lit_fns=ICON_LIT_P.get(pid, ICON_LIT.get(cat)), fmt='WEBP')
     for ob in extra:
         bpy.data.objects.remove(ob)
     set_icon_glass(False)

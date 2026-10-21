@@ -271,7 +271,7 @@ function poolMaterial(c: THREE.Color, cat: CategoryId) {
 /** Arka lambaların genişliği (lamba yerel X), dizilim için: modelden ölçülür, yoksa ürüne göre tahmin */
 /** Eski hale/zemin ışığı sprite'ları (bloom öncesi). Kapalı: yansıma efektleri yanıltmasın (kullanıcı, 2026-10-20) */
 const GLOW_SPRITES = false;
-const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2856: 0.451, lzd2423: 0.155, lzd2448: 0.145, lzd2877: 0.115, lzd2880: 0.115 };
+const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2854: 0.449, lzd2448: 0.168, lzd2452: 0.168 };
 
 export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuild {
   const group = new THREE.Group();
@@ -400,7 +400,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const R = M.rear;
   const rx = R?.faceX ?? R?.x ?? a.rear.x;
   const ly = R?.y ?? a.rear.lampY;
-  const zEdge = R ? R.zOuter : Math.min(W2 - 0.03, a.rear.lampZ[0] + (LAMP_W[stop.product] ?? 0.3) / 2);
+  // set (ör. LUNA): her yanda dıştan içe bileşenler sırayla
+  const stopSet = productById('stop', stop.product).set ?? [stop.product];
+  const zEdge = R ? R.zOuter : Math.min(W2 - 0.03, a.rear.lampZ[0] + (LAMP_W[stopSet[0]] ?? 0.3) / 2);
   const perSide = Math.floor(stop.qty / 2);
   // her yan: dıştan içe dizilen lambalar [z merkezi, yarı genişlik]
   const rearLamps: { s: number; z: number; hw: number }[] = [];
@@ -409,11 +411,12 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   for (const s of [1, -1]) {
     let edge = zEdge;
     for (let k = 0; k < perSide; k++) {
-      const o = mount('stop', stop.product, V(rx, ly, 0), (obj) => {
+      const sid = stopSet[k % stopSet.length];
+      const o = mount('stop', sid, V(rx, ly, 0), (obj) => {
         obj.rotation.y = Math.PI / 2;
         if (s < 0) obj.scale.x = -1; // sağ lamba: ayna (LZD 3195 / 2857)
       });
-      const w = lampWidth(stop.product, o);
+      const w = lampWidth(sid, o);
       const z = edge - w / 2;
       o.position.z = s * z;
       rearLamps.push({ s, z, hw: w / 2 });
@@ -930,7 +933,7 @@ export function lampIds(c: Config): string[] {
   const ids = new Set<string>();
   for (const cat of CATEGORIES) {
     const ch = c.lamps[cat.id];
-    if (ch.qty > 0) ids.add(productById(cat.id, ch.product).id);
+    if (ch.qty > 0) for (const id of productById(cat.id, ch.product).set ?? [productById(cat.id, ch.product).id]) ids.add(id);
   }
   const frame = rulesFor(c.trailer).plateFrame;
   if (frame) ids.add(frame);
