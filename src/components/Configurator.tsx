@@ -64,14 +64,16 @@ function iconSrc(id: string, state: 'off' | 'on') {
   return v ? (typeof v === 'string' ? v : v.src) : null;
 }
 /** Ürün simgesi: sönük hâl; üzerine gelince ya da ışıklar açıkken yanık hâl */
-function LampIcon({ id, lit }: { id: string; lit: boolean }) {
+/** Ürün görseli (512 px render): size 'card' = seçenek kartında büyük, 'thumb' = kategori başlığında küçük. Üzerine gelince ya da ışıklar modunda yanık hâli */
+function LampIcon({ id, lit, size = 'thumb' }: { id: string; lit: boolean; size?: 'card' | 'thumb' }) {
   const off = iconSrc(id, 'off');
   const on = iconSrc(id, 'on');
-  if (!off) return <span class="lglyph ph" aria-hidden="true" />;
+  const px = size === 'card' ? 512 : 96;
+  if (!off) return <span class={`lglyph ${size} ph`} aria-hidden="true" />;
   return (
-    <span class={`lglyph${lit ? ' lit' : ''}`} aria-hidden="true">
-      <img src={off} alt="" width={56} height={56} loading="lazy" decoding="async" />
-      {on && <img class="on" src={on} alt="" width={56} height={56} loading="lazy" decoding="async" />}
+    <span class={`lglyph ${size}${lit ? ' lit' : ''}`} aria-hidden="true">
+      <img src={off} alt="" width={px} height={px} loading="lazy" decoding="async" />
+      {on && <img class="on" src={on} alt="" width={px} height={px} loading="lazy" decoding="async" />}
     </span>
   );
 }
@@ -528,7 +530,10 @@ export default function Configurator({ lang, t, ui }: Props) {
               <section class={`lc ${open ? 'open' : ''} ${ch.qty === 0 ? 'off' : ''}`} key={cat.id}>
                 <div class="lc-head">
                   <button type="button" class="lc-toggle" aria-expanded={open} onClick={() => toggleCat(cat.id)}>
-                    <i class="lc-dot" style={`background:${CAT_DOT[cat.id]}`} />
+                    <span class="lc-thumb">
+                      <LampIcon id={prod.id} lit={lights && ch.qty > 0} />
+                      <i class="lc-dot" style={`background:${CAT_DOT[cat.id]}`} />
+                    </span>
                     <span class="lc-name">
                       <b>{categoryName(t, cat.id)}</b>
                       <small class="mono">{ch.qty ? prod.code : t.none}</small>
@@ -548,12 +553,21 @@ export default function Configurator({ lang, t, ui }: Props) {
                 {sideMin > 0 && ch.qty / 2 < sideMin && <p class="lc-rule">{fmtT(t.side_rule, { n: sideMin })}</p>}
                 {open && (
                   <div class="lc-opts" role="radiogroup" aria-label={`${categoryName(t, cat.id)}: ${t.model}`}>
-                    {cat.products.map((p) => (
-                      <button type="button" role="radio" aria-checked={p.id === ch.product} onClick={() => pickProduct(cat.id, p.id)}>
-                        <LampIcon id={p.id} lit={lights} />
-                        <span class="mono">{p.code}{p.codeR ? ` / ${p.codeR}` : ''}</span>
-                      </button>
-                    ))}
+                    {cat.products.map((p) => {
+                      const on = p.id === ch.product;
+                      return (
+                        <button type="button" role="radio" class="lpc" aria-checked={on} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
+                          <LampIcon id={p.id} lit={lights} size="card" />
+                          <span class="lpc-code mono ltr">{p.code}</span>
+                          {p.codeR && <small class="lpc-pair mono ltr">{p.codeR}</small>}
+                          {on && ch.qty > 0 && (
+                            <b class="lpc-qty mono ltr" aria-hidden="true">
+                              ×{ch.qty}
+                            </b>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </section>
