@@ -31,7 +31,8 @@ Giriş: `Devam Noktası.md` → `Dökümantasyon Wiki.md`. Kararlar: `02 - Karar
 - Yeni 3D/JS bağımlılığı eklemeden önce bütçeye etkisini ölç (bkz. vault `08 - 3D Performans ve Kalite Stratejisi.md`).
 
 ## Teknik kurallar (statik site, kodlandı 2026-10-15)
-- Komutlar: `npm install`, `npm run dev` (http://localhost:4321/tr/), `npm run build`. Astro 7, **Preact 10** (11 uyumsuz).
+- Komutlar: `npm install`, `npm run dev` (http://localhost:4321/tr/), `npm run build`, `npm run check` (tip denetimi, 0 hata beklenir), `npm test` (konfigüratör kuralları, `tests/*.test.mjs`). Astro 7, **Preact 10** (11 uyumsuz).
+- Konfigüratör kuralı değişince `tests/data.test.mjs` de güncellenir (test kuralı belgeler). Teklif formu tek bileşen: `src/components/QuoteFields.tsx`. Tesisat renkleri tek kaynak: `src/configurator/colors.ts`.
 - Sayfalar ürün verisini yalnızca `src/data/products.ts` + `src/lib/catalog.ts` üzerinden okur.
 - Dorse 3D modelleri yalnız Blender betiklerinden: `tools/blender/<tip>.py` (ölçülerin tek kaynağı; AO + yüzey dokusu pişirir, `*-anchors.json` yazar) → `npm run models:pack -- <tip>` → `src/configurator/engine/baked.ts` kaydı. Kodla çizilen model yok. Her tipin referansı ve kararları `docs/<Tip> Dorse/README.md`.
 - Yeni arayüz metni: `src/i18n/ui.ts` içinde **4 dile birden** (tr, en, ru, ar). RU/AR çevirmen onayı bekliyor.
