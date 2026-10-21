@@ -15,7 +15,7 @@
   /* set kartı ve set ayrıntısında ürün karolarının arkasındaki grup zemini (karolar beyaz, grup hafif mavi-gri) */
   --photo-group: #e4eaf2;
   --photo-line: #d3dce8;
-  --photo-ink: #7a889d;
+  --photo-ink: #687589;
   /* hero: logo mavisiyle güçlü marka alanı */
   --hero-bg: linear-gradient(135deg, #1d5399 0%, #153a73 100%);
   --hero-line: transparent;
@@ -34,7 +34,8 @@
   /* metin */
   --ink: #0d1b30;
   --muted: #475870;
-  --faint: #6f7d93;
+  /* küçük yardımcı metin: beyaz zeminde ve açık mavi bantta WCAG AA (4,5:1) */
+  --faint: #626f86;
   /* çizgiler */
   --line: #d6e0ed;
   --line-strong: #c0cee0;
@@ -91,7 +92,7 @@
   /* set kartı ve set ayrıntısında ürün karolarının arkasındaki grup zemini (karolar beyaz, grup hafif mavi-gri) */
   --photo-group: #e4eaf2;
   --photo-line: #d3dce8;
-  --photo-ink: #7a889d;
+  --photo-ink: #687589;
   --ink: #e8edf5;
   --muted: #a1adc1;
   --faint: #7d8aa0;
