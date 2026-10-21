@@ -297,7 +297,15 @@ export class Engine {
     canvas.addEventListener('pointerdown', this.onDown);
     canvas.addEventListener('pointerup', this.onUp);
     canvas.addEventListener('pointermove', this.onMove);
+    // bağlam kaybı (mobilde arka plan, sürücü sıfırlaması): three.js dokuları ve gölgelendiricileri kendisi yeniden yükler;
+    // GPU'da pişirilen ortam haritası ve gölge haritası kaybolur, onlar yeniden pişirilir
     canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => {
+      if (this.disposed) return;
+      this.envKind = null;
+      this.applyLook();
+      this.invalidate();
+    });
   }
 
   async init() {

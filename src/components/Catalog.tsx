@@ -99,7 +99,7 @@ export default function Catalog({ items, ui, lang }: Props) {
               )}
               <div class="buy">
                 <div class="qty">
-                  <button type="button" aria-label={ui.qty_dec} onClick={() => step(it.id, -1)}>
+                  <button type="button" aria-label={ui.qty_dec} disabled={get(it.id) <= 1} onClick={() => step(it.id, -1)}>
                     −
                   </button>
                   <output aria-live="polite">{get(it.id)}</output>

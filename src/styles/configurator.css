@@ -422,10 +422,6 @@ html[lang='ar'] .cfg-label {
   min-width: 24px;
   font-size: 0.9rem;
 }
-.qty button[disabled] {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
 .lc-opts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -468,6 +464,13 @@ html[lang='ar'] .cfg-label {
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lpc-code.set {
+  white-space: normal;
+  text-wrap: balance;
+}
+.lpc-code.set span {
   white-space: nowrap;
 }
 .lpc-qty {

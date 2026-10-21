@@ -616,7 +616,19 @@ export default function Configurator({ lang, t, ui }: Props) {
                       return (
                         <button type="button" role="radio" class="lpc" aria-checked={on} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
                           <LampIcon id={p.set ?? p.id} lit={lights} size="card" />
-                          <span class="lpc-code mono ltr">{p.code}</span>
+                          {/* set kodu dar kartta kesilmesin: bileşen kodları arasından alt satıra geçer, kodun içinden bölünmez */}
+                          {p.setCodes ? (
+                            <span class="lpc-code set mono ltr">
+                              {p.setCodes.map((sc, i) => (
+                                <>
+                                  {i > 0 && ' + '}
+                                  <span>{sc}</span>
+                                </>
+                              ))}
+                            </span>
+                          ) : (
+                            <span class="lpc-code mono ltr">{p.code}</span>
+                          )}
                           {on && ch.qty > 0 && (
                             <b class="lpc-qty mono ltr" aria-hidden="true">
                               ×{ch.qty}

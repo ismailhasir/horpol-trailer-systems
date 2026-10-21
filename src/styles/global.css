@@ -911,8 +911,12 @@ html[lang='ar'] .kind {
   font-size: 1.1rem;
   line-height: 1;
 }
-.qty button:hover {
+.qty button:hover:not([disabled]) {
   background: var(--band);
+}
+.qty button[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 .qty output {
   min-width: 28px;
