@@ -7,6 +7,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "check": "astro check",
+    "test": "node --import ./tests/ts-hooks.mjs --test tests/*.test.mjs",
     "models:pack": "node tools/blender/pack.mjs"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 // Konfigüratör verisi: dorse tipleri, soketler, uzunluklar ve lamba katalogu.
 // Lamba ürünleri vault'taki ürün listesidir (Kablolama ve Işıklandırma/Ürün Data/Ürün Listesi.md, tek doğru kaynak; 2026-10-21).
-// 3D modeli olmayan ürünler (STEP bekleniyor) sahnede yer tutucuyla, panelde boş kartla görünür.
+// 3D modeli olmayan ürünler (STEP bekleniyor) sahnede yer tutucuyla, panelde sönük lamba çizgili kartla görünür.
+// Kurallar tests/data.test.mjs ile korunur (npm test).
 // Adet tavanları kurala ve fiziksel yuvaya dayalı önerimizdir, satış ekibiyle doğrulanacak.
 
 export type TrailerId =
@@ -52,7 +53,7 @@ export const lengthMeters = (l: LengthId) => Number(l);
 
 /**
  * Lamba ürünü. 3D modeli tools/blender/lamps.py üretir (src/assets/models/lamp-<id>.glb); simgesi src/assets/lamps/<id>-off|on.webp.
- * pair: sol/sağ çift (sağdaki ayna; kodu `codeR`). max: ürünün fiziksel tavanı (kategori tavanından küçükse geçerli).
+ * codeR: sağ yandaki ayna lambanın kodu (sol/sağ çift). max: ürünün fiziksel tavanı (kategori tavanından küçükse geçerli).
  * fixed: sabit adet (seçilince bu adet; − / + yalnız 0 ile bu adet arasında geçer). Ör. plaka lambaları çift, plaka çerçevesi tek.
  */
 export interface LampProduct {
@@ -100,7 +101,8 @@ export interface CategoryDef {
 
 // Tavanlar (2026-10-19): arka lambalar çift (sol + sağ); büyük kombine lambalar tek çift, yuvarlak/küçük lambalar lamba
 // barında her yanda 4'e (Lucy/Luna) ya da 2'ye (CUBE) kadar. Yan marker tavanı dorseye göre (sideMax); ön pozisyon ve
-// plaka 2; lastik kol 4 (önde ve arkada birer çift); çalışma ve tepe lambası 2 (modülün boş portları ve sabit yuvalar).
+// plaka 2; lastik kol 4 (önde ve arkada birer çift; standart dorsede yalnız arka çift, armMax 2); çalışma ve tepe lambası 2
+// (modülün boş portları ve sabit yuvalar).
 export const CATEGORIES: CategoryDef[] = [
   {
     id: 'stop',
