@@ -1,0 +1,64 @@
+---
+// Bulunamayan adres: statik barındırma (Cloudflare Pages vb.) bu sayfayı 404.html olarak sunar. Dil adresten bilinemez:
+// ana metin varsayılan dilde, altında her dilin kendi diliyle ana sayfa bağlantısı.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { DEFAULT_LANG, LANGS, isRtl } from '../lib/labels';
+import { useUi } from '../i18n/ui';
+
+const lang = DEFAULT_LANG;
+const ui = useUi(lang);
+---
+
+<BaseLayout lang={lang} title={ui.nf_title} path="/" noindex>
+  <section class="block nf">
+    <div class="wrap nf-box">
+      <p class="eyebrow">404</p>
+      <h1>{ui.nf_title}</h1>
+      <p class="lead">{ui.nf_text}</p>
+      <div class="cta">
+        <a class="btn btn-primary" href={`/${lang}/`}>{ui.nf_home}</a>
+        <a class="btn" href={`/${lang}/konfigurator/`}>{ui.nav_configurator}</a>
+      </div>
+      <ul class="nf-langs">
+        {
+          LANGS.filter((l) => l !== lang).map((l) => {
+            const u = useUi(l);
+            return (
+              <li>
+                <a href={`/${l}/`} lang={l} dir={isRtl(l) ? 'rtl' : 'ltr'}>
+                  {u.nf_title}: {u.nf_home}
+                </a>
+              </li>
+            );
+          })
+        }
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .nf-box {
+    display: grid;
+    gap: 16px;
+    justify-items: start;
+    min-height: 46vh;
+    align-content: center;
+  }
+  .nf h1 {
+    font-size: clamp(1.8rem, 1.3rem + 2vw, 2.8rem);
+    line-height: 1.15;
+  }
+  .nf-langs {
+    display: grid;
+    gap: 6px;
+    margin: 18px 0 0;
+    padding: 16px 0 0;
+    border-block-start: 1px solid var(--line);
+    list-style: none;
+    font-size: 0.92rem;
+  }
+  .nf-langs a {
+    color: var(--link);
+  }
+</style>

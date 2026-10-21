@@ -119,9 +119,11 @@ const tr = {
   footer_rights: '© 2026 Horpol Trailer Systems. Tüm hakları saklıdır.',
   footer_placeholder: 'Geçici bilgiler: sosyal medya bağlantıları örnektir.',
 
-  cfg_title: '3D konfigüratör yakında',
-  cfg_text: 'Setinizi dorse üzerinde 3D olarak oluşturduğunuz konfigüratör bir sonraki aşamada bu sayfada açılacak.',
-  cfg_back: 'Ana sayfaya dön',
+  cfg_desc: 'Horpol dorse aydınlatma setinizi 3D olarak oluşturun: dorse tipini ve lambaları seçin, sonucu dorse üzerinde anında görün, teklif isteyin.',
+
+  nf_title: 'Sayfa bulunamadı',
+  nf_text: 'Aradığınız sayfa taşınmış ya da kaldırılmış olabilir.',
+  nf_home: 'Ana sayfaya dön',
 };
 
 export type Ui = typeof tr;
@@ -242,9 +244,11 @@ const en: Ui = {
   footer_rights: '© 2026 Horpol Trailer Systems. All rights reserved.',
   footer_placeholder: 'Placeholder details: social media links are examples.',
 
-  cfg_title: '3D configurator coming soon',
-  cfg_text: 'The configurator, where you build your set on the trailer in 3D, will open on this page in the next stage.',
-  cfg_back: 'Back to home',
+  cfg_desc: 'Build your Horpol trailer lighting set in 3D: choose the trailer type and lamps, see the result on the trailer instantly and request a quote.',
+
+  nf_title: 'Page not found',
+  nf_text: 'The page you are looking for may have been moved or removed.',
+  nf_home: 'Back to home',
 };
 
 const ru: Ui = {
@@ -363,9 +367,11 @@ const ru: Ui = {
   footer_rights: '© 2026 Horpol Trailer Systems. Все права защищены.',
   footer_placeholder: 'Временные данные: ссылки на соцсети приведены для примера.',
 
-  cfg_title: '3D-конфигуратор скоро',
-  cfg_text: 'Конфигуратор, в котором вы собираете комплект на прицепе в 3D, откроется на этой странице на следующем этапе.',
-  cfg_back: 'На главную',
+  cfg_desc: 'Соберите комплект освещения Horpol для прицепа в 3D: выберите тип прицепа и фонари, сразу увидьте результат на прицепе и запросите предложение.',
+
+  nf_title: 'Страница не найдена',
+  nf_text: 'Возможно, страница была перемещена или удалена.',
+  nf_home: 'На главную',
 };
 
 const ar: Ui = {
@@ -484,9 +490,11 @@ const ar: Ui = {
   footer_rights: '© 2026 Horpol Trailer Systems. جميع الحقوق محفوظة.',
   footer_placeholder: 'بيانات مؤقتة: روابط وسائل التواصل أمثلة.',
 
-  cfg_title: 'المُهيّئ ثلاثي الأبعاد قريبًا',
-  cfg_text: 'سيُفتح المُهيّئ الذي تصمّم فيه طقمك على المقطورة بتقنية ثلاثية الأبعاد في هذه الصفحة في المرحلة التالية.',
-  cfg_back: 'العودة إلى الرئيسية',
+  cfg_desc: 'صمّم طقم إضاءة Horpol لمقطورتك بتقنية ثلاثية الأبعاد: اختر نوع المقطورة والمصابيح، وشاهد النتيجة على المقطورة فورًا، واطلب عرض سعر.',
+
+  nf_title: 'الصفحة غير موجودة',
+  nf_text: 'ربما نُقلت الصفحة التي تبحث عنها أو حُذفت.',
+  nf_home: 'العودة إلى الرئيسية',
 };
 
 const dict: Record<Lang, Ui> = { tr, en, ru, ar };

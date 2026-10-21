@@ -1,0 +1,4 @@
+# Horpol Trailer Systems
+# Site haritası (Sitemap:) alan adı belli olunca eklenecek: mutlak adres ister.
+User-agent: *
+Allow: /

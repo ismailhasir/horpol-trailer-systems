@@ -16,7 +16,7 @@ const ui = useUi(lang);
 const t = useCUi(lang);
 ---
 
-<BaseLayout lang={lang} title={t.title} description={ui.cfg_text} path="/konfigurator/" app>
+<BaseLayout lang={lang} title={t.title} description={ui.cfg_desc} path="/konfigurator/" app>
   <h1 class="sr-only">{t.title}</h1>
   <Configurator client:only="preact" lang={lang} t={t} ui={ui} />
   <noscript><p class="wrap" style="padding-block:40px">{t.webgl_fail}</p></noscript>

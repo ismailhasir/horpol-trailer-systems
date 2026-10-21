@@ -17,7 +17,7 @@ import ar400 from '@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-a
 import ar600 from '@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-600-normal.woff2?url';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { LANGS, isRtl, type Lang } from '../lib/labels';
+import { DEFAULT_LANG, LANGS, isRtl, type Lang } from '../lib/labels';
 import { useUi } from '../i18n/ui';
 import { loadCatalog } from '../lib/catalog';
 
@@ -31,14 +31,21 @@ interface Props {
   stickybar?: boolean;
   /** Uygulama modu (konfigüratör): alt bilgi yok, içerik ekranı doldurur. */
   app?: boolean;
+  /** Arama motorları dizine eklemesin (404 sayfası). Dil bağlantıları da yazılmaz. */
+  noindex?: boolean;
 }
-const { lang, title, description, path, stickybar = false, app = false } = Astro.props;
+const { lang, title, description, path, stickybar = false, app = false, noindex = false } = Astro.props;
 const ui = useUi(lang);
 // Uygulama modunda (konfigüratör) ürün listesi gerekmez: arama ve sepet yoktur.
 const { details } = app ? { details: [] } : await loadCatalog(lang);
 const fullTitle = title === ui.site_name ? title : `${title} | ${ui.site_name}`;
 // Ekranın üstünde görünen yazı tiplerini dile göre önceden yükle
 const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600] : [latin400, latin600];
+// Paylaşım önizlemesi (Open Graph). Kanonik adres, og:url ve hreflang mutlak adres ister: alan adı belli olunca
+// astro.config'e "site" yazılması yeter (o zamana kadar göreli yollar, kanonik ve og:url yazılmaz).
+const OG_LOCALE: Record<Lang, string> = { tr: 'tr_TR', en: 'en_US', ru: 'ru_RU', ar: 'ar_AR' };
+const abs = (p: string) => (Astro.site ? new URL(p, Astro.site).href : p);
+const self = `/${lang}${path}`;
 ---
 
 <!doctype html>
@@ -48,9 +55,19 @@ const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={ui.site_name} />
+    <meta property="og:title" content={fullTitle} />
+    {Astro.site && !noindex && <link rel="canonical" href={abs(self)} />}
+    {Astro.site && !noindex && <meta property="og:url" content={abs(self)} />}
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:locale" content={OG_LOCALE[lang]} />
+    {LANGS.filter((l) => l !== lang).map((l) => <meta property="og:locale:alternate" content={OG_LOCALE[l]} />)}
     <link rel="icon" type="image/png" href="/brand/logo-blue.png" />
     {preload.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
-    {LANGS.map((l) => <link rel="alternate" hreflang={l} href={`/${l}${path}`} />)}
+    {!noindex && LANGS.map((l) => <link rel="alternate" hreflang={l} href={abs(`/${l}${path}`)} />)}
+    {!noindex && <link rel="alternate" hreflang="x-default" href={abs(`/${DEFAULT_LANG}${path}`)} />}
     <!-- Tema: kayıtlı seçim yoksa sistem tercihi. Titremeyi önlemek için render'dan önce çalışır. -->
     <script is:inline>
       (function () {
