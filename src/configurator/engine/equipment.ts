@@ -13,25 +13,13 @@ import { CATEGORIES, layoutOf, productById, rulesFor, type CategoryId, type Conf
 import type { Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
-import { emitterSpots, lampInstance, type LampFn } from './lampfx';
+import { lampInstance } from './lampfx';
 import type { PlateLight } from './plateLight';
 
-/** Yanınca görünen ışık efekti: lens önünde hale (sprite) ya da zemine düşen renkli ışık (pool) */
-export interface Glow {
-  sprite: THREE.Object3D;
-  fn: LampFn;
-}
-/** Sahnedeki gerçek ışıkların yerleşimi (Engine sabit sayıda ışığı buraya taşır: gölgelendirici yeniden derlenmez) */
-export interface LampLightAnchors {
-  rear: THREE.Vector3[];
-  work: { pos: THREE.Vector3; dir: THREE.Vector3 }[];
-}
 export interface EquipmentBuild {
   group: THREE.Group;
-  glows: Glow[];
   harness: THREE.Group;
   lampsByCat: Record<CategoryId, THREE.Object3D[]>;
-  lights: LampLightAnchors;
   /** gerçek modeli henüz yüklenmemiş lamba var mı (Engine yüklenince yeniden kurar) */
   placeholders: number;
   /** plaka: çerçeve seçiliyse plakanın yeni yeri (null: taşıyıcıdaki yerinde) ve plakaya düşen ışığın yerleşimi */
@@ -224,61 +212,14 @@ function controlModule(mats: Mats) {
   return g;
 }
 
-// ---------- yanan lamba efektleri ----------
-/** hale boyu tavanı (m) */
-const HALO_MAX: Record<CategoryId, number> = { stop: 0.7, side: 0.32, plate: 0.26, front: 0.36, arm: 0.34, work: 0.9, beacon: 0.75 };
-/** zemine düşen ışığın boyu ve eni (m); plaka zemine düşmez */
-// tepe lambası zemine düşmez (kullanıcı isteği 2026-10-20); plaka da düşmez
-const POOL: Partial<Record<CategoryId, [number, number]>> = { stop: [3.2, 2.0], side: [1.2, 0.9], front: [1.8, 1.3], arm: [1.0, 0.8], work: [6.5, 4.2] };
-const POOL_GEO = markShared(new THREE.PlaneGeometry(1, 1));
-const haloMats = new Map<string, THREE.SpriteMaterial>();
-function haloMaterial(mats: Mats, c: THREE.Color) {
-  const k = c.getHexString();
-  let m = haloMats.get(k);
-  if (!m) {
-    m = new THREE.SpriteMaterial({ map: mats.glow.white.map, color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.95, toneMapped: false, fog: false });
-    haloMats.set(k, m);
-  }
-  return m;
-}
-const poolMats = new Map<string, THREE.MeshBasicMaterial>();
-let poolTex: THREE.CanvasTexture | null = null;
-function poolTexture() {
-  if (poolTex) return poolTex;
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
-  g.addColorStop(0.7, 'rgba(255,255,255,0.15)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  poolTex = new THREE.CanvasTexture(c);
-  return poolTex;
-}
-function poolMaterial(c: THREE.Color, cat: CategoryId) {
-  const k = `${c.getHexString()}|${cat}`;
-  let m = poolMats.get(k);
-  if (!m) {
-    const op = cat === 'work' ? 0.7 : cat === 'stop' ? 0.5 : 0.42;
-    m = new THREE.MeshBasicMaterial({ map: poolTexture(), color: c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: op, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2 });
-    poolMats.set(k, m);
-  }
-  return m;
-}
-
+// Işıma (hale, zemin ışığı) Engine'deki bloom ile yanan parçanın kendi biçiminden gelir (2026-10-20); sprite efektleri kaldırıldı.
 /** Arka lambaların genişliği (lamba yerel X), dizilim için: modelden ölçülür, yoksa ürüne göre tahmin */
-/** Eski hale/zemin ışığı sprite'ları (bloom öncesi). Kapalı: yansıma efektleri yanıltmasın (kullanıcı, 2026-10-20) */
-const GLOW_SPRITES = false;
 const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2854: 0.449, lzd2448: 0.168, lzd2452: 0.168 };
 
 export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuild {
   const group = new THREE.Group();
   const harness = new THREE.Group();
   group.add(harness);
-  const glows: Glow[] = [];
   const lampsByCat = Object.fromEntries(CATEGORIES.map((k) => [k.id, []])) as unknown as Record<CategoryId, THREE.Object3D[]>;
   const M: MountsLike = (a.mounts as MountsLike) ?? {};
   let placeholders = 0;
@@ -294,55 +235,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     obj.traverse((o) => (o.userData.category = cat));
     group.add(obj);
     lampsByCat[cat].push(obj);
-    if (inst) glowLater.push(obj);
     return obj;
-  };
-  // parlamalar lambalar son yerlerine oturduktan sonra (arka lambalar kurulduktan sonra kaydırılır)
-  const glowLater: THREE.Object3D[] = [];
-  const makeGlows = () => {
-    // hale ve zemin ışığı sprite'ları kapalı (2026-10-20): ışıma artık Engine'deki bloom ile yanan parçanın kendi biçiminden gelir
-    if (!GLOW_SPRITES) return;
-    for (const obj of glowLater) {
-      const cat = obj.userData.category as CategoryId;
-      obj.updateMatrixWorld(true);
-      const facing = V(0, 0, 1).applyQuaternion(obj.getWorldQuaternion(new THREE.Quaternion())).normalize();
-      const pooled = new Set<string>();
-      for (const sp of emitterSpots(obj)) {
-        // 1) hale: lensin hemen önünde, ton eşlemesiz; yanınca lambanın çevresi parlar
-        const halo = new THREE.Sprite(haloMaterial(mats, sp.color));
-        halo.position.copy(sp.pos).addScaledVector(facing, 0.02);
-        // bölünmüş büyük parça (neon kılavuz): küçük ve çok sayıda hale; paylaşılan kılavuzun pozisyon işlevi sönük
-        const hs = sp.split ? Math.min(HALO_MAX[cat], Math.max(0.13, sp.size * 2.2)) : Math.min(HALO_MAX[cat], Math.max(0.16, sp.size * 2.4));
-        halo.scale.setScalar(sp.weak ? hs * 0.55 : hs);
-        halo.visible = false;
-        halo.renderOrder = 10;
-        group.add(halo);
-        glows.push({ sprite: halo, fn: sp.fn });
-        // 2) zemine düşen ışık: lamba başına renk + işlev için bir tane
-        const key = `${sp.fn}|${sp.color.getHexString()}`;
-        if (pooled.has(key) || !POOL[cat] || sp.weak) continue; // sönük pozisyon zemine ışık düşürmez
-        pooled.add(key);
-        // lastik kolun yüzleri farklı yönlere bakar: beyaz öne, kırmızı arkaya, turuncu yana
-        let dir = facing.clone();
-        if (cat === 'arm') dir = sp.color.r > 0.9 && sp.color.g > 0.9 ? V(-1, 0, 0) : sp.color.g < 0.2 ? V(1, 0, 0) : V(0, 0, Math.sign(sp.pos.z) || 1);
-        const flat = V(dir.x, 0, dir.z);
-        if (cat !== 'beacon' && flat.lengthSq() < 1e-4) flat.set(1, 0, 0);
-        flat.normalize();
-        const [len, wid] = POOL[cat]!;
-        const pool = new THREE.Mesh(POOL_GEO, poolMaterial(sp.color, cat));
-        const hgt = Math.max(0, sp.pos.y);
-        // lamba yükseldikçe ışık zeminde uzağa düşer ve yayılır
-        const reach = cat === 'beacon' ? 0 : cat === 'work' ? 3.2 : len * 0.42 + hgt * 0.35;
-        pool.position.set(sp.pos.x + flat.x * reach, 0.013, sp.pos.z + flat.z * reach);
-        pool.scale.set(len * (1 + hgt * 0.15), wid * (1 + hgt * 0.1), 1);
-        pool.rotation.set(-Math.PI / 2, 0, cat === 'beacon' ? 0 : Math.atan2(-flat.z, flat.x));
-        pool.visible = false;
-        pool.renderOrder = 9;
-        pool.userData.noEdge = true;
-        group.add(pool);
-        glows.push({ sprite: pool, fn: sp.fn });
-      }
-    }
   };
   const lampWidth = (id: string, obj?: THREE.Object3D) => {
     if (obj && !obj.userData.placeholder) {
@@ -833,8 +726,6 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     }
   }
 
-  makeGlows();
-
   // =========================== HATLARI ÇİZ ===========================
   for (const w of wires) {
     const pts = rounded(follow(w.pts));
@@ -905,11 +796,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     harness.add(b, g);
   }
 
-  const lights: LampLightAnchors = {
-    rear: rearLamps.map((r) => V(rx + 0.25, ly, r.s * r.z)),
-    work: lampsByCat.work.map((o) => ({ pos: o.position.clone(), dir: V(0, 0, 1).applyQuaternion(o.quaternion).normalize() })),
-  };
-  return { group, glows, harness, lampsByCat, lights, placeholders, plate: { pos: platePos, light: plateLight } };
+  return { group, harness, lampsByCat, placeholders, plate: { pos: platePos, light: plateLight } };
 }
 
 let sealMat: THREE.MeshStandardMaterial | null = null;

@@ -16,8 +16,7 @@ const REAR_W_MAX = 0.451; // en geniş arka lamba (LZD 2856)
 const FOG_TOP = -0.012; // LZD 3194 sis kanalı (yerel y −0,040…−0,012) ve kanal kalınlığı ±0,002
 const FOG_BOT = -0.042;
 const REV_TOP = 0.062; // geri vites pencereleri (yerel y 0,050 ± 0,012)
-const MARKER_L = 0.11; // yan marker boyu / yüksekliği (yer tutucu PH_SIZE)
-const MARKER_H = 0.045;
+const MARKER_H = 0.045; // yan marker yüksekliği (yer tutucu PH_SIZE)
 const FRONT_W = 0.11; // ön pozisyon genişliği / yüksekliği
 const FRONT_H = 0.045;
 

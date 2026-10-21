@@ -3,21 +3,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { CategoryId, Config, TrailerId } from '../data';
 import { createMaterials, fadeTexture, type Mats } from './materials';
 import { buildTrailer, disposeGroup, modelUrls, setGhost, type Anchors, type TrailerBuild } from './trailer';
 import { loadedModel, loadModel } from './models';
 import { buildEquipment, disposeEquipment, lampIds, setHarnessHighlight, type EquipmentBuild } from './equipment';
-import { fnGroup, lampFailed, lampReady, lampUrl, loadLamp, needsAnimation, setLampState, tickLamps, type FnToggle } from './lampfx';
+import { lampFailed, lampReady, lampUrl, loadLamp, needsAnimation, setLampState, tickLamps, type FnToggle } from './lampfx';
 import { setPlateLight } from './plateLight';
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
 /** Arayüz düğmeleri dışında motorun kendi kullandığı kamera pozları */
 type Pose = View | 'arm' | 'beacon' | 'system' | 'extra';
-/** lamba yüklemesi bitince setConfig'i tekrarlamak için */
-const LAMP_RETRY = Symbol('lampRetry');
 
 export interface EngineOptions {
   theme: Theme;
@@ -30,8 +27,6 @@ export interface EngineOptions {
 // ---------- ortam ışığı (IBL) ----------
 // Dış dosya yok: küçük bir "ortam sahnesi" (gökyüzü/zemin gradyanı + yumuşak ışık panelleri) bir kez PMREM'e
 // çizilir. Metal (alüminyum, krom), lens ve boya yansımaları buradan gelir; yanında tek yönlü ışık (güneş/ay) gölge verir.
-/** Yanan lambaların gövdeye ve zemine düşen ışığı (nokta/spot ışık). Kullanıcı isteğiyle kapalı (2026-10-20): yanıltmasın. */
-const LAMP_SPILL = false;
 /** Işıklar modunda bloom: eşik HDR parlaklık (yalnız yanan ışık parçaları aşar), şiddet ve yayılım */
 const BLOOM = { threshold: 1.05, strength: 0.8, radius: 0.36 };
 /**
@@ -350,14 +345,8 @@ export class Engine {
     this.sun.shadow.normalBias = 0.02;
     this.sun.shadow.radius = this.low ? 2.5 : 4;
     this.scene.add(this.sun, this.sun.target);
-    // yanan lambaların gövdeye ve zemine düşen gerçek ışığı: sayı sabit (gölgesiz), yalnız şiddet ve konum değişir
-    for (let i = 0; i < 2; i++) {
-      const p = new THREE.PointLight('#ff2010', 0, 3.2, 1.6);
-      this.rearLights.push(p);
-      const s = new THREE.SpotLight('#f1f5ff', 0, 14, 0.62, 0.65, 1.3);
-      this.workLights.push(s);
-      this.scene.add(p, s, s.target);
-    }
+    // yanan lambaların gövdeye ve zemine düşen ışığı yok (kullanıcı 2026-10-20: yanıltmasın). Şiddeti 0 olan ışıklar da her
+    // malzemenin gölgelendiricisinde döngü maliyeti yaratıyordu; ışıma yalnız bloom ile
     this.applyLook();
     this.resize();
   }
@@ -378,6 +367,8 @@ export class Engine {
   // ---------- yapılandırma ----------
   /** modeli indirilmeyi bekleyen son istek (gelince uygulanır; arada gelen yeni istek bunun yerine geçer) */
   private pending: Config | null = null;
+  /** lamba modelleri yüklenince ekipmanı yeniden kuran son isteğin sırası (eski istekler yok sayılır) */
+  private lampRetry = 0;
 
   setConfig(c: Config, keepView = false) {
     if (this.disposed || !this.mats) return;
@@ -432,10 +423,9 @@ export class Engine {
     // yalnız modeli VAR olup henüz yüklenmemiş lambalar için (modeli olmayan ürünler yer tutucuyla kalır; döngü yok)
     const missing = lampIds(c).filter((id) => lampUrl(id) && !lampReady(id) && !lampFailed(id));
     if (this.equip.placeholders > 0 && missing.length) {
-      const ids = missing;
-      const token = ((this as unknown as Record<symbol, number>)[LAMP_RETRY] = ((this as unknown as Record<symbol, number>)[LAMP_RETRY] ?? 0) + 1);
-      Promise.all(ids.map(loadLamp)).then(() => {
-        if (this.disposed || this.cfg !== c || (this as unknown as Record<symbol, number>)[LAMP_RETRY] !== token) return;
+      const token = ++this.lampRetry;
+      Promise.all(missing.map(loadLamp)).then(() => {
+        if (this.disposed || this.cfg !== c || this.lampRetry !== token) return;
         this.setConfig(c, true);
       });
     }
@@ -603,48 +593,7 @@ export class Engine {
   private applyLights() {
     if (!this.mats) return;
     setLampState(this.lights, this.fns);
-    this.syncGlows();
   }
-  private syncGlows() {
-    this.syncLampLights();
-    for (const g of this.equip?.glows ?? []) {
-      g.sprite.visible = this.lights && this.fns.includes(fnGroup(g.fn)) && (fnGroup(g.fn) !== 'turn' || this.blinkOn) && (fnGroup(g.fn) !== 'beacon' || this.flashOn);
-    }
-  }
-  private rearLights: THREE.PointLight[] = [];
-  private workLights: THREE.SpotLight[] = [];
-  /** gerçek ışıkları ekipmanın lamba konumlarına taşır ve yanan işlevlere göre açar (LAMP_SPILL kapalıyken hep 0) */
-  private syncLampLights() {
-    const L = this.equip?.lights;
-    const on = (f: FnToggle) => LAMP_SPILL && this.lights && this.fns.includes(f);
-    const red = on('stop') ? 4.2 : on('position') ? 1.4 : 0;
-    this.rearLights.forEach((p, i) => {
-      // görünürlük değişmez (ışık sayısı değişirse tüm gölgelendiriciler yeniden derlenir): kapalıyken şiddet 0
-      const at = L?.rear.find((v) => (i === 0 ? v.z > 0 : v.z < 0));
-      if (at) p.position.copy(at);
-      p.intensity = at ? red : 0;
-    });
-    this.workLights.forEach((s, i) => {
-      const w = L?.work[i];
-      if (!w) {
-        s.intensity = 0;
-        return;
-      }
-      s.position.copy(w.pos).addScaledVector(w.dir, 0.06);
-      // çalışma lambası dorsenin arkasındaki yükleme alanını aydınlatır: ışık zemine, ~3 m geriye düşer
-      const flat = new THREE.Vector3(w.dir.x, 0, w.dir.z);
-      if (flat.lengthSq() < 1e-4) flat.set(1, 0, 0);
-      flat.normalize();
-      s.target.position.set(w.pos.x + flat.x * 3.2, 0, w.pos.z + flat.z * 3.2);
-      s.target.updateMatrixWorld();
-      s.angle = 0.75;
-      s.distance = 16;
-      s.intensity = on('work') ? 115 : 0;
-    });
-  }
-  private blinkOn = true;
-  private flashOn = true;
-
   setTheme(t: Theme) {
     this.theme = t;
     this.applyLook();
@@ -695,7 +644,6 @@ export class Engine {
   }
 
   private fitShadow(a: Anchors) {
-    const cx = -a.L / 2;
     this.placeSun();
     // temas gölgesi: dorse izdüşümünün kenarında yumuşak geçiş (0,3 m içeriden 0,6 m dışarıya)
     const mi = 0.3;
@@ -731,12 +679,8 @@ export class Engine {
     this.raf = 0;
     let busy = false;
     if (needsAnimation()) {
-      const s = now / 1000;
-      this.blinkOn = (s * 1.5) % 1 < 0.55;
-      const f = (s * 2.1) % 1;
-      this.flashOn = f < 0.18 || (f > 0.3 && f < 0.42);
-      tickLamps(s);
-      this.syncGlows();
+      // sinyal ~1,5 Hz, tepe lambası 2,1 Hz flaş: faz lampfx'te, burada yalnız sürekli çizim
+      tickLamps(now / 1000);
       busy = true;
     }
     if (this.tween) {
@@ -802,7 +746,6 @@ export class Engine {
   }
   // ---------- ışıklar modu: parlama (bloom) ----------
   private composer: EffectComposer | null = null;
-  private bloom: UnrealBloomPass | null = null;
   private bloomLoading = false;
   /** İlk kez ışıklar açılınca yüklenir (gündüz görünümünde ek paket ve çizim maliyeti yok) */
   private async ensureBloom() {
@@ -836,7 +779,6 @@ export class Engine {
     c.addPass(b);
     c.addPass(new OutputPass());
     this.composer = c;
-    this.bloom = b;
     this.resize();
     this.invalidate();
   }
@@ -937,7 +879,7 @@ export class Engine {
     this.canvas.style.cursor = this.pick(e) ? 'pointer' : 'grab';
   };
 
-  /** Geliştirme/test: anlık görüntü (PNG data URL) */
+  /** Geliştirme/test: anlık görüntü (JPEG data URL) */
   snapshot(): string {
     this.controls.update();
     this.draw();

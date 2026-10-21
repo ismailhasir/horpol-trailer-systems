@@ -8,7 +8,6 @@ import { loadedModel, loadModel } from './models';
 export type LampFn = 'position' | 'stop' | 'turn' | 'reverse' | 'fog' | 'marker' | 'front' | 'outline' | 'plate' | 'work' | 'beacon';
 /** Kullanıcının açıp kapatabildiği işlevler (pozisyon grubu: position + marker + front + outline + plate birlikte) */
 export type FnToggle = 'position' | 'stop' | 'turn' | 'reverse' | 'fog' | 'work' | 'beacon';
-export const FN_TOGGLES: FnToggle[] = ['position', 'stop', 'turn', 'reverse', 'fog', 'work', 'beacon'];
 const GROUP: Record<LampFn, FnToggle> = {
   position: 'position',
   marker: 'position',
@@ -67,8 +66,6 @@ const LENS_GAIN: Record<string, number> = { cad: 0.25 };
 const registered = new WeakSet<THREE.Object3D>();
 // yanan ışık rengi: gerçek LED tayfına yakın (kırmızı ~625 nm biraz turuncuya, turuncu ~590 nm, soğuk beyaz)
 const GLOW: Record<string, string> = { red: '#ff3a18', amber: '#ff9010', white: '#eef3ff' };
-/** paylaşılan kılavuzda tam güç işlevler: yalnız pozisyon/kontur yanıyorsa kılavuz sönük */
-const STRONG = new Set<LampFn>(['stop', 'turn', 'reverse', 'fog', 'work', 'beacon']);
 
 /** Yüklenmiş lamba modelinin klonu (malzemeler paylaşılır); yüklenmemişse null */
 export function lampInstance(id: string): THREE.Object3D | null {
@@ -202,54 +199,6 @@ export function onLampChange(fn: () => void) {
   return () => listeners.delete(fn);
 }
 
-/**
- * Bir lamba nesnesinin yanan (EMIT) parçaları: parlama sprite'ları için konum, boyut, renk ve işlev.
- * Büyük ışık parçaları (neon kılavuz, sinyal kaması) 6 cm'lik ızgara hücrelerine bölünür: tek büyük hale lambayı kaplamasın.
- * split: bölünmüş parça; weak: paylaşılan kılavuzun zayıf (pozisyon) işlevi.
- */
-export function emitterSpots(root: THREE.Object3D) {
-  root.updateMatrixWorld(true);
-  const out: { pos: THREE.Vector3; size: number; color: THREE.Color; fn: LampFn; split: boolean; weak: boolean }[] = [];
-  const CELL = 0.06;
-  root.traverse((o) => {
-    const mm = o as THREE.Mesh;
-    if (!mm.isMesh || !o.name.startsWith('EMIT')) return;
-    const m = (Array.isArray(mm.material) ? mm.material[0] : mm.material) as THREE.Material;
-    const p = m.name.split('.');
-    if (p[0] !== 'E') return;
-    const fns = p[1].split('+') as LampFn[];
-    const color = new THREE.Color(GLOW[p[2]] ?? '#fff');
-    mm.geometry.computeBoundingBox();
-    const bb = mm.geometry.boundingBox!.clone().applyMatrix4(mm.matrixWorld);
-    const size = bb.getSize(new THREE.Vector3());
-    const spots: { pos: THREE.Vector3; size: number }[] = [];
-    if (Math.max(size.x, size.y, size.z) <= CELL * 1.6) {
-      spots.push({ pos: bb.getCenter(new THREE.Vector3()), size: Math.max(size.x, size.y, size.z) });
-    } else {
-      // en büyük iki eksende ızgara; her dolu hücre bir hale
-      const ax = (['x', 'y', 'z'] as const).slice().sort((a, b) => size[b] - size[a]).slice(0, 2);
-      const pa = mm.geometry.attributes.position;
-      const v = new THREE.Vector3();
-      const cells = new Map<string, THREE.Box3>();
-      for (let i = 0; i < pa.count; i++) {
-        v.fromBufferAttribute(pa, i).applyMatrix4(mm.matrixWorld);
-        const key = `${Math.floor((v[ax[0]] - bb.min[ax[0]]) / CELL)}|${Math.floor((v[ax[1]] - bb.min[ax[1]]) / CELL)}`;
-        let b = cells.get(key);
-        if (!b) cells.set(key, (b = new THREE.Box3()));
-        b.expandByPoint(v);
-      }
-      for (const b of cells.values()) {
-        const s = b.getSize(new THREE.Vector3());
-        spots.push({ pos: b.getCenter(new THREE.Vector3()), size: Math.max(s.x, s.y, s.z) });
-      }
-    }
-    for (const sp of spots) {
-      for (const fn of fns) out.push({ ...sp, pos: sp.pos.clone(), color, fn, split: spots.length > 1, weak: fns.length > 1 && !STRONG.has(fn) });
-    }
-  });
-  return out;
-}
-export const fnGroup = (fn: LampFn) => GROUP[fn];
 export function fnLit(fn: LampFn) {
   return isOn(fn);
 }
