@@ -978,8 +978,7 @@ def build_ld2773_cad(L):
 #   "⌴", altta aynası; frende kanalların arasındaki 5-7-9-7-5 LED retronun ardından parlar.
 # CAD ekseni (mm): lens +x, genişlik y (turuncu uç −y), yukarı z. Arka montaj yüzü x −50 (gövdenin büyük arka düzlemi).
 # Yerel (site sözleşmesi, LZD 3194 ile aynı): X = CAD y, Y = CAD z, Z = CAD x + 50 (arka montaj yüzü z = 0, lens +Z).
-# Lastik kol: lambanın gövdesine monteli (kullanıcı kuralı, Revizeler/Standart Dorse md. 14). STEP'te adaptör yok: dış uca
-# sade bir adaptör levhası (biçimi doğrulanmadı); MOUNT_arm levhanın dış yüzünde.
+# Lastik kol: lambaya değil tampona monte (kullanıcı 2026-10-21, Revizeler/Standart Dorse md. 14): adaptör ve MOUNT_arm yok.
 # =====================================================================
 LZD2854_M = Matrix(((0, 1, 0, 0), (-1, 0, 0, -0.050), (0, 0, 1, 0), (0, 0, 0, 1)))
 LZD2854_H, LZD2854_C = 54.8, 18.5  # pencere yarı yüksekliği ve köşe pahı (ön çerçevenin x 20,5 kesiti)
@@ -1154,18 +1153,7 @@ def build_lzd2854_cad(L):
                        for a in range(12)])
     _obj('brake_led', bmd, E('stop', 'red'), L.E('stop'), 0.0)
 
-    # ===== 6) lastik kol adaptörü: dış uç yüzüne (yerel x −224,6, çerçevenin dış kenarı) civatalı siyah levha; kol plakası dış
-    # yüzüne oturur. STEP'te adaptör yok ve LZD 3194'ün kancalı adaptörü bu düz uca oturmuyor: biçim ve ölçü DOĞRULANMADI
-    # (kol plakasını taşıyacak kadar: 80 × 58 mm, 16 mm kalın). Kol plakası merkezi z 20 (LZD 3194 ile aynı yükseklik/derinlik)
-    XA0, XA1 = -224.6, -240.6
-    L.bracket = Group('BRACKET')
-    box(L.bracket, 'arm_adapter', XA1 / 1000, XA0 / 1000, -0.040, 0.040, 0.004, 0.062, mat('Housing'), 0.0015)
-    for yy in (-0.026, 0.026):
-        cyl(L.bracket, 'adapter_bolt', 0.0042, (XA1 / 1000, yy, 0.044), ((XA1 - 2.2) / 1000, yy, 0.044), mat('Zinc'), 6)
-    mnt = bpy.data.objects.new('MOUNT_arm', None)
-    mnt.location = bl((XA1 / 1000, 0.0, 0.020))
-    scene.collection.objects.link(mnt)
-    L.empties = [mnt]
+    # lastik kol lambaya takılmaz: tampona (stop taşıyıcı plakasının dış kenarı) monte (kullanıcı 2026-10-21, revize md. 14)
     # kablo: arkadaki rakordan 6 × 0,5 kablo (sitede tesisat sürer)
     tube(L.body, 'cable', [(0.0, 0.0, -0.004), (0.0, 0.0, -0.020), (0.0, -0.010, -0.034)], 0.0040, mat('Cable'), 3, smooth=True)
 
@@ -1315,3 +1303,80 @@ def build_lzd2448_cad(L):
 @product('lzd2452', 'LZD 2452', 'stop', 'LUNA sol (sağ: LZD 2453, ayna), HOR 96B: pozisyon, sis, geri vites — üretici CAD + fotoğraflar')
 def build_lzd2452_cad(L):
     return _luna(L, '2452')
+
+
+# =====================================================================
+# LDO 2660 — tepe (uyarı) lambası, HOR 110A, vidalı montaj, turuncu flaş 2,1 Hz, 24 LED, 14 W. Kaynaklar: üretici STEP
+# "LDO 2660", ürün paketi (Downloads/LDO-2660.zip: föy, teknik çizim, 4 fotoğraf, video).
+# STEP'te: siyah taban (p000), turuncu kubbe (p001; alt bandın iç yüzünde dikey Fresnel kaburgalar), yan tırnak (p002), alt
+# montaj levhası Ø160 (p003), conta halkası Ø141 (p004). LED modülü YOK: fotoğraflardan (foto 1 sönük, foto 3 yanık):
+#   alt bant (y 43…66) Fresnel'in ardında turuncu reflektör; y 66'da LED tablası; y 68…86 arasında 12 dışa bakan reflektör kap
+#   (üst kenarları fotoğraftaki dalgalı / taraklı çizgi), her kapta 2 LED (24); üstte krom kapak. Yanınca kap halkası en
+#   parlak bant (foto 3), alt bant ve kubbe turuncuyla aydınlanır.
+# CAD ekseni (mm): y yukarı (montaj levhasının altı y −2,5), lamba ekseni y. Yerel: three (x, y + 2,5, z); taban y = 0.
+# =====================================================================
+LDO_M = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0.0025), (0, 0, 0, 1)))
+
+
+def _radial_cup(group, ang, r_in, r_out, y, mouth, back, gains, fn, color, tint, rough, seg=20):
+    """Dışa (yatay, ang yönünde) bakan LED kabı: r_in'de dip, r_out'ta ağız; içi önden görülür, bantlar halinde ışır"""
+    c, s = math.cos(ang), math.sin(ang)
+    n = len(gains)
+    for i, g in enumerate(gains):
+        t0, t1 = i / n, (i + 1) / n
+        ra, rb = r_in + (r_out - r_in) * t0, r_in + (r_out - r_in) * t1
+        wa, wb = back + (mouth - back) * t0, back + (mouth - back) * t1
+        ob = cyl(group, 'cup', wa / 1000, (ra * c / 1000, y / 1000, ra * s / 1000), (rb * c / 1000, y / 1000, rb * s / 1000),
+                 _refl_tint(fn, color, g, tint, rough), seg, r2=wb / 1000, caps=False)
+        bm_ = bmesh.new()
+        bm_.from_mesh(ob.data)
+        bmesh.ops.reverse_faces(bm_, faces=bm_.faces[:])
+        bm_.to_mesh(ob.data)
+        bm_.free()
+
+
+@product('ldo2660', 'LDO 2660', 'beacon', 'Tepe lambası HOR 110A, turuncu flaş, 24 LED, vidalı — üretici CAD + fotoğraflar')
+def build_ldo2660_cad(L):
+    cad = os.path.join(CAD_ROOT, 'ldo2660')
+    if not os.path.exists(os.path.join(cad, 'p001.stl')):
+        print('CAD YOK, eski el modeli:', cad)
+        return build_ldo2660(L)
+    mY = lambda y: y / 1000
+    # ===== 1) CAD: taban, tırnak, levha, conta (dış yüzler), kubbe (iki yüz: iç Fresnel kaburgaları görünsün) =====
+    parts = _cad_parts(cad, LDO_M, ['p000', 'p002', 'p003', 'p004'], angle=0.5)
+    ext = _assembly_exterior(parts)
+    _plate_parts(L, parts, ext, {'p000': ([mat('Housing')], L.body, 6000), 'p002': ([mat('Housing')], L.body, 400),
+                                 'p003': ([mat('Housing')], L.body, 2500), 'p004': ([mat('Rubber')], L.body, 2500)}, 'ldo')
+    # kubbe: yalnız dış kabuk (iki kat turuncu kubbeyi opaklaştırıyordu; iç Fresnel kaburgaları malzemenin dikey kaburga
+    # dokusundan)
+    raw = _stl(os.path.join(cad, 'p001.stl'), LDO_M)
+    _simplify(raw, 0.3)
+    # dış kabuk: normali eksenin (yerel y 40'taki nokta) dışına bakan yüzler; içe bakan iç kabuk atılır (ışın testi açık
+    # tabandan kaçtığı için iç kabuğu da dış sayıyordu)
+    o = Vector((0.0, 0.0, 0.040))  # Blender (x, −z, y): yerel (0, 40 mm, 0)
+    dome = _subset(raw, lambda f: f.normal.dot(f.calc_center_median() - o) > 0.0)
+    raw.free()
+    ob = _mesh_obj('ldo_dome', dome, [mat('Dome.amber')], L.lens, 40, decimate=None if FAST else 9000)
+    set_uv_cyl(ob, 0.025)
+
+    # ===== 2) iç: alt bant reflektörü, LED tablası, 12 kap × 2 LED, merkez kolon, üst krom kapak =====
+    tint, rough = '#d39040', 0.3
+    # alt bant: Fresnel'in ardında turuncu reflektör (yanınca LED ışığıyla aydınlanır)
+    lathe(L.E('beacon'), 'band', mp([(51.2, 44.0), (51.2, 66.5)]), _glow('beacon', 'amber', '#c8741e', 0.45), 72, axis='y')
+    lathe(L.inner, 'floor', mp([(0.01, 44.5), (51.0, 44.5)]), mat('HousingGloss'), 48, axis='y')
+    lathe(L.inner, 'tray', mp([(0.01, 66.5), (50.6, 66.5), (50.6, 68.0), (0.01, 68.0)]), mat('HousingGloss'), 72, axis='y')
+    # kap halkası: 12 dışa bakan kap (ağız Ø25, ağızları dalgalı üst kenarı verir), her kapta 2 LED
+    YC, R0, R1 = 77.0, 36.5, 49.5
+    for i in range(12):
+        a = math.radians(15 + 30 * i)
+        _radial_cup(L.E('beacon'), a, R0, R1, YC, 12.8, 3.6, (0.95, 0.70, 0.48), 'beacon', 'amber', tint, rough)
+        c, s = math.cos(a), math.sin(a)
+        for dy in (-2.4, 2.4):
+            cyl(L.E('beacon'), 'led', 0.0022, ((R0 - 0.4) * c / 1000, mY(YC + dy), (R0 - 0.4) * s / 1000),
+                ((R0 + 0.6) * c / 1000, mY(YC + dy), (R0 + 0.6) * s / 1000), E('beacon', 'amber'), 12)
+    lathe(L.inner, 'column', mp([(0.01, 68.0), (36.4, 68.0), (36.4, 86.0), (0.01, 86.0)]), mat('HousingGloss'), 48, axis='y')
+    # üst kapak: hafif konik krom (yukarıdan bakınca kubbenin içinde parlak), kenarı kapların üstünü örter
+    lathe(L.E('beacon'), 'cap', mp([(0.01, 90.5), (30.0, 89.5), (49.0, 86.8), (49.0, 86.0), (0.01, 86.0)]),
+          _refl_tint('beacon', 'amber', 0.30, '#cfd3d8', 0.2), 72, axis='y')
+    # kablo: alt levhanın ortasından (sitede tesisat sürer)
+    tube(L.body, 'cable', [(0.0, 0.001, 0.0), (0.0, -0.010, 0.0), (0.0, -0.022, 0.006)], 0.0030, mat('Cable'), 3, smooth=True)

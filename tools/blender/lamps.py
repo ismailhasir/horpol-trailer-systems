@@ -838,7 +838,7 @@ def render_views(pid, objs, folder, views, size=900, lit_fns=None, fmt='PNG'):
         dist = r / math.tan(cam.data.angle / 2) * 1.08
         cam.location = c + dv * dist
         cam.rotation_euler = (c - cam.location).to_track_quat('-Z', 'Y').to_euler()
-        set_emission(objs, lit, 11.0 if fmt == 'WEBP' else 6.0, lit_fns)
+        set_emission(objs, lit, (11.0 if fmt == 'WEBP' else 6.0) * ICON_BOOST.get(pid, 1.0), lit_fns)
         night(lit)
         scene.render.image_settings.file_format = fmt
         if fmt == 'WEBP':
@@ -859,6 +859,8 @@ ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan i
     'work': ('work',),
     'beacon': ('beacon',),
 }
+# yanık simgede ürüne özel şiddet çarpanı (tepe lambası: ışık kaplardan yansır, turuncu kılavuz çubuklarından zayıf kalıyordu)
+ICON_BOOST = {'ldo2660': 1.8}
 ICON_LIT_P = {'lzd2452': ('position', 'fog', 'reverse')}  # kategorinin imzası ürüne uymuyorsa (LUNA 2452: sis + geri vites)
 ICON_DIR_VEC = {'arm': (0.55, 0.25, 0.8), 'beacon': (0.45, 0.45, 1.0), 'plate': (-0.35, 0.55, 1.0)}
 
