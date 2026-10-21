@@ -7,6 +7,8 @@ export interface SummaryRow {
   label: string;
   value: string;
   mono?: boolean;
+  /** soldan sağa yazılan değer (kod, "15 pin"): Arapça sayfada yönü yalıtılır, sırası bozulmaz */
+  ltr?: boolean;
 }
 
 /** setQty: aynı siparişten kaç set istendiği (1 ise satır eklenmez) */
@@ -14,7 +16,7 @@ export function summaryRows(c: Config, t: CUi, lang: Lang, setQty = 1): SummaryR
   const nf = new Intl.NumberFormat(numberLocale(lang), { minimumFractionDigits: c.length === '13.6' ? 2 : 0 });
   const rows: SummaryRow[] = [
     { label: t.sum_trailer, value: trailerName(t, c.trailer) },
-    { label: t.sum_socket, value: socketName(t, c.socket) },
+    { label: t.sum_socket, value: socketName(t, c.socket), ltr: true },
     { label: t.sum_length, value: `${nf.format(Number(c.length))} ${t.length_unit}` },
   ];
   const frame = rulesFor(c.trailer).plateFrame;

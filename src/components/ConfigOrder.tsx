@@ -85,7 +85,7 @@ export default function ConfigOrder({ open, onClose, cfg, qty, t, ui, lang }: Pr
                   {rows.map((r) => (
                     <div>
                       <dt>{r.label}</dt>
-                      <dd class={r.mono ? 'mono ltr' : ''}>{r.value}</dd>
+                      <dd class={r.mono ? 'mono' : ''}>{r.mono || r.ltr ? <span class="ltr">{r.value}</span> : r.value}</dd>
                     </div>
                   ))}
                 </dl>

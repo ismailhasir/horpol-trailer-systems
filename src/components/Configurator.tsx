@@ -464,7 +464,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             <span class="cc-sep" aria-hidden="true" />
             <span class="cc-item">
               <small>{t.socket_label}</small>
-              <b>{socketName(t, cfg.socket)}</b>
+              <b class="ltr">{socketName(t, cfg.socket)}</b>
             </span>
             <span class="cc-sep" aria-hidden="true" />
             <span class="cc-item">
@@ -533,7 +533,7 @@ export default function Configurator({ lang, t, ui }: Props) {
           <div class="cfg-seg" role="radiogroup" aria-label={t.socket_label}>
             {SOCKETS.map((s) => (
               <button type="button" role="radio" aria-checked={cfg.socket === s} onClick={() => update((c) => ({ ...c, socket: s }))}>
-                {socketName(t, s)}
+                <span class="ltr">{socketName(t, s)}</span>
               </button>
             ))}
           </div>
@@ -655,7 +655,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             {rows.map((r) => (
               <div>
                 <dt>{r.label}</dt>
-                <dd class={r.mono ? 'mono' : ''}>{r.value}</dd>
+                <dd class={r.mono ? 'mono' : ''}>{r.mono || r.ltr ? <span class="ltr">{r.value}</span> : r.value}</dd>
               </div>
             ))}
           </dl>
