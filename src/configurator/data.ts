@@ -88,9 +88,9 @@ export const CATEGORIES: CategoryDef[] = [
     color: '#e0322d',
     products: [
       // tavanlar ürün ailesinden: LZD 2854 büyük kombine (tek çift), Luna (2448, 2452) her yanda 4, CUBE (2875, 2876) her
-      // yanda 2. LZD 2854'ün sağ eşinin kodu bilinmiyor (doğrulanmadı), yazılmadı.
+      // yanda 2. LZD 2854'ün sağ eşi LZD 2855 (ürün sayfası: "Side right").
       { id: 'lzd3194', code: 'LZD 3194/AMP', codeR: 'LZD 3195/AMP', max: 2 },
-      { id: 'lzd2854', code: 'LZD 2854', max: 2 },
+      { id: 'lzd2854', code: 'LZD 2854', codeR: 'LZD 2855', max: 2 },
       { id: 'lzd2448', code: 'LZD 2448', max: 8 },
       { id: 'lzd2452', code: 'LZD 2452', max: 8 },
       { id: 'lzd2875', code: 'LZD 2875/GRAPHITE', max: 4 },

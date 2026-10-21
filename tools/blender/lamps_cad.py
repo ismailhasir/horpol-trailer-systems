@@ -236,16 +236,33 @@ def _refl(fn, color, gain):
     return MATS[key]
 
 
-def _cup_bands(group, x, y, z, r_front, r_back, depth, gains, fn, color):
+def _refl_tint(fn, color, gain, tint, rough):
+    """Renkli lensin ardındaki krom kap: yansıması lens renginde (metal taban rengi) ve saten (rough). Cilalı beyaz krom
+    renkli lensin ardında ayı / ay ışığını beyaz yansıtıp ışığın rengine karışıyordu (LZD 2854). Ad: E.<işlev>.<renk>.g<yüzde>.t"""
+    key = f'E.{fn}.{color}.g{int(round(gain * 100))}.t'
+    if key not in MATS:
+        m = _refl(fn, color, gain).copy()
+        m.name = key
+        p = m.node_tree.nodes['Principled BSDF']
+        p.inputs['Base Color'].default_value = srgb(tint)
+        p.inputs['Roughness'].default_value = rough
+        m['fn'] = fn
+        m['gain'] = gain
+        MATS[key] = m
+    return MATS[key]
+
+
+def _cup_bands(group, x, y, z, r_front, r_back, depth, gains, fn, color, tint=None, rough=0.3):
     """İçi önden görünen krom LED kabı, dipten ağza bantlara bölünmüş: her bant kendi oranında ışır (LED'e yakın dip parlak,
-    ağız sönük; yansıyan ışığın düşüşü). Normaller içe: sitede tek yüzlü çizim, dış yüz arkada kalır"""
+    ağız sönük; yansıyan ışığın düşüşü). Normaller içe: sitede tek yüzlü çizim, dış yüz arkada kalır. tint: lens renginde krom"""
     n = len(gains)
     for i, g in enumerate(gains):
         z0 = z - depth + depth * i / n
         z1 = z - depth + depth * (i + 1) / n
         r0 = r_back + (r_front - r_back) * i / n
         r1 = r_back + (r_front - r_back) * (i + 1) / n
-        ob = cyl(group, 'cup', r0, (x, y, z0), (x, y, z1), _refl(fn, color, g), 28, r2=r1, caps=False)
+        mt = _refl_tint(fn, color, g, tint, rough) if tint else _refl(fn, color, g)
+        ob = cyl(group, 'cup', r0, (x, y, z0), (x, y, z1), mt, 28, r2=r1, caps=False)
         bm_ = bmesh.new()
         bm_.from_mesh(ob.data)
         bmesh.ops.reverse_faces(bm_, faces=bm_.faces[:])
@@ -814,3 +831,327 @@ def build_rtr3366_cad(L):
     L.empties = [mnt]
     # kablo: alt kenarın ortasından aşağı (çizim), arka yüze yakın
     tube(L.body, 'cable', [(0.0, -0.0790, 0.0045), (0.0, -0.1000, 0.0045), (0.0, -0.1150, 0.0020)], 0.0030, mat('Cable'), 3, smooth=True)
+
+
+# =====================================================================
+# Tutuculu marker LD 2774 (turuncu yan) / LD 2773 (beyaz ön) — HOR 123. Üretici STEP "LD 2773, 2774, 2775" (tek geometri,
+# lens rengi değişir) + ürün paketleri (Downloads/LD-2774.zip, LD-2773.zip: 12 fotoğraf, teknik çizim).
+# STEP'te: tutucu (p000, L biçim: arka dikey plaka + üstte geriye flanş, kaburga), lamba taban halkası (p001), iç taban (p002),
+# lens (p003: dış kabuk, ön yüzde kabartma yazılar, İÇ YÜZDE GERÇEK altıgen retro prizmalar ~2,5 mm, neon çubuğun oturduğu cep),
+# 2 × M5 saplama (p004, p005). Neon ışık kılavuzu YOK: fotoğraflara göre cebin tavanını izleyen süt beyazı kılavuz.
+# Yanınca (foto 2, 3): çubuk parlak, lensin dış kenar halkası ışık iletir (parlak halka), retro alanı hafif aydınlanır.
+# CAD ekseni (mm): x genişlik, y yukarı, z dışa (lens yönü); tutucu plakanın arka yüzü z = 0, plaka merkezi y −0,56.
+# Site sözleşmesi (lamps_small.py ile aynı): plaka arka yüzü z = 0, lens +Z, Y yukarı, orijin plakanın sınır kutusu merkezi.
+# =====================================================================
+LD277X_M = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0.00056), (0, 0, 0, 1)))
+LD277X_LAMP = (0.0, -15.2)  # lamba (stadyum) merkezi, CAD mm
+LD277X_R, LD277X_A = 23.07, 36.85  # stadyum yarıçapı ve düz kısmın yarı uzunluğu (lens dış hattı 119,8 × 46,1)
+
+
+def _stadium_sd(x, y, cx=0.0, cy=0.0, a=LD277X_A, r=LD277X_R):
+    """Stadyum dış hattına işaretli uzaklık (mm; içeride negatif)"""
+    dx = max(abs(x - cx) - a, 0.0)
+    return math.hypot(dx, y - cy) - r
+
+
+def _retro_cad(fn, color, gain):
+    """CAD'deki gerçek retro prizma yüzleri: opak renkli, kaplamalı (prizma yüzleri ışığı geometriden yansıtır; normal doku yok,
+    STL'de UV yok). Lensin iç yüzü önden arkasından görülür: çift yüzlü. Yanınca LED ışığıyla gain oranında aydınlanır."""
+    key = f'E.{fn}.{color}.g{int(round(gain * 100))}'
+    if key not in MATS:
+        m = mat(f'Retro.{color}').copy()
+        m.name = key
+        nt = m.node_tree
+        for n in [n for n in nt.nodes if n.type in ('NORMAL_MAP', 'TEX_IMAGE')]:
+            nt.nodes.remove(n)
+        p = nt.nodes['Principled BSDF']
+        p.inputs['Emission Color'].default_value = (*GLOW[color], 1.0)
+        p.inputs['Emission Strength'].default_value = 0.0
+        m.use_backface_culling = False
+        m['fn'] = fn
+        m['gain'] = gain
+        MATS[key] = m
+    return MATS[key]
+
+
+def _ld277x_cad(L, fn, color):
+    cad = os.path.join(CAD_ROOT, 'ld277x')
+    if not os.path.exists(os.path.join(cad, 'p003.stl')):
+        print('CAD YOK, eski el modeli:', cad)
+        return _s_ld2774_like(L, color)
+    lens_col = 'amber' if color == 'amber' else 'clear'
+    cx, cy = LD277X_LAMP
+    # --- opak parçalar: dışarıdan görünen yüzler (lens ışını kesmez: arkasındaki taban ve halka görünür kalır) ---
+    parts = {nm: _stl(os.path.join(cad, nm + '.stl'), False) for nm in ('p000', 'p001', 'p002', 'p004', 'p005')}
+    for b in parts.values():
+        _simplify(b, 0.5)
+    ext = _assembly_exterior(parts)
+    spec = {'p000': ([mat('Housing')], L.body, 4000), 'p001': ([mat('Housing')], L.body, 1800), 'p002': ([mat('Housing')], L.inner, 1200),
+            'p004': ([mat('Zinc')], L.body, 160), 'p005': ([mat('Zinc')], L.body, 160)}
+    for nm, b in parts.items():
+        mats_, grp, dec = spec[nm]
+        sb = _subset(b, lambda f: ext[nm][f.index])
+        b.free()
+        _mesh_obj(f'ld277x_{nm}', _xf(sb, LD277X_M), mats_, grp, 35, decimate=None if FAST else dec)
+
+    # --- lens: yüz yüz sınıflandırma (CAD mm) ---
+    lens = _stl(os.path.join(cad, 'p003.stl'), False)
+    # lens zarfının dışındaki artıklar (sınır kutusu z 35,3'e uzanıyor; lens ön yüzü 23,4'te biter)
+    lens.faces.ensure_lookup_table()
+    stray = [f for f in lens.faces if f.calc_center_median().z * 1000 > 24.0]
+    print('LD277X lens stray faces z>24:', len(stray))
+    if stray:
+        bmesh.ops.delete(lens, geom=stray, context='FACES')
+    bar = lambda x, y: abs(x - cx) <= 52.6 and -22.4 <= y <= -8.0
+    pocket, retro, rim, clear = [], [], [], []
+    lens.faces.index_update()
+    for f in lens.faces:
+        c = f.calc_center_median() * 1000
+        n = f.normal
+        sd = _stadium_sd(c.x, c.y, cx, cy)
+        if bar(c.x, c.y) and abs(c.x - cx) <= 50.6 and -21.8 <= c.y <= -9.4 and n.z < -0.3 and 19.2 < c.z < 21.4:
+            pocket.append(f.index)  # cebin tavanı: neon kılavuz bunu izler
+            f.material_index = 0
+        elif not bar(c.x, c.y) and sd < -2.6 and 17.7 < c.z < 19.7 and n.z < 0.97:
+            f.material_index = 1  # iç yüzdeki retro prizmalar
+            retro.append(f)
+        elif sd > -3.2 and c.z > 13.6 and n.z < 0.97 and (n.x * (c.x - cx) + n.y * (c.y - cy)) > 0.0:
+            f.material_index = 2  # dış kenar halkası ve yuvarlatılmış kenar: ışık iletir
+            rim.append(f)
+        else:
+            f.material_index = 0
+    print(f'LD277X lens faces: pocket {len(pocket)} retro {len(retro)} rim {len(rim)} total {len(lens.faces)}')
+    # neon kılavuz: cebin tavanının 0,3 mm altında, ışık veren ince levha + kenarlarında 2,4 mm'lik süt beyazı duvar
+    pk = set(pocket)
+    neon = _subset(lens, lambda f: f.index in pk)
+    # düzlemsel yüzler birleşir (sınıflar ayrı kalır): prizma yüzleri zaten düz, yazılar ve ön yüz sadeleşir
+    _simplify(lens, 0.5)
+    _move(neon, (0, 0, -0.0003))
+    edges = [e for e in neon.edges if e.is_boundary]
+    ext_ = bmesh.ops.extrude_edge_only(neon, edges=edges)
+    _move_v = [v for v in ext_['geom'] if isinstance(v, bmesh.types.BMVert)]
+    bmesh.ops.translate(neon, vec=Vector((0, 0, -0.0024)), verts=_move_v)
+    bmesh.ops.recalc_face_normals(neon, faces=neon.faces)
+    _mesh_obj('neon', _xf(neon, LD277X_M), [_emat(fn, color, OFF[color], 'cad')], L.E(fn), 40, decimate=None if FAST else 900)
+    _mesh_obj('ld277x_lens', _xf(lens, LD277X_M),
+              [_lmat(lens_col), _retro_cad(fn, color, 0.16), _glow(fn, color, '#e6832a' if color == 'amber' else '#e9edf2', 0.55)],
+              L.lens, 40, decimate=None if FAST else 9000)
+    # tabanın ortasındaki kablo deliği: arkasında kablo rakoru (CAD'de yok; delikten arka plan görünüyordu)
+    yl = (cy + 0.56) / 1000
+    cyl(L.inner, 'grommet', 0.0098, (0.0, yl, 0.0028), (0.0, yl, 0.0102), mat('Rubber'), 24)
+    # kablo: lambanın arkasından tutucunun orta deliğine, oradan rayın / dikmenin içine (sitede tesisat sürer)
+    tube(L.body, 'cable', [(0.0, yl, 0.0035), (0.0, yl, -0.004), (0.0, yl - 0.004, -0.016)], 0.0028, mat('Cable'), 3, smooth=True)
+
+
+@product('ld2774', 'LD 2774', 'side', 'Turuncu yan marker (HOR 123), neon çubuk, retro reflektör, L tutucu — üretici CAD')
+def build_ld2774_cad(L):
+    _ld277x_cad(L, 'marker', 'amber')
+
+
+@product('ld2773', 'LD 2773', 'front', 'Beyaz ön pozisyon (HOR 123), neon çubuk, retro reflektör, L tutucu — üretici CAD')
+def build_ld2773_cad(L):
+    _ld277x_cad(L, 'front', 'white')
+
+
+# =====================================================================
+# LZD 2854 HEAVY DUTY (sol; sağ: LZD 2855, ayna) — HOR 129. Kaynaklar: üretici STEP "LZD 2854 - LZD 2857 - HOR 129",
+# ürün paketi (Downloads/LZD-2854.zip: föy, teknik çizim, 13 fotoğraf), ürün sayfası (horpolautomotive.com).
+# Föy: pozisyon 4 W, fren 10 W, sinyal 5,5 W, geri vites 4 W, sis 5,5 W, reflektör; 139 LED; DEĞİŞTİRİLEBİLİR LED modülleri.
+# STEP'te: arka gövde (p000, modül yuvaları), ön çerçeve (p001, 4 pencere), 8 çerçeve vidası, 2 × M8 saplama + pul + somun,
+# kablo rakoru (p18). Modüller (lens + LED) YOK: pencereler CAD çerçevesinden, modül içleri ürün fotoğraflarından.
+#   Dıştan içe (lambanın geniş/dış ucu yerel −X): turuncu SİNYAL | büyük kırmızı (POZİSYON ışık kılavuzları + FREN LED'leri +
+#   retro reflektör) | beyaz GERİ VİTES | kırmızı SİS. Küçük modüllerde 3-4-3-4-3-4-3 dizili 24 LED (yuvarlak optik).
+#   Büyük modül (foto 5-2 sönük, 13 pozisyon, 12 fren): bütün alan retro prizma, içinden 4 düz kanal (kılavuz): üstte iki iç içe
+#   "⌴", altta aynası; frende kanalların arasındaki 5-7-9-7-5 LED retronun ardından parlar.
+# CAD ekseni (mm): lens +x, genişlik y (turuncu uç −y), yukarı z. Arka montaj yüzü x −50 (gövdenin büyük arka düzlemi).
+# Yerel (site sözleşmesi, LZD 3194 ile aynı): X = CAD y, Y = CAD z, Z = CAD x + 50 (arka montaj yüzü z = 0, lens +Z).
+# Lastik kol: lambanın gövdesine monteli (kullanıcı kuralı, Revizeler/Standart Dorse md. 14). STEP'te adaptör yok: dış uca
+# sade bir adaptör levhası (biçimi doğrulanmadı); MOUNT_arm levhanın dış yüzünde.
+# =====================================================================
+LZD2854_M = Matrix(((0, 1, 0, 0), (-1, 0, 0, -0.050), (0, 0, 1, 0), (0, 0, 0, 1)))
+LZD2854_H, LZD2854_C = 54.8, 18.5  # pencere yarı yüksekliği ve köşe pahı (ön çerçevenin x 20,5 kesiti)
+LZD2854_WIN = {'turn': (-198.3, -130.7), 'big': (-114.3, 30.3), 'reverse': (46.7, 114.3), 'fog': (130.7, 198.3)}
+
+
+def _oct(x0, x1, h=LZD2854_H, c=LZD2854_C, grow=0.0):
+    x0, x1, h, c = x0 - grow, x1 + grow, h + grow, c + grow * 0.414
+    return [(x0 + c, -h), (x1 - c, -h), (x1, -h + c), (x1, h - c), (x1 - c, h), (x0 + c, h), (x0, h - c), (x0, -h + c)]
+
+
+def _band(pts, w):
+    """Çoklu çizgiden w genişliğinde şerit çokgeni (köşelerde açıortay birleşim)"""
+    n = len(pts)
+    L_, R_ = [], []
+    for i in range(n):
+        ds = []
+        for a, b in ((i - 1, i), (i, i + 1)):
+            if 0 <= a and b < n:
+                dx, dy = pts[b][0] - pts[a][0], pts[b][1] - pts[a][1]
+                ln = math.hypot(dx, dy)
+                ds.append((dx / ln, dy / ln))
+        tx, ty = sum(d[0] for d in ds), sum(d[1] for d in ds)
+        ln = math.hypot(tx, ty)
+        tx, ty = tx / ln, ty / ln
+        nx, ny = -ty, tx
+        k = 1.0 / max(0.3, (nx * -ds[0][1] + ny * ds[0][0]))  # açıortayda kalınlık korunur
+        L_.append((pts[i][0] + nx * w / 2 * k, pts[i][1] + ny * w / 2 * k))
+        R_.append((pts[i][0] - nx * w / 2 * k, pts[i][1] - ny * w / 2 * k))
+    return L_ + list(reversed(R_))
+
+
+@product('lzd2854', 'LZD 2854', 'stop', 'HEAVY DUTY sol (sağ: LZD 2855, ayna), HOR 129, 139 LED — üretici CAD + ürün fotoğrafları')
+def build_lzd2854_cad(L):
+    cad = os.path.join(CAD_ROOT, 'lzd2854')
+    if not os.path.exists(os.path.join(cad, 'p001.stl')):
+        print('CAD YOK (LZD 2854 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    m_ = lambda pts: [(x / 1000, y / 1000) for x, y in pts]
+
+    # ===== 1) CAD: gövde, çerçeve, vidalar, saplamalar; dışarıdan görünen yüzler =====
+    # p16/17: arka yüzdeki iki kare modül kapağı (gövdenin arka açıklıklarını kapatır; tampon arkasından bakınca görünür)
+    names = [f'p{i:03d}' for i in range(19)]
+    parts = _cad_parts(cad, LZD2854_M, names, angle=0.5)
+    ext = _assembly_exterior(parts)
+    steel, zinc = mat('Stainless'), mat('Zinc')
+    spec = {'p000': ([mat('Housing')], L.body, 26000), 'p001': ([mat('Housing')], L.body, 9000), 'p018': ([mat('Rubber')], L.body, 300)}
+    for i in range(2, 10):
+        spec[f'p{i:03d}'] = ([steel], L.body, 220)
+    for i in range(10, 16):
+        spec[f'p{i:03d}'] = ([zinc], L.body, 260)
+    for i in (16, 17):
+        spec[f'p{i:03d}'] = ([mat('HousingGloss')], L.body, 700)
+    _plate_parts(L, parts, ext, spec, 'lzd2854')
+
+    # ===== 2) fotoğraf → lamba: 8 çerçeve vidası (aynı düzlemde: düzlemsel eşleme; foto 5-2 neredeyse dik çekim) =====
+    photo = [(76.9, 457.3), (408.2, 445.5), (1022.8, 445.2), (1678.5, 453.2), (75.2, 867.4), (405.7, 878.4), (1022.4, 876.9), (1679.3, 866.1)]
+    lamp = [(-209.56, 53.56), (-122.5, 56.0), (38.5, 56.0), (209.56, 53.55), (-209.56, -53.56), (-122.5, -56.0), (38.5, -56.0), (209.56, -53.55)]
+    Hm = _homography(photo, lamp)
+    def ph(pts):
+        out = []
+        for u, v in pts:
+            w = Hm @ np.array([u, v, 1.0])
+            out.append((float(w[0] / w[2]), float(w[1] / w[2])))
+        return out
+    err = max(math.dist(p, q) for p, q in zip(ph(photo), lamp))
+    print(f'LZD2854 homography max err {err:.2f} mm')
+
+    # ===== 3) lensler (modül önleri): çerçeve penceresinin 1,5 mm dışına (kenarı çerçevenin ardında), z 65…67,5 =====
+    ZL0, ZL1 = 65.0, 67.5
+    lens_col = {'turn': 'amber', 'big': 'red', 'reverse': 'clear', 'fog': 'red'}
+    for key, (x0, x1) in LZD2854_WIN.items():
+        ob = prism(L.lens, 'lens_' + key, m_(_oct(x0, x1, grow=1.5)), ZL0 / 1000, ZL1 / 1000, _lmat(lens_col[key]), 0.0)
+        set_uv_planar(ob, 0.013)  # lensin ince kare deseni ~1,6 mm (foto 5-2; doku döşemede 8 hücre)
+
+    # ===== 4) küçük modüller: 24 LED, yuvarlak optik (krom kap, yanınca LED'in ışığıyla bantlar halinde parlar) =====
+    # Kap dipten ağza üç bantta ışır (LZD 3194 geri vites kaplarıyla aynı yaklaşım): yanınca bütün daire aydınlanır, ortadaki LED
+    # optiği en parlak (foto 8, 12); sönükken kaplar renkli lensin ardında krom (foto 5-2). Oranlar föy güçlerini izler: sinyal ve
+    # sis 5,5 W, geri vites 4 W (fren 10 W: büyük modül en baskın).
+    fn_col = {'turn': ('turn', 'amber'), 'reverse': ('reverse', 'white'), 'fog': ('fog', 'red')}
+    rows = [(44.7, (-18.1, 0.0, 18.1)), (29.8, (-27.15, -9.05, 9.05, 27.15)), (14.9, (-18.1, 0.0, 18.1)), (0.0, (-27.15, -9.05, 9.05, 27.15)),
+            (-14.9, (-18.1, 0.0, 18.1)), (-29.8, (-27.15, -9.05, 9.05, 27.15)), (-44.7, (-18.1, 0.0, 18.1))]
+    ZF = 57.0  # modül tabanı
+    for key, (fn, col) in fn_col.items():
+        x0, x1 = LZD2854_WIN[key]
+        cx = (x0 + x1) / 2
+        prism(L.inner, 'mod_floor_' + key, m_(_oct(x0, x1, grow=1.0)), (ZF - 1.0) / 1000, ZF / 1000, mat('HousingGloss'), 0.0)
+        gains = (0.50, 0.38, 0.27) if col == 'white' else (0.62, 0.46, 0.32)
+        # kap yansıması lensin renginde (turuncu / kırmızı lensin ardında beyaz yansıma olmaz), geri viteste koyu satenli krom
+        tint = {'amber': '#c98a3c', 'red': '#9c3a34', 'white': '#a9aeb4'}[col]
+        # LED'in önündeki küçük optik kubbe: sönükken fosfor sarısı (beyaz) / lens renginin açığı, yanınca tam şiddet
+        core = _emat(fn, col, {'amber': '#f2a548', 'white': '#e9d98f', 'red': '#c83a30'}[col], 'core')
+        for yy, xs in rows:
+            for xx in xs:
+                x, y = (cx + xx) / 1000, yy / 1000
+                _cup_bands(L.E(fn), x, y, 63.8 / 1000, 0.0058, 0.0022, (63.8 - ZF - 0.4) / 1000, gains, fn, col, tint, 0.3)
+                box(L.E(fn), 'led', x - 0.0013, x + 0.0013, y - 0.0013, y + 0.0013, (ZF + 0.1) / 1000, (ZF + 0.9) / 1000, E(fn, col))
+                cyl(L.E(fn), 'optic_core', 0.0021, (x, y, 63.2 / 1000), (x, y, 63.6 / 1000), core, 16)
+
+    # ===== 5) büyük modül: retro prizma levha, 4 ışık kılavuzu kanalı (pozisyon), fren LED'leri =====
+    bx0, bx1 = LZD2854_WIN['big']
+    bc = (bx0 + bx1) / 2
+    # kılavuz orta çizgileri (foto 5-2, üst yarı ölçüldü; alt yarı ve sol-sağ simetrik): B1 üst kenardan, B2 yan kenardan iner
+    B1 = ph([(505, 470), (575, 535), (855, 535), (910, 470)])
+    B2 = ph([(446, 522), (560, 607), (870, 607), (982, 522)])
+    def sym(poly):
+        # orta çizgiye göre simetrik: sol yarının ve sağ yarının aynalı ortalaması (ölçüm gürültüsü)
+        n = len(poly)
+        out = []
+        for i in range(n):
+            a, b = poly[i], poly[n - 1 - i]
+            dx = ((a[0] - bc) - (b[0] - bc)) / 2
+            out.append((bc + dx, (a[1] + b[1]) / 2))
+        return out
+    B1, B2 = sym(B1), sym(B2)
+    # uçlar pencere kenarının 3 mm ötesine uzatılır (çerçevenin ardında biter)
+    def extend(poly, d=4.0):
+        p = list(poly)
+        for i, j in ((0, 1), (-1, -2)):
+            dx, dy = p[i][0] - p[j][0], p[i][1] - p[j][1]
+            ln = math.hypot(dx, dy)
+            p[i] = (p[i][0] + dx / ln * d, p[i][1] + dy / ln * d)
+        return p
+    B1, B2 = extend(B1), extend(B2)
+    guides = [B1, B2, [(x, -y) for x, y in B2], [(x, -y) for x, y in B1]]
+    print('LZD2854 B1', [(round(x, 1), round(y, 1)) for x, y in B1])
+    print('LZD2854 B2', [(round(x, 1), round(y, 1)) for x, y in B2])
+    ZR = 63.6  # retro prizmaların ön yüzü (lensin 1,4 mm gerisi)
+    win_big = _oct(bx0, bx1, grow=0.5)
+    chans = [_band(g, 5.2) for g in guides]
+    # fren LED'leri: 5-7-9-7-5, kılavuzların arasında (foto 12), yatay aralık 15,5 mm
+    yB1, yB2 = B1[1][1], B2[1][1]
+    rows_b = [((LZD2854_H + yB1) / 2, 5), ((yB1 + yB2) / 2, 7), (0.0, 9), (-(yB1 + yB2) / 2, 7), (-(LZD2854_H + yB1) / 2, 5)]
+    print('LZD2854 brake rows', [(round(y, 1), n) for y, n in rows_b])
+    bleds = [(bc + (k - (n - 1) / 2) * 15.5, yy) for yy, n in rows_b for k in range(n)]
+    # Fren ışığı prizmaların kendisinden: LED retronun ardında, ışığı prizma hücrelerinden geçer (foto 12: her LED parlak bir
+    # prizma kümesi, çevresi kademeli sönen kırmızı). LED'e uzaklığa göre dört bant; şiddet × oran: iki yakın bant bloom eşiğinin
+    # üstünde (ışır), dış bantlar altında (kırmızı dolgu). Sönükken hepsi aynı retro: desen kesintisiz (önceki düz LED/hale
+    # diskleri sönükken leke gibi görünüyordu). Föy: fren 10 W, geri vites 4 W: fren bölmesi baskın (kullanıcı: fren zayıftı).
+    # Hücre ~2,2 mm (fotoğrafta ~1,5 mm; üçgen bütçesi için biraz iri)
+    dmin = lambda x, y: min(math.hypot(x * 1000 - a, y * 1000 - b) for a, b in bleds)
+    for lo, hi, g in ((0.0, 3.2, 0.95), (3.2, 6.2, 0.64), (6.2, 9.5, 0.42), (9.5, 1e9, 0.27)):
+        _s_hex_retro(L.inner, 'big_retro', m_(win_big), [m_(c) for c in chans], ZR / 1000, 0.0022, 0.0008, _retro_cad('stop', 'red', g),
+                     keep=lambda x, y, lo=lo, hi=hi: lo <= dmin(x, y) < hi)
+    prism(L.inner, 'big_floor', m_(_oct(bx0, bx1, grow=1.0)), (ZF - 1.0) / 1000, ZF / 1000, mat('ReflectorRed'), 0.0)
+    # kılavuz: kanal tabanında ışık veren şerit (sönükken koyu kırmızı, düz; foto 5-2'de prizmasız koyu bant)
+    # kılavuz şeridi pozisyon şiddetinin %85'inde (bloom eşiğinin üstü, foto 13'te parlak çizgi); içindeki LED'ler ~9 mm aralıkla tam şiddette nokta (kılavuz boyunca
+    # parlak noktalar)
+    gmat = _glow('position', 'red', '#6e1612', 0.85)
+    dots = bmesh.new()
+    for i, g in enumerate(guides):
+        prism(L.E('position'), f'guide{i}', m_(_band(g, 4.0)), (ZR - 2.6) / 1000, (ZR - 0.6) / 1000, gmat, 0.0004)
+        prism(L.inner, f'chan{i}', m_(_band(g, 5.4)), (ZR - 3.0) / 1000, (ZR - 2.6) / 1000, mat('HousingGloss'), 0.0)
+        for (ax, ay), (bx_, by_) in zip(g, g[1:]):
+            ln = math.hypot(bx_ - ax, by_ - ay)
+            for k in range(int(ln // 9.0) + 1):
+                t = (k + 0.5) * 9.0 / ln
+                if t > 1:
+                    break
+                px, py = ax + (bx_ - ax) * t, ay + (by_ - ay) * t
+                if not _inside(_oct(bx0, bx1, grow=-1.5), px, py):
+                    continue
+                ring_ = [dots.verts.new(bl(((px + 1.3 * math.cos(a * math.pi / 6)) / 1000, (py + 1.3 * math.sin(a * math.pi / 6)) / 1000, (ZR - 0.5) / 1000)))
+                         for a in range(12)]
+                dots.faces.new(ring_)
+    print('LZD2854 guide dots', len(dots.faces), 'brake LED', len(bleds))  # kılavuz noktaları görsel (ışık çıkış izleri; föyün 139 LED'inin dağılımı doğrulanmadı)
+    _obj('guide_leds', dots, _emat('position', 'red', '#7a1a16', 'hdled'), L.E('position'), 0.0)  # sönükken kılavuz renginde (fotoğrafta görünmez)
+    # LED'in kendisi: retronun ardında (prizmaların arasından seçilir; sönükken görünmez)
+    bmd = bmesh.new()
+    for xx, yy in bleds:
+        bmd.faces.new([bmd.verts.new(bl(((xx + 1.6 * math.cos(a * math.pi / 6)) / 1000, (yy + 1.6 * math.sin(a * math.pi / 6)) / 1000, (ZR - 1.2) / 1000)))
+                       for a in range(12)])
+    _obj('brake_led', bmd, E('stop', 'red'), L.E('stop'), 0.0)
+
+    # ===== 6) lastik kol adaptörü: dış uç yüzüne (yerel x −224,6, çerçevenin dış kenarı) civatalı siyah levha; kol plakası dış
+    # yüzüne oturur. STEP'te adaptör yok ve LZD 3194'ün kancalı adaptörü bu düz uca oturmuyor: biçim ve ölçü DOĞRULANMADI
+    # (kol plakasını taşıyacak kadar: 80 × 58 mm, 16 mm kalın). Kol plakası merkezi z 20 (LZD 3194 ile aynı yükseklik/derinlik)
+    XA0, XA1 = -224.6, -240.6
+    L.bracket = Group('BRACKET')
+    box(L.bracket, 'arm_adapter', XA1 / 1000, XA0 / 1000, -0.040, 0.040, 0.004, 0.062, mat('Housing'), 0.0015)
+    for yy in (-0.026, 0.026):
+        cyl(L.bracket, 'adapter_bolt', 0.0042, (XA1 / 1000, yy, 0.044), ((XA1 - 2.2) / 1000, yy, 0.044), mat('Zinc'), 6)
+    mnt = bpy.data.objects.new('MOUNT_arm', None)
+    mnt.location = bl((XA1 / 1000, 0.0, 0.020))
+    scene.collection.objects.link(mnt)
+    L.empties = [mnt]
+    # kablo: arkadaki rakordan 6 × 0,5 kablo (sitede tesisat sürer)
+    tube(L.body, 'cable', [(0.0, 0.0, -0.004), (0.0, 0.0, -0.020), (0.0, -0.010, -0.034)], 0.0040, mat('Cable'), 3, smooth=True)

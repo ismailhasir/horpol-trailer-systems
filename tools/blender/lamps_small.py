@@ -420,6 +420,125 @@ def build_ld0127(L):
 
 
 # ---------------------------------------------------------------------
+# LD 500 (turuncu yan, 3 LED) / LD 499 (beyaz ön, 1 LED) — lamba HOR 55/SM1 + L tutucu. STEP YOK: ölçüler ürün paketindeki
+# çizimden (Downloads/LD-500.zip, LD-499.zip: "picture-1" ölçülü görünüşler, HOR 55/SM1 onay çizimi), biçim fotoğraflardan.
+#   Lamba: lens 98 × 31 (köşe R4), tutucu plakasının önünden 11 mm; ortada 21 × 17,5 LED penceresi (merkezden 1,8 mm yukarıda,
+#   üstünde "TOP" yazısı); 2 vida ±36,8 mm, Ø5 baş lensin önündeki havşada. Retro bal peteği (~2 mm) pencere ve vidalar dışında.
+#   Pencere: LD 500'de dört çeyrekte Fresnel halka grupları, LD 499'da ortada eş merkezli halkalar (fotoğraf).
+#   Tutucu: lambanın 19 mm üstüne çıkan yamuk plaka (altta 80, üstte 66 mm), üstte geriye ~16 mm flanş, 2 × Ø4,4 delik 50 mm
+#   aralık, flanşın altında kaburga. Toplam yükseklik 50 mm (orijin plakanın ortası; lamba merkezi y −9,5 mm).
+#   LD 500'ün 3 LED'inin pencere içindeki yeri çizimde yok (doğrulanmadı): üçgen dizildi.
+# ---------------------------------------------------------------------
+def _s_hex_retro(group, name, region, holes, z, cell, depth, material, keep=None):
+    """Gerçek köşe küp (cube-corner) retro reflektör yüzeyi: altıgen hücreler, her biri ortası depth kadar çökük 3 eğik yüz
+    (normal dokusu bu boyutta okunmuyordu; LD 2774'ün CAD lensindeki prizmalarla aynı yaklaşım). region içinde, holes dışında
+    kalan hücreler (merkezine göre); kenarlar fotoğraftaki gibi zikzak. Yüz +Z'ye bakar. keep(x, y): yalnız bu hücreler
+    (aynı ızgara birkaç malzemeye bölünür; ör. LED'e uzaklığa göre parlaklık bantları)."""
+    bm = bmesh.new()
+    a = cell / 2  # altıgenin köşe yarıçapı (sivri uç yanlarda)
+    dx, dy = 1.5 * a, math.sqrt(3) * a
+    xs, ys = [p[0] for p in region], [p[1] for p in region]
+    i = 0
+    x = min(xs)
+    while x <= max(xs):
+        y = min(ys) + (dy / 2 if i % 2 else 0.0)
+        while y <= max(ys):
+            ok = _inside(region, x, y) and not any(_inside(h, x, y) for h in holes) and (keep is None or keep(x, y))
+            if ok:
+                rim = [bm.verts.new(bl((x + a * math.cos(math.pi / 3 * k), y + a * math.sin(math.pi / 3 * k), z))) for k in range(6)]
+                c = bm.verts.new(bl((x, y, z - depth)))
+                for k in (0, 2, 4):
+                    bm.faces.new([c, rim[k], rim[k + 1], rim[(k + 2) % 6]])
+            y += dy
+        x += dx
+        i += 1
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=a * 0.02)
+    for f in bm.faces:
+        if f.normal.dot(Vector((0, -1, 0))) < 0:  # three +Z = Blender −Y
+            f.normal_flip()
+    return _obj(name, bm, material, group, 0.0, 3, 20)
+
+
+def _s_ld500_like(L, color):
+    fn, emit_col, lens_key, retro_key = ('marker', 'amber', 'Lens.amber', 'Retro.amber') if color == 'amber' else ('front', 'white', 'Lens.clear', 'Retro.white')
+    H = 0.050
+    LW, LH = 0.098, 0.031
+    yl = -H / 2 + LH / 2
+    t = T_PLATE
+    fd = 0.016 - t
+    # tutucu plakası: lambanın ardında 80 mm (R4 alt köşe), lambanın üst kenarından 66 mm'lik tepeye yamuk
+    wb, wt, rb = 0.080, 0.066, 0.004
+    yk = yl + LH / 2
+    outline = _s_arc(wb / 2 - rb, -H / 2 + rb, rb, -90, 0, 5) + [(wb / 2, yk), (wt / 2, H / 2), (-wt / 2, H / 2), (-wb / 2, yk)] + \
+        _s_arc(-wb / 2 + rb, -H / 2 + rb, rb, 180, 270, 5)
+    sx = 0.0368
+    holes = [(0.0, yl, 0.0045)] + [(s * sx, yl, 0.0018) for s in (-1, 1)]
+    zb = _s_holder(L, H, outline, wt, fd, (-0.028, 0.028), 0.014, holes, [(-0.025, -fd / 2, 0.0022, 0.0), (0.025, -fd / 2, 0.0022, 0.0)])
+    zf = zb + 0.011  # lens ön yüzü
+    # gövde: lensin ardında ince siyah taban (üstten görünüşte 2,5 mm)
+    _s_dome(L.body, 'housing', rrect(0.0955, 0.0290, 0.0032, 4, 0.0, yl), zb - 0.0002, zb + 0.0025, 0.0006, mat('Housing'), 2)
+    # lens: tek parça saydam blok, kenarı yuvarlak; vida havşaları açık
+    lens = _s_dome(L.lens, 'lens', rrect(LW, LH, 0.004, 5, 0.0, yl), zb + 0.0015, zf, 0.0026, mat(lens_key), 4, cap0=False)
+    _s_cut(lens, [_s_cutter(circle(0.0047, 24, s * sx, yl), zf - 0.0032, zf + 0.01, 'z') for s in (-1, 1)])
+    set_uv_planar(lens, 0.006)
+    # LED penceresi (lens içinde, retro yok)
+    wy = yl + 0.0018
+    ww, wh = 0.0215, 0.0175
+    # retro: tek levha, lensin yuvarlak kenarına kadar (fotoğraf; lensin ardı boş kalınca kenar soluk görünüyordu); pencere ve
+    # vida yuvaları kesik (parçalı levha dikiş izi bırakıyordu). Bal peteği hücresi ~2,2 mm (doku: döşemede 4 hücre)
+    zr1 = zb + 0.0080
+    region = rrect(0.0948, 0.0280, 0.0030, 4, 0.0, yl)
+    holes = [rrect(ww + 0.0016, wh + 0.0016, 0.0030, 3, 0.0, wy)] + [circle(0.0052, 20, s * sx, yl) for s in (-1, 1)]
+    _s_hex_retro(L.inner, 'retro', region, holes, zr1, 0.0022, 0.0008, _retro_cad(fn, emit_col, 0.12))
+    # prizmaların ardı: lens renginde koyu taban (aralardan arka plan görünmesin)
+    prism(L.inner, 'retro_back', region, zb + 0.0026, zb + 0.0030, _s_refl(emit_col), 0.0)
+    # vidalar: havşada Ø5 yıldız başlı (çinko), pul; gövde arka plakaya
+    for s in (-1, 1):
+        x = s * sx
+        cyl(L.body, 'washer', 0.0034, (x, yl, zf - 0.0032), (x, yl, zf - 0.0026), mat('Zinc'), 20)
+        cyl(L.body, 'screw_head', 0.0025, (x, yl, zf - 0.0026), (x, yl, zf - 0.0012), mat('Zinc'), 20)
+        for a in (0, math.pi / 2):
+            ca, sa = math.cos(a) * 0.0019, math.sin(a) * 0.0019
+            prism(L.body, 'slot', [(x - ca - sa * 0.15, yl - sa + ca * 0.15), (x + ca - sa * 0.15, yl + sa + ca * 0.15),
+                                   (x + ca + sa * 0.15, yl + sa - ca * 0.15), (x - ca + sa * 0.15, yl - sa - ca * 0.15)],
+                  zf - 0.0012, zf - 0.0011, mat('HousingGloss'), 0.0)
+        cyl(L.body, 'screw', 0.0017, (x, yl, zf - 0.0032), (x, yl, -0.004), mat('Zinc'), 10)
+    # pencere bölmesi: beyaz reflektör zemin ve duvarlar, ışık veren difüzör, LED'ler, iç yüzde Fresnel halkaları
+    prism(L.inner, 'bay_floor', rrect(ww, wh, 0.0025, 3, 0.0, wy), zb + 0.0025, zb + 0.0031, mat('Reflector'), 0.0)
+    frame(L.inner, 'bay_wall', rrect(ww + 0.0012, wh + 0.0012, 0.003, 3, 0.0, wy), rrect(ww, wh, 0.0025, 3, 0.0, wy), zb + 0.0025, zb + 0.0084,
+          mat('Reflector'), 0.0)
+    prism(L.E(fn), 'diffuser', rrect(ww - 0.0010, wh - 0.0010, 0.002, 3, 0.0, wy), zb + 0.0031, zb + 0.0036, E(fn, emit_col), 0.0)
+    if color == 'amber':
+        leds = [(-0.0045, wy - 0.0030), (0.0045, wy - 0.0030), (0.0, wy + 0.0042)]
+        rings = [((s1 * 0.0050, wy + s2 * 0.0042), (0.0012, 0.0022, 0.0032)) for s1 in (-1, 1) for s2 in (-1, 1)]
+    else:
+        leds = [(0.0, wy)]
+        rings = [((0.0, wy), (0.0022, 0.0038, 0.0054, 0.0070))]
+    for x, y in leds:
+        led(L.E(fn), L.inner, 'led', x, y, zb + 0.0052, 0.0011, E(fn, emit_col), mat('Chrome'), 0.0030, 0.0016)
+    zw = zf - 0.0026  # pencerenin iç yüzü (lens kalınlığı)
+    for (cx_, cy_), rs in rings:
+        for r in rs:
+            o = [(x, y) for x, y in circle(r + 0.00035, 32, cx_, cy_)]
+            i = [(x, y) for x, y in circle(r - 0.00035, 32, cx_, cy_)]
+            # pencerenin dışına taşan halka parçaları kırpılmaz; pencere duvarı (beyaz) örter
+            frame(L.lens, 'fresnel', o, i, zw - 0.0007, zw, mat(lens_key), 0.0)
+    # kablo: plakanın orta deliğinden geriye (sitede tesisat sürer)
+    cyl(L.body, 'grommet', 0.0046, (0.0, yl, zb), (0.0, yl, -0.0025), mat('Rubber'), 20)
+    _s_tube(L.body, 'cable', [(0.0, yl, zb), (0.0, yl, -0.006), (0.0, yl - 0.004, -0.016)], 0.0025, mat('Cable'), 2, True, 4)
+
+
+@product('ld500', 'LD 500', 'side', 'Turuncu yan marker (HOR 55/SM1), 3 LED, retro reflektör, L tutucu — üretici çizimi')
+def build_ld500(L):
+    _s_ld500_like(L, 'amber')
+
+
+@product('ld499', 'LD 499', 'front', 'Beyaz ön pozisyon (HOR 55), 1 LED, retro reflektör, L tutucu — üretici çizimi')
+def build_ld499(L):
+    _s_ld500_like(L, 'white')
+
+
+# ---------------------------------------------------------------------
 # Plaka lambaları: XY kesitli (önden görünüş) gövdenin Z boyunca loft'u
 # ---------------------------------------------------------------------
 def _s_hood_profile(w, h, yb, a, b, n=8, p=2.0):

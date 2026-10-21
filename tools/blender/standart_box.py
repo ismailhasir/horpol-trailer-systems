@@ -94,9 +94,10 @@ PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y = CH_TOP - 0.035  # yan C rayın (y 1,155–1,225) ortası
 SIDE_X0, SIDE_X1, SIDE_N = XF + 0.8, -0.5, 10  # ilk/son marker (önden 0,8 / arkadan 0,5 m), yan başına en çok 10 (~1,38 m; revize md. 12)
 ARM_Y = Y_PANEL0 + 0.07  # lastik kollar: kasanın 4 ALT köşesi (kullanıcı isteği 2026-10-20), köşe dikmesinin yan yüzü
-# revize md. 9 (2026-10-21): ön ALT köşeler, öne bakar, yan marker seviyesine (y 1,19) olabildiğince yakın. LD 2773'ün tutucusu
-# merkezden 85 mm aşağı iner; alt ucu ön travers altına (NECK_BOT, köşeye kadar uzanır) denk gelir, altından taşmaz.
-FRONT_LAMP_Y = NECK_BOT + 0.085
+# revize md. 9 (2026-10-21): ön ALT köşeler, öne bakar, yan markerla aynı seviyede. LD 2773 (CAD) en alt noktası tutucu
+# merkezinin 37,6 mm altı; ön traversin (köşeye kadar uzanır) altını (NECK_BOT) geçmez. Tutucu plaka traversin ön yüzüne oturur.
+FRONT_LAMP_Y = max(CH_TOP - 0.035, NECK_BOT + 0.038)
+FRONT_LAMP_X = XF + 0.01  # ön traversin ön yüzü (box2 'front_cross')
 REAR_GAP = 0.0  # stop lambaları taşıyıcının dış ucuna dayalı (kullanıcı 2026-10-20: önceki 0,09 m boşluk geri alındı)
 POST_D = 0.13  # ön/arka köşe dikmesinin yan yüz derinliği
 WORK_Y, WORK_Z = Y_TOP - 0.07, 0.80  # arka başlık (y 3,88–4,02) ortası
@@ -114,7 +115,7 @@ def mounts_dict():
                   'plateW': PLATE_W, 'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y, 'z': RAIL_Z + 0.001, 'maxPerSide': SIDE_N,
                  'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None},
-        'front': {'x': XF, 'y': FRONT_LAMP_Y, 'z': W2 - 0.06, 'bracket': None},
+        'front': {'x': FRONT_LAMP_X, 'y': FRONT_LAMP_Y, 'z': W2 - 0.06, 'bracket': None},
         'armFront': {'x': XF + POST_D / 2, 'y': ARM_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRear': {'x': XR - POST_D / 2, 'y': ARM_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRearAlt': {'x': -0.14, 'y': LAMP_Y, 'z': CARRIER_Z, 'wallZ': CARRIER_Z, 'bracket': None},
@@ -128,7 +129,7 @@ def mounts_dict():
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
                     'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
         'notes': 'Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol, çalışma ve tepe lambaları kasaya bağlanır. '
-                 'Ön pozisyon ön köşe dikmesinin ön yüzünde, alt köşede (y 1,235; tutucu ön travers altına kadar). Lastik kollar köşe dikmelerinin '
+                 'Ön pozisyon ön traversin ön yüzünde, alt köşede, yan markerla aynı yükseklikte (y 1,19). Lastik kollar köşe dikmelerinin '
                  'yan yüzünde, kasanın alt köşelerinde (y 1,36). Yan markerlar şasinin '
                  'dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır '
                  '1,5 m). Çalışma lambaları arka başlığın arka yüzünde, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için '

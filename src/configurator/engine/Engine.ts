@@ -34,6 +34,15 @@ export interface EngineOptions {
 const LAMP_SPILL = false;
 /** Işıklar modunda bloom: eşik HDR parlaklık (yalnız yanan ışık parçaları aşar), şiddet ve yayılım */
 const BLOOM = { threshold: 1.05, strength: 0.8, radius: 0.36 };
+/**
+ * Küçük lambalar (yan marker, ön pozisyon: ~12 cm) genel görünümde 13 m'lik dorsenin yanında kayboluyordu (kullanıcı
+ * 2026-10-21). Kameradan uzaklığa göre büyütülür: near metreye kadar gerçek ölçü (yakın çekimde ölçüler doğru), far metrede
+ * ve ötesinde max katı (genel görünümde ürün seçilebilir); arası yumuşak geçiş. Sabit büyük model (WAS) yakından kaba
+ * görünüyordu. Ölçek montaj noktası çevresinde: yan marker tutucunun üst flanşından rayda asılı kalır, ön pozisyon alt
+ * kenarından büyür (şasinin altından taşmaz). Pivot her lambanın kendi sınır kutusundan (LD 2774 ile LD 500 tutucuları farklı).
+ */
+const MARKER_SCALE = { near: 3.5, far: 16, max: 2.3 };
+const MARKER_PIVOT: Partial<Record<CategoryId, 'top' | 'bottom'>> = { side: 'top', front: 'bottom' };
 
 type EnvKind = 'studioLight' | 'studioDark' | 'night';
 type RGB = [number, number, number];
@@ -737,8 +746,44 @@ export class Engine {
     if (busy || moved) this.invalidate();
   };
 
+  /** Küçük lambaları kameradan uzaklığa göre büyütür (MARKER_SCALE); her karede, çizimden önce */
+  private scaleMarkers() {
+    const e = this.equip;
+    if (!e) return;
+    const { near, far, max } = MARKER_SCALE;
+    const off = new THREE.Vector3();
+    for (const [cat, edge] of Object.entries(MARKER_PIVOT) as [CategoryId, 'top' | 'bottom'][]) {
+      for (const o of e.lampsByCat[cat]) {
+        const base = (o.userData.basePos ??= o.position.clone()) as THREE.Vector3;
+        // pivot: lambanın KENDİ ekseninde (ölçeksiz) sınır kutusunun üst / alt kenarı. Dünya kutusundan hesaplanınca lambanın
+        // atası (gövde / şasi grubu) kaydırılmış olduğunda pivot metrelerce sapıyor, lamba kasanın içine kaçıyordu.
+        if (!o.userData.pivot) {
+          const bb = new THREE.Box3();
+          o.updateWorldMatrix(true, true);
+          const inv = o.matrixWorld.clone().invert();
+          const m = new THREE.Matrix4();
+          o.traverse((c) => {
+            const g = (c as THREE.Mesh).geometry;
+            if (!(c as THREE.Mesh).isMesh || !g) return;
+            g.boundingBox ?? g.computeBoundingBox();
+            bb.union(g.boundingBox!.clone().applyMatrix4(m.multiplyMatrices(inv, c.matrixWorld)));
+          });
+          o.userData.pivot = new THREE.Vector3(0, bb.isEmpty() ? 0 : edge === 'top' ? bb.max.y : bb.min.y, 0);
+        }
+        const piv = o.userData.pivot as THREE.Vector3;
+        const t = THREE.MathUtils.clamp((this.camera.position.distanceTo(base) - near) / (far - near), 0, 1);
+        const k = 1 + (max - 1) * t * t * (3 - 2 * t);
+        if (Math.abs(o.scale.y - k) < 1e-3) continue;
+        o.scale.setScalar(k);
+        // pivot sabit kalır: konum = taban + dönüş × pivot × (1 − k)
+        o.position.copy(base).add(off.copy(piv).multiplyScalar(1 - k).applyQuaternion(o.quaternion));
+      }
+    }
+  }
+
   /** Işıklar modunda sahne bloom ile çizilir: yanan parçaların ışıması kendi biçimini izler (şerit şerit, homojen) */
   private draw() {
+    this.scaleMarkers();
     if (this.lights && this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }

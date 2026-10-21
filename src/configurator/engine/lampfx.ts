@@ -56,6 +56,8 @@ interface EmitMat {
   color: THREE.Color;
   /** "E.<işlev>.<renk>.g<yüzde>": LED'in ışığını yansıtan krom kap, işlev şiddetinin bu oranında ışır */
   gain: number;
+  /** metal yansıtıcı (krom LED kabı): modeldeki pürüzlülük; ışıklar modunda NIGHT_ROUGH'a yükseltilir */
+  rough?: number;
 }
 const emitMats: EmitMat[] = [];
 /** renkli dış lensler: yanan işlevin renginde hafif ışır (gerçek lambada lensin tamamı aydınlanır) */
@@ -85,7 +87,8 @@ export function lampInstance(id: string): THREE.Object3D | null {
         const p = m.name.split('.');
         if (p[0] === 'E' && p.length >= 3 && !emitMats.some((e) => e.mat === m)) {
           const g = /^g(\d+)$/.exec(p[3] ?? '');
-          emitMats.push({ mat: m, fns: p[1].split('+') as LampFn[], color: new THREE.Color(GLOW[p[2]] ?? '#ffffff'), gain: g ? Number(g[1]) / 100 : 1 });
+          emitMats.push({ mat: m, fns: p[1].split('+') as LampFn[], color: new THREE.Color(GLOW[p[2]] ?? '#ffffff'), gain: g ? Number(g[1]) / 100 : 1,
+            rough: m.metalness > 0.5 ? m.roughness : undefined });
         }
         if ((p[0] === 'Lens' || p[0] === 'Dome') && !lensMats.some((l) => l.mat === m)) lensMats.push({ mat: m, color: p[1], gain: LENS_GAIN[p[2]] ?? 1 });
         // lens: ince yüzey, iki yüzü de görünsün; gölge atmasın (ışığı kesmez)
@@ -166,6 +169,13 @@ const FN_I: Record<LampFn, number> = {
   work: 4.5,
   beacon: 3.6,
 };
+/**
+ * Gece (ışıklar modu) krom LED kaplarının pürüzlülüğü. Ortamdaki ay (gece ortam haritasının en parlak paneli) ve ay ışığı
+ * cilalı kaplarda (0,08) iğne ucu yansıma yapıp bloom eşiğini geçiyor, sönük lambada beyaz parlama, yanan lambada ışığın
+ * rengine karışan beyaz benek oluyordu (LZD 2854'ün 72 kabı, kullanıcı 2026-10-21). Gerçekte kaplar lensin ardında karanlıkta
+ * kalır: gece yansıma yayılır, tepe değeri eşiğin altına iner; LED'in kendi ışıması (emissive) değişmez.
+ */
+const NIGHT_ROUGH = 0.55;
 function apply() {
   for (const l of lensMats) {
     l.mat.emissive.set('#000000');
@@ -174,11 +184,12 @@ function apply() {
     l.mat.needsUpdate = true;
   }
   for (const e of emitMats) {
-    const lit = e.fns.filter(isOn);
-    const o = lit.length > 0;
+    const litFns = e.fns.filter(isOn);
+    const o = litFns.length > 0;
     e.mat.emissive.copy(o ? e.color : BLACK);
     // paylaşılan kılavuz (pozisyon + fren) en güçlü yanan işlevin şiddetinde
-    e.mat.emissiveIntensity = o ? Math.max(...lit.map((f) => FN_I[f] ?? 3)) * e.gain : 0;
+    e.mat.emissiveIntensity = o ? Math.max(...litFns.map((f) => FN_I[f] ?? 3)) * e.gain : 0;
+    if (e.rough !== undefined) e.mat.roughness = lit ? Math.max(e.rough, NIGHT_ROUGH) : e.rough;
     e.mat.toneMapped = true;
     e.mat.needsUpdate = true;
   }

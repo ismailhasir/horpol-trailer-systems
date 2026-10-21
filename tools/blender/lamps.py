@@ -375,7 +375,7 @@ MATS = {}
 LENS_ALPHA = {'red': 0.32, 'amber': 0.38, 'clear': 0.1, 'smoke': 0.55, 'white': 0.14}
 COL = {'red': '#d00a14', 'amber': '#ff8c0a', 'clear': '#f2f4f7', 'white': '#f4f6fa', 'smoke': '#25272b'}
 # yanan ışık rengi (lineer, emissive). Kırmızı ve turuncu doygun kalsın diye yeşil/mavi çok düşük.
-GLOW = {'red': (1.0, 0.012, 0.006), 'amber': (1.0, 0.30, 0.0), 'white': (0.92, 0.95, 1.0)}
+GLOW = {'red': (1.0, 0.012, 0.006), 'amber': (1.0, 0.52, 0.02), 'white': (0.92, 0.95, 1.0)}
 # sönükken ışık kılavuzunun/LED'in rengi (sRGB onaltılık): süt beyazı ışık kılavuzu, kırmızı lensin ardında açık kırmızı okunur
 OFF = {'red': '#f3dcd9', 'amber': '#ffd79a', 'white': '#f4f1e6'}
 
@@ -772,6 +772,11 @@ def bounds(objs):
     return lo, hi
 
 
+# render ton eşlemesi (AgX) parlak turuncuyu beyaza kaydırıyor: simgede turuncu ışık daha düşük şiddette doygun kalır
+# (ürün fotoğrafında çubuğun özü sarı-turuncu, kenarı turuncu)
+EMIT_COLOR_GAIN = {'amber': 0.12, 'white': 0.22, 'red': 0.35}
+
+
 def set_emission(objs, on, strength=6.0, fns=None):
     for o in objs:
         if o.type != 'MESH':
@@ -781,7 +786,15 @@ def set_emission(objs, on, strength=6.0, fns=None):
                 fn = m.name.split('.')[1].split('+')  # "position+stop": işlevlerden biri açıksa yanar
                 p = m.node_tree.nodes['Principled BSDF']
                 lit = on and (fns is None or any(f in fns for f in fn))
-                p.inputs['Emission Strength'].default_value = strength * m.get('gain', 1.0) if lit else 0.0  # gain: yansıtıcı krom (.g<yüzde>)
+                color = m.name.split('.')[2]
+                k = EMIT_COLOR_GAIN.get(color, 1.0)
+                p.inputs['Emission Strength'].default_value = strength * k * m.get('gain', 1.0) if lit else 0.0  # gain: yansıtıcı krom (.g<yüzde>)
+                # yanan ışık kılavuzunun açık renkli tabanı stüdyo ışığını yansıtıp ışığı soldurur (turuncu çubuk pembemsi
+                # görünüyordu): yanınca taban ışık renginde; krom/retro (gain < 1) kendi rengini korur
+                if 'off_color' not in m:
+                    m['off_color'] = list(p.inputs['Base Color'].default_value)
+                full = m.get('gain', 1.0) >= 0.99 and color in GLOW
+                p.inputs['Base Color'].default_value = (*GLOW[color], 1.0) if (lit and full) else tuple(m['off_color'])
 
 
 def set_icon_glass(on):
@@ -791,6 +804,21 @@ def set_icon_glass(on):
             p = m.node_tree.nodes['Principled BSDF']
             p.inputs['Transmission Weight'].default_value = 0.0
             p.inputs['Alpha'].default_value = LENS_ALPHA.get(m['lens'], 0.62)
+
+
+NIGHT = 0.3  # yanık görüntüde stüdyo ışığının oranı (ürünün gece fotoğrafları gibi: ışık yüzey parlamasından baskın)
+
+
+def night(on):
+    """Yanık render'da stüdyo ışığı kısılır: lensin stüdyo yansıması yanan ışığı soldurmaz, ışık düşük şiddette (ton
+    eşlemesinin beyaza kaydırmadığı aralıkta) doygun kalır"""
+    k = NIGHT if on else 1.0
+    bg = scene.world.node_tree.nodes.get('Background')
+    if bg:
+        bg.inputs['Strength'].default_value = 1.1 * k
+    for nm, e in (('key', 60), ('fill', 25), ('rim', 40)):
+        if nm in bpy.data.lights:
+            bpy.data.lights[nm].energy = e * k
 
 
 def render_views(pid, objs, folder, views, size=900, lit_fns=None, fmt='PNG'):
@@ -811,6 +839,7 @@ def render_views(pid, objs, folder, views, size=900, lit_fns=None, fmt='PNG'):
         cam.location = c + dv * dist
         cam.rotation_euler = (c - cam.location).to_track_quat('-Z', 'Y').to_euler()
         set_emission(objs, lit, 11.0 if fmt == 'WEBP' else 6.0, lit_fns)
+        night(lit)
         scene.render.image_settings.file_format = fmt
         if fmt == 'WEBP':
             scene.render.image_settings.quality = 88
@@ -818,6 +847,7 @@ def render_views(pid, objs, folder, views, size=900, lit_fns=None, fmt='PNG'):
         scene.render.filepath = os.path.join(folder, f'{pid}-{nm}.{fmt.lower()}')
         bpy.ops.render.render(write_still=True)
     set_emission(objs, False)
+    night(False)
 
 
 ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan imza)
