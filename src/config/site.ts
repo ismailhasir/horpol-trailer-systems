@@ -2,6 +2,8 @@
 // Başka hiçbir yerde iletişim bilgisi yazılmaz.
 export const site = {
   name: 'Horpol Trailer Systems',
+  // Konfigüratörde dorse plakasında yazan site adresi. ŞİMDİLİK yer tutucu (kullanıcı 2026-10-21: alan adı kesinleşince değişecek).
+  plateText: 'horpol-trailer-systems',
   contact: {
     phone: '0 (536) 776 30 95',
     email: 'info@didebanotomotiv.com',

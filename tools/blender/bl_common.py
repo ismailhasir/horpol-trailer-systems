@@ -894,7 +894,30 @@ def planar_uv(ob, scales):
 
 # ---------------- logo/çıkartma ----------------
 def logo_material(name, path):
-    img = bpy.data.images.load(os.path.abspath(path))
+    return _decal_material(name, bpy.data.images.load(os.path.abspath(path)))
+
+
+def logo_from_original(name, path):
+    """Özgün logodan (beyaz çizim, düz mavi zemin; design/source) yüksek çözünürlüklü çıkartma malzemesi: renk zeminin
+    mavisi, alfa beyazlık (kenar yumuşatması korunur). Bayt görüntü pikselleri sRGB değerleriyle okunur ve yazılır."""
+    import numpy as np
+    src = bpy.data.images.load(os.path.abspath(path))
+    w, h = src.size
+    px = np.array(src.pixels[:], dtype=np.float32).reshape(h, w, 4)
+    rgb = px[:, :, :3]
+    bg = np.median(rgb.reshape(-1, 3), axis=0)  # zemin (en yaygın renk)
+    lum = rgb.mean(axis=2)
+    out = np.empty_like(px)
+    out[:, :, :3] = bg
+    out[:, :, 3] = np.clip((lum - bg.mean()) / (1.0 - bg.mean()), 0.0, 1.0)
+    img = bpy.data.images.new(name + 'Tex', w, h, alpha=True)
+    img.pixels[:] = out.ravel()
+    img.pack()
+    bpy.data.images.remove(src)
+    return _decal_material(name, img)
+
+
+def _decal_material(name, img):
     lm = bpy.data.materials.new(name)
     lm.use_nodes = True
     nt = lm.node_tree

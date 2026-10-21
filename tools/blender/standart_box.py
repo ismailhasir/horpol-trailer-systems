@@ -42,7 +42,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bl_common import (  # noqa: E402
     Parts, add_obj, bake_ao, beam, bl, box, box2, build_wheel, cylinder, decal_mesh, delete_interior, export_glb, hose, join,
-    link_occlusion, logo_material, material, poly_tube, prism_xy, prism_xz, prism_zy, quad, rear_quad, rect_x, run_bake,
+    link_occlusion, logo_from_original, logo_material, material, poly_tube, prism_xy, prism_xz, prism_zy, quad, rear_quad, rect_x, run_bake,
     select_only, side_quad, smart_uv, bez, write_anchors,
 )
 
@@ -92,10 +92,12 @@ CARRIER_TOP = 1.05
 REAR_ZIN = 0.30  # arka bölgenin iç sınırı: plaka (±0,26) + boşluk; stop iç kenarları arası ≥ 0,60
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y = CH_TOP - 0.035  # yan C rayın (y 1,155–1,225) ortası
-SIDE_X0, SIDE_X1, SIDE_N = XF + 0.8, -0.5, 9  # ilk/son marker (önden 0,8 / arkadan 0,5 m), yan başına en çok 9 (~1,55 m)
-FRONT_LAMP_Y = Y_PANEL1 - 0.08  # kullanıcı isteği (2026-10-20): kasanın ön ÜST köşeleri, öne bakar (R48 önerisi 2,10 m üstü: bilinçli)
-REAR_GAP = 0.0  # stop lambaları taşıyıcının dış ucuna dayalı (kullanıcı 2026-10-20: önceki 0,09 m boşluk geri alındı)
+SIDE_X0, SIDE_X1, SIDE_N = XF + 0.8, -0.5, 10  # ilk/son marker (önden 0,8 / arkadan 0,5 m), yan başına en çok 10 (~1,38 m; revize md. 12)
 ARM_Y = Y_PANEL0 + 0.07  # lastik kollar: kasanın 4 ALT köşesi (kullanıcı isteği 2026-10-20), köşe dikmesinin yan yüzü
+# revize md. 9 (2026-10-21): ön ALT köşeler, öne bakar, yan marker seviyesine (y 1,19) olabildiğince yakın. LD 2773'ün tutucusu
+# merkezden 85 mm aşağı iner; alt ucu ön travers altına (NECK_BOT, köşeye kadar uzanır) denk gelir, altından taşmaz.
+FRONT_LAMP_Y = NECK_BOT + 0.085
+REAR_GAP = 0.0  # stop lambaları taşıyıcının dış ucuna dayalı (kullanıcı 2026-10-20: önceki 0,09 m boşluk geri alındı)
 POST_D = 0.13  # ön/arka köşe dikmesinin yan yüz derinliği
 WORK_Y, WORK_Z = Y_TOP - 0.07, 0.80  # arka başlık (y 3,88–4,02) ortası
 BEACON_Z = 1.0
@@ -126,8 +128,8 @@ def mounts_dict():
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
                     'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
         'notes': 'Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol, çalışma ve tepe lambaları kasaya bağlanır. '
-                 'Ön pozisyon ön köşe dikmesinin ön yüzünde y 1,95 (R48 üst sınırı 2,10). Lastik kollar köşe dikmelerinin yan yüzünde '
-                 'y 3,95: en yüksek sabit nokta ve 270° açılan kapının (üst kenar 3,875) katlanma bölgesinin üstü. Yan markerlar şasinin '
+                 'Ön pozisyon ön köşe dikmesinin ön yüzünde, alt köşede (y 1,235; tutucu ön travers altına kadar). Lastik kollar köşe dikmelerinin '
+                 'yan yüzünde, kasanın alt köşelerinde (y 1,36). Yan markerlar şasinin '
                  'dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır '
                  '1,5 m). Çalışma lambaları arka başlığın arka yüzünde, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için '
                  'adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli).',
@@ -584,13 +586,21 @@ body = join(B, 'StdBody')
 # kasa içi hiç görünmez: içe bakan yüzler silinir
 delete_interior(body, XF + 0.025, XR - 0.05, FLOOR_TOP - 0.002, Y_TOP - 0.012, -(W2 - 0.025), W2 - 0.025)
 
-# kasa çıkartmaları: iki yanda büyük logo, sol kapak üstünde küçük logo
+# kasa çıkartmaları: iki yanda büyük logo; arkada iki kapının ortasında büyük logo (revize md. 7)
 bq = []
 LH = 2.1
 for s in (1, -1):
     bq.append(side_quad(-L / 2 + 0.6, Y_PANEL0 + (Y_PANEL1 - Y_PANEL0) * 0.55, LH * 720 / 528, LH, s * (W2 - 0.0035), s))
-bq.append(rear_quad(DXb + 0.0015, 3.55, 0.62, 0.42 * 720 / 528, 0.42))
 body_logos = decal_mesh('BodyLogos', bq, LOGO)
+# Arka logo: kapı alanının en büyüğü. Genişlik menteşelerle sınırlı (iç uçları z ±1,023 → 2,0 m), alt kenar kilit kolunun
+# (y 2,12) üstünde, üst kenar kapı üst kenarının (3,875) altında; dikeyde bu aralığın ortası. Kapı birleşimindeki conta
+# logonun ortasından geçer (gerçek araçta da kapılar ayrı açılır). Yakın çekimde keskin olsun diye yüksek çözünürlüklü
+# özgün logodan (design/source, 1773 px; beyaz-mavi zemin) mavi + saydam doku üretilir: 886 px/m.
+REAR_LOGO_W = 2.0
+REAR_LOGO_H = REAR_LOGO_W * 1300 / 1773
+REAR_LOGO_Y = (2.17 + DY1) / 2
+rear_logo = decal_mesh('RearLogo', [rear_quad(DXb + 0.0015, REAR_LOGO_Y, 0.0, REAR_LOGO_W, REAR_LOGO_H)],
+                       logo_from_original('RearLogoMat', 'design/source/horpol-logo-original.png'))
 
 # =====================================================================
 # UV, AO, dışa aktarma
@@ -600,7 +610,7 @@ smart_uv(wheel, 0.004)
 smart_uv(body, 0.003, planar={'FrontSteel': 'x'})
 size = 1024 if FAST else 2048
 targets = bake_ao([(chassis, size, 'std_chassis_ao'), (wheel, 512 if FAST else 1024, 'std_wheel_ao'), (body, size, 'std_body_ao')], K, samples=16 if FAST else 96, distance=0.6)
-decals = [chassis_logos, body_logos]
+decals = [chassis_logos, body_logos, rear_logo]
 for ob, img in targets:
     # şasi ve tekerlekler kasasız pişer (tesisat görünümünde kasa gizli; gölgesi şasiye düşmemeli), kasa şasiyle birlikte
     run_bake(ob, img, hide=decals + ([body] if ob is not body else []))
@@ -608,7 +618,7 @@ for ob, img in targets:
 link_occlusion([chassis, wheel, body])
 
 export_glb(os.path.join(RAW_DIR, 'standart-chassis.glb'), [chassis, chassis_logos] + wheels)
-export_glb(os.path.join(RAW_DIR, 'standart-body.glb'), [body, body_logos])
+export_glb(os.path.join(RAW_DIR, 'standart-body.glb'), [body, body_logos, rear_logo])
 tri = lambda ob: sum(len(p.vertices) - 2 for p in ob.data.polygons)
 print(f'TRIS chassis={tri(chassis)} wheel={tri(wheel)} body={tri(body)}')
 
@@ -717,5 +727,6 @@ if PREVIEW:
     shot('rear34.png', (6.0, 2.6, 7.5), (-4.0, 1.6, 0), 40)
     body.hide_render = True
     body_logos.hide_render = True
+    rear_logo.hide_render = True
     shot('chassis34.png', (3.5, 5.0, 6.5), (-5.0, 0.9, 0), 32)
     print('PREVIEWS', PREVIEW)

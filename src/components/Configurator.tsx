@@ -9,9 +9,11 @@ import {
   TRAILER_LIST,
   fromQuery,
   maxQty,
-  sideMinPerSide,
   normalize,
+  categoriesFor,
   productById,
+  productsFor,
+  rulesFor,
   toQuery,
   type CategoryId,
   type Config,
@@ -208,6 +210,7 @@ export default function Configurator({ lang, t, ui }: Props) {
   /** aynı siparişten kaç set (tüm yapılandırma bu sayıyla çarpılır) */
   const [orderQty, setOrderQty] = useState(1);
   const rows = summaryRows(cfg, t, lang, orderQty);
+  const rules = rulesFor(cfg.trailer);
   const stepper = (
     <div class="qty" role="group" aria-label={t.set_qty} title={t.set_qty}>
       <button type="button" aria-label={ui.qty_dec} disabled={orderQty <= 1} onClick={() => setOrderQty((q) => Math.max(1, q - 1))}>
@@ -520,25 +523,31 @@ export default function Configurator({ lang, t, ui }: Props) {
       {/* ---------- sağ: lambalar + özet ---------- */}
       <aside class="cfg-card cfg-right" aria-label={t.lamps_title}>
         <div class="cfg-lamps">
-          {CATEGORIES.map((cat) => {
+          {categoriesFor(cfg.trailer).map((cat) => {
             const ch = cfg.lamps[cat.id];
             const prod = productById(cat.id, ch.product);
             const open = openCat === cat.id;
             const max = maxQty(cfg, cat.id);
-            const sideMin = cat.id === 'side' ? sideMinPerSide(cfg.trailer) : 0;
+            // ön pozisyon yan markerın eşi (model seçilmez, yalnız aç/kapa); plaka çerçevesi sabit, lambalar ona ek
+            const auto = cat.id === 'front' && !!rules.frontFromSide;
+            const frame = cat.id === 'plate' ? rules.plateFrame : undefined;
+            const frameCode = frame ? productById('plate', frame).code : '';
+            const thumb = frame && !ch.qty ? frame : prod.id;
+            const code = frame ? (ch.qty ? `${frameCode} + ${prod.code}` : frameCode) : ch.qty ? prod.code : t.none;
             return (
-              <section class={`lc ${open ? 'open' : ''} ${ch.qty === 0 ? 'off' : ''}`} key={cat.id}>
+              <section class={`lc ${open && !auto ? 'open' : ''} ${ch.qty === 0 && !frame ? 'off' : ''}`} key={cat.id}>
                 <div class="lc-head">
-                  <button type="button" class="lc-toggle" aria-expanded={open} onClick={() => toggleCat(cat.id)}>
+                  <button type="button" class={`lc-toggle${auto ? ' static' : ''}`} aria-expanded={auto ? undefined : open} onClick={() => (auto ? engineRef.current?.focusCategory(cat.id) : toggleCat(cat.id))}>
                     <span class="lc-thumb">
-                      <LampIcon id={prod.id} lit={lights && ch.qty > 0} />
+                      <LampIcon id={thumb} lit={lights && (ch.qty > 0 || !!frame)} />
                       <i class="lc-dot" style={`background:${CAT_DOT[cat.id]}`} />
                     </span>
                     <span class="lc-name">
                       <b>{categoryName(t, cat.id)}</b>
-                      <small class="mono">{ch.qty ? prod.code : t.none}</small>
+                      <small class="mono">{code}</small>
+                      {auto && <small class="lc-auto">{t.front_auto}</small>}
                     </span>
-                    <Ico d={IC.chevron} size={16} />
+                    {!auto && <Ico d={IC.chevron} size={16} />}
                   </button>
                   <div class="qty sm" role="group" aria-label={`${categoryName(t, cat.id)}: ${t.qty}`}>
                     <button type="button" aria-label={ui.qty_dec} disabled={ch.qty <= 0} onClick={() => step(cat.id, -1)}>
@@ -550,10 +559,16 @@ export default function Configurator({ lang, t, ui }: Props) {
                     </button>
                   </div>
                 </div>
-                {sideMin > 0 && ch.qty / 2 < sideMin && <p class="lc-rule">{fmtT(t.side_rule, { n: sideMin })}</p>}
-                {open && (
+                {open && !auto && (
                   <div class="lc-opts" role="radiogroup" aria-label={`${categoryName(t, cat.id)}: ${t.model}`}>
-                    {cat.products.map((p) => {
+                    {frame && (
+                      <div class="lpc fixed" aria-label={`${frameCode}: ${t.included}`}>
+                        <LampIcon id={frame} lit={lights} size="card" />
+                        <span class="lpc-code mono ltr">{frameCode}</span>
+                        <b class="lpc-qty lpc-inc">{t.included}</b>
+                      </div>
+                    )}
+                    {productsFor(cfg.trailer, cat.id).map((p) => {
                       const on = p.id === ch.product;
                       return (
                         <button type="button" role="radio" class="lpc" aria-checked={on} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
@@ -573,7 +588,6 @@ export default function Configurator({ lang, t, ui }: Props) {
               </section>
             );
           })}
-          <p class="cfg-note">{t.note_3d}</p>
         </div>
 
         <div class="cfg-summary" aria-live="polite">

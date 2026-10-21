@@ -3,7 +3,8 @@
 // betiğin yazdığı JSON'dan üretilir. Koordinatlar metre: X boyuna (arka uç x=0, ön x=-L), Y yukarı, Z yanal.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { TrailerId } from '../data';
+import { rulesFor, type TrailerId } from '../data';
+import { site } from '../../config/site';
 import type { Mats } from './materials';
 import { BAKED, bakedContact, bakedSections, type BakedSpec } from './baked';
 import { loadedModel } from './models';
@@ -77,13 +78,18 @@ export function profileAt(prof: [number, number][], x: number) {
 const W = 2.55;
 
 // ---------- plaka ----------
-let plateTex: THREE.CanvasTexture | null = null;
-function plateTexture() {
-  if (plateTex) return plateTex;
+// Plaka yazısı: dorse kuralı sitePlate ise site adresi (src/config/site.ts), değilse örnek plaka. 3 px/mm (520 × 110 mm):
+// arka görünümde yakınlaşınca da keskin. tools/blender/lamps.py RTR 3366 simgesindeki plaka aynı yerleşimi çizer.
+const PX = 3;
+const plateTex = new Map<string, THREE.CanvasTexture>();
+function plateTexture(text: string) {
+  const hit = plateTex.get(text);
+  if (hit) return hit;
   const c = document.createElement('canvas');
-  c.width = 520;
-  c.height = 110;
+  c.width = 520 * PX;
+  c.height = 110 * PX;
   const ctx = c.getContext('2d')!;
+  ctx.scale(PX, PX);
   ctx.fillStyle = '#f6f6f1';
   ctx.fillRect(0, 0, 520, 110);
   ctx.fillStyle = '#1f4fa8';
@@ -92,20 +98,32 @@ function plateTexture() {
   ctx.font = 'bold 30px Arial';
   ctx.fillText('TR', 4, 92);
   ctx.fillStyle = '#111';
-  ctx.font = 'bold 76px Arial';
-  ctx.fillText('34 HRP 2026', 62, 84);
+  // yazı bant ile sağ kenar arasına sığar (uzun adres küçülür), dikeyde ortalı
+  let size = 76;
+  ctx.font = `bold ${size}px Arial`;
+  const room = 520 - 46 - 26;
+  const w = ctx.measureText(text).width;
+  if (w > room) {
+    size = Math.floor((size * room) / w);
+    ctx.font = `bold ${size}px Arial`;
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 46 + (520 - 46) / 2, 57);
   ctx.strokeStyle = '#222';
   ctx.lineWidth = 4;
   ctx.strokeRect(2, 2, 516, 106);
-  plateTex = new THREE.CanvasTexture(c);
-  plateTex.colorSpace = THREE.SRGBColorSpace;
-  plateTex.anisotropy = 8;
-  return plateTex;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  plateTex.set(text, tex);
+  return tex;
 }
-let plateMat: THREE.MeshStandardMaterial | null = null;
+const plateMats = new Map<string, THREE.MeshStandardMaterial>();
 const PLATE_GEO = markShared(new THREE.PlaneGeometry(0.52, 0.11));
-function plate(g: THREE.Group, y: number, x = -0.015) {
-  plateMat ??= new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.35, metalness: 0.1 });
+function plate(g: THREE.Group, y: number, x = -0.015, text = '34 HRP 2026') {
+  let plateMat = plateMats.get(text);
+  if (!plateMat) plateMats.set(text, (plateMat = new THREE.MeshStandardMaterial({ map: plateTexture(text), roughness: 0.35, metalness: 0.1 })));
   const p = mesh(PLATE_GEO, plateMat, false);
   p.name = 'plate';
   p.rotation.y = Math.PI / 2;
@@ -131,7 +149,7 @@ export function buildTrailer(type: TrailerId, m: Mats): TrailerBuild {
   for (const mm of mergedFromModel(rig)) chassisG.add(mm);
   // plaka: montaj haritasındaki tutucu yüksekliği (yoksa eski nokta)
   const mp = (S as { mounts?: { plate?: { plateY?: number } } }).mounts?.plate;
-  const plateMesh = plate(group, mp?.plateY ?? S.rear.plateY, S.rear.x + 0.006);
+  const plateMesh = plate(group, mp?.plateY ?? S.rear.plateY, S.rear.x + 0.006, rulesFor(type).sitePlate ? site.plateText : undefined);
 
   const edgePos: number[] = [];
   for (const loop of bakedSections(S)) {

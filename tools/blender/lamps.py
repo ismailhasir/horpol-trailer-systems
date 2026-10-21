@@ -36,7 +36,7 @@ ICON_DIR = os.path.abspath('src/assets/lamps')
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bl_common import bl, srgb  # noqa: E402
+from bl_common import bl, material, srgb  # noqa: E402
 
 scene = bpy.context.scene
 
@@ -832,12 +832,67 @@ ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan i
 ICON_DIR_VEC = {'arm': (0.55, 0.25, 0.8), 'beacon': (0.45, 0.45, 1.0), 'plate': (-0.35, 0.55, 1.0)}
 
 
+PLATE_TEXT = 'horpol-trailer-systems'  # src/config/site.ts plateText ile aynı (şimdilik yer tutucu)
+PLATE_FONT = 'C:/Windows/Fonts/arialbd.ttf'  # sitedeki plaka dokusu da kalın Arial
+
+
+def icon_plate():
+    """Yalnız simge: plaka çerçevesinin (MOUNT_plate) yuvasına sitedeki plakanın aynısı (520 × 110 mm, TR bandı, site adresi;
+    src/configurator/engine/trailer.ts plateTexture). Boş çerçeve simgede anlaşılmıyor (revize md. 5). GLB'ye girmez."""
+    mp = bpy.data.objects.get('MOUNT_plate')
+    if not mp:
+        return []
+    c = mp.location.copy()
+    y = c.y - 0.0004  # plaka yüzü yuvanın hemen önünde (Blender −Y = lamba önü)
+    made = []
+
+    def rect(nm, x0, x1, z0, z1, dy, m):
+        me = bpy.data.meshes.new(nm)
+        me.from_pydata([(x0, y - dy, c.z + z0), (x1, y - dy, c.z + z0), (x1, y - dy, c.z + z1), (x0, y - dy, c.z + z1)], [], [(0, 1, 2, 3)])
+        ob = bpy.data.objects.new(nm, me)
+        ob.data.materials.append(m)
+        scene.collection.objects.link(ob)
+        made.append(ob)
+
+    def text(nm, body, size, x, z, m, center=True, fit=None):
+        cu = bpy.data.curves.new(nm, 'FONT')
+        cu.body = body
+        cu.font = bpy.data.fonts.load(PLATE_FONT, check_existing=True)
+        cu.size = size
+        cu.align_x = 'CENTER' if center else 'LEFT'
+        cu.align_y = 'CENTER' if center else 'BOTTOM_BASELINE'
+        ob = bpy.data.objects.new(nm, cu)
+        ob.rotation_euler = (math.pi / 2, 0, 0)  # metin yerel +Z (yüz) → Blender −Y, yerel +Y → yukarı
+        ob.location = (x, y - 0.0003, c.z + z)
+        ob.data.materials.append(m)
+        scene.collection.objects.link(ob)
+        bpy.context.view_layer.update()
+        if fit and ob.dimensions.x > fit:
+            cu.size = size * fit / ob.dimensions.x
+        made.append(ob)
+
+    white = material('PlateWhite', '#f6f6f1', 0.35, 0.1)
+    blue = material('PlateBlue', '#1f4fa8', 0.35, 0.1)
+    ink = material('PlateInk', '#111111', 0.4, 0.0)
+    snow = material('PlateTR', '#ffffff', 0.35, 0.0)
+    rect('plate', -0.26, 0.26, -0.055, 0.055, 0.0, white)
+    rect('plate_band', -0.26, -0.214, -0.055, 0.055, 0.0001, blue)
+    # tuval (520 × 110 px = mm): "TR" taban çizgisi y 92, adres bant ile sağ kenar arası ortada (y 57), en çok 448 mm
+    text('plate_tr', 'TR', 0.030, -0.256, 0.055 - 0.092, snow, center=False)
+    text('plate_txt', PLATE_TEXT, 0.076, -0.214 + 0.474 / 2, 0.055 - 0.057, ink, fit=0.448)
+    return made
+
+
 def icons(pid, objs, cat):
     """Konfigüratör ürün simgeleri: 3/4 açı, şeffaf zemin, sönük ve yanık (WEBP)"""
     os.makedirs(ICON_DIR, exist_ok=True)
     set_icon_glass(True)
-    d = ICON_DIR_VEC.get(cat, (-0.45, 0.28, 1.0))
+    extra = icon_plate() if pid == 'rtr3366' else []
+    # plaka çerçevesi: plakadaki yazı okunsun diye öne yakın açı
+    d = (-0.2, 0.18, 1.0) if extra else ICON_DIR_VEC.get(cat, (-0.45, 0.28, 1.0))
     render_views(pid, objs, ICON_DIR, [('off', d, False), ('on', d, True)], size=384 if FAST else 512, lit_fns=ICON_LIT.get(cat), fmt='WEBP')
+    for ob in extra:
+        bpy.data.objects.remove(ob)
     set_icon_glass(False)
     print('ICONS', pid)
 

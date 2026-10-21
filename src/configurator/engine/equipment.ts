@@ -9,7 +9,7 @@
 //   Çalışma ve tepe lambaları (HOR-1001 şeması): modülün boş portlarından; ayrı 2×1 besleme hattı soketten modüle.
 // Montaj noktaları dorse betiğinin yazdığı `mounts` (R48 haritası) varsa ondan, yoksa eski bağlantı noktalarından.
 import * as THREE from 'three';
-import { CATEGORIES, productById, type CategoryId, type Config } from '../data';
+import { CATEGORIES, productById, rulesFor, type CategoryId, type Config } from '../data';
 import type { Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
@@ -40,6 +40,8 @@ export interface EquipmentBuild {
 
 /** RTR 3366 plaka yuvası, çerçeve yerelinde (m): tools/blender/lamps_cad.py RTR_SEAT ile aynı; model yüklenince MOUNT_plate esas */
 const RTR_SEAT = { y: 0.00385, z: 0.0184 };
+/** RTR 3366 çerçevesinin yarı genişliği (m; lamp-rtr3366.glb sınır kutusu) */
+const RTR_HALF_W = 0.2653;
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** art arda çakışan noktaları atar (kısa düz uçlarda iki nokta aynı yere düşebilir) */
@@ -444,41 +446,46 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const plateFace = a.rear.x + 0.006; // plakanın arka yüzü (trailer.ts ile aynı)
   const PLATE_HALF_W = 0.26;
   /** Her plaka lambası: konum, yönlendirme (lens plakaya bakar) ve kablonun girdiği nokta */
-  type PlateSpot = { pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3 };
+  type PlateSpot = { id: string; pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3 };
   const plateSpots: PlateSpot[] = [];
   let plateLight: PlateLight = null;
   /** plaka çerçevesinde plakanın yeni yeri (yoksa taşıyıcıdaki yerinde kalır) */
   let platePos: THREE.Vector3 | null = null;
   const basis = (x: THREE.Vector3, y: THREE.Vector3, z: THREE.Vector3) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
-  if (pl.qty > 0) {
-    if (pl.product === 'rtr3366') {
-      // RTR 3366 (HOR 160): LED aydınlatmalı plaka çerçevesi, plakanın yerine taşıyıcıya vidalanır; plaka çerçevenin yuvasına
-      // oturur, saçağın altındaki 3 modül plakaya aşağı ışık verir. Yerel: Z dışa (dünya +X), Y yukarı, X = dünya −Z.
-      // Kablo alt kenarın ortasından çıkar.
-      const base = V(plateFace - 0.001, plateCy - RTR_SEAT.y, 0);
-      plateSpots.push({ pos: base, q: basis(V(0, 0, -1), V(0, 1, 0), V(1, 0, 0)), entry: V(base.x + 0.002, base.y - 0.115, 0) });
-      plateLight = { kind: 'top', z: [-0.171, 0, 0.171] };
-    } else {
-      // LTD 2834 ve LTD 229: plakanın İKİ YANINDA (çizim HOR 47: lamba ekseni plaka kenarından 40–80 mm), TABANI taşıyıcının
-      // dikey arka yüzüne vidalı (civatalar öne, taşıyıcıya girer), ışık penceresi plakanın ortasına bakar. Yerel eksenler:
-      // Y (taban → üst) = dünya +X (arkaya), Z (pencere) = plakaya doğru (∓z), X = Y × Z.
-      const zs = pl.qty === 1 ? [PLATE_HALF_W + 0.04] : [PLATE_HALF_W + 0.04, -(PLATE_HALF_W + 0.04)];
-      for (const z of zs) {
-        const s = z > 0 ? 1 : -1;
-        const Yw = V(1, 0, 0);
-        const Zw = V(0, 0, -s);
-        const base = V(plateFace - 0.002, plateCy, z);
-        plateSpots.push({ pos: base, q: basis(Yw.clone().cross(Zw), Yw, Zw), entry: V(base.x - 0.02, base.y, z) });
-      }
-      // ışık penceresi lambanın derinlik ortasından ~31 mm plakaya doğru
-      plateLight = { kind: 'side', z: zs.map((z) => z - Math.sign(z) * 0.031) };
+  // dorse kuralı plateFrame (ör. standart: RTR 3366): çerçeve her zaman takılı, seçilen plaka lambaları onun iki yanına eklenir
+  const frameId = rulesFor(c.trailer).plateFrame;
+  const frameOn = frameId ?? (pl.qty > 0 && pl.product === 'rtr3366' ? pl.product : undefined);
+  const sideId = pl.qty > 0 && pl.product !== frameOn ? pl.product : undefined;
+  if (frameOn) {
+    // RTR 3366 (HOR 160): LED aydınlatmalı plaka çerçevesi, plakanın yerine taşıyıcıya vidalanır; plaka çerçevenin yuvasına
+    // oturur, saçağın altındaki 3 modül plakaya aşağı ışık verir. Yerel: Z dışa (dünya +X), Y yukarı, X = dünya −Z.
+    // Kablo alt kenarın ortasından çıkar.
+    const base = V(plateFace - 0.001, plateCy - RTR_SEAT.y, 0);
+    plateSpots.push({ id: frameOn, pos: base, q: basis(V(0, 0, -1), V(0, 1, 0), V(1, 0, 0)), entry: V(base.x + 0.002, base.y - 0.115, 0) });
+    plateLight = { top: [-0.171, 0, 0.171] };
+  }
+  if (sideId) {
+    // LTD 2834 ve LTD 229: plakanın İKİ YANINDA (çizim HOR 47: lamba ekseni plaka kenarından 40–80 mm), TABANI taşıyıcının
+    // dikey arka yüzüne vidalı (civatalar öne, taşıyıcıya girer), ışık penceresi plakanın ortasına bakar. Yerel eksenler:
+    // Y (taban → üst) = dünya +X (arkaya), Z (pencere) = plakaya doğru (∓z), X = Y × Z.
+    // Çerçeve varsa lamba çerçevenin dış kenarının dışına (RTR yarı genişliği 265 mm + lamba yarı derinliği 35 mm + 12 mm pay).
+    const zl = frameOn ? RTR_HALF_W + 0.035 + 0.012 : PLATE_HALF_W + 0.04;
+    const zs = pl.qty === 1 ? [zl] : [zl, -zl];
+    for (const z of zs) {
+      const s = z > 0 ? 1 : -1;
+      const Yw = V(1, 0, 0);
+      const Zw = V(0, 0, -s);
+      const base = V(plateFace - 0.002, plateCy, z);
+      plateSpots.push({ id: sideId, pos: base, q: basis(Yw.clone().cross(Zw), Yw, Zw), entry: V(base.x - 0.02, base.y, z) });
     }
+    // ışık penceresi lambanın derinlik ortasından ~31 mm plakaya doğru
+    plateLight = { ...plateLight, side: zs.map((z) => z - Math.sign(z) * 0.031) };
   }
   for (const sp of plateSpots) {
-    const o = mount('plate', pl.product, sp.pos, (obj) => {
+    const o = mount('plate', sp.id, sp.pos, (obj) => {
       obj.quaternion.copy(sp.q);
     });
-    if (pl.product === 'rtr3366') {
+    if (sp.id === frameOn) {
       const mp = o.getObjectByName('MOUNT_plate');
       o.updateMatrixWorld(true);
       platePos = mp ? mp.getWorldPosition(V(0, 0, 0)) : V(sp.pos.x + RTR_SEAT.z, plateCy, 0);
@@ -925,6 +932,8 @@ export function lampIds(c: Config): string[] {
     const ch = c.lamps[cat.id];
     if (ch.qty > 0) ids.add(productById(cat.id, ch.product).id);
   }
+  const frame = rulesFor(c.trailer).plateFrame;
+  if (frame) ids.add(frame);
   return [...ids];
 }
 

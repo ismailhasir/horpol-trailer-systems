@@ -1,6 +1,7 @@
 // Konfigüratör verisi: dorse tipleri, soketler, uzunluklar ve lamba katalogu.
-// Lamba ürünleri gerçek Horpol ürünleridir (vault: Kablolama ve Işıklandırma/Ürün Data); 3D modelleri üreticinin teknik
-// çizimlerinden Blender'da yapıldı. Adet tavanları kurala ve fiziksel yuvaya dayalı önerimizdir, satış ekibiyle doğrulanacak.
+// Lamba ürünleri vault'taki ürün listesidir (Kablolama ve Işıklandırma/Ürün Data/Ürün Listesi.md, tek doğru kaynak; 2026-10-21).
+// 3D modeli olmayan ürünler (STEP bekleniyor) sahnede yer tutucuyla, panelde boş kartla görünür.
+// Adet tavanları kurala ve fiziksel yuvaya dayalı önerimizdir, satış ekibiyle doğrulanacak.
 
 export type TrailerId =
   | 'standart'
@@ -60,6 +61,8 @@ export interface LampProduct {
   codeR?: string;
   max?: number;
   fixed?: number;
+  /** yan marker: eşleşen ön pozisyon lambası (dorse kuralı frontFromSide ise ön lamba bundan seçilir) */
+  front?: string;
 }
 
 export interface CategoryDef {
@@ -84,12 +87,14 @@ export const CATEGORIES: CategoryDef[] = [
     step: 2,
     color: '#e0322d',
     products: [
+      // tavanlar ürün ailesinden: LZD 2854 büyük kombine (tek çift), Luna (2448, 2452) her yanda 4, CUBE (2875, 2876) her
+      // yanda 2. LZD 2854'ün sağ eşinin kodu bilinmiyor (doğrulanmadı), yazılmadı.
       { id: 'lzd3194', code: 'LZD 3194/AMP', codeR: 'LZD 3195/AMP', max: 2 },
-      { id: 'lzd2856', code: 'LZD 2856', codeR: 'LZD 2857', max: 2 },
-      { id: 'lzd2423', code: 'LZD 2423', max: 8 },
+      { id: 'lzd2854', code: 'LZD 2854', max: 2 },
       { id: 'lzd2448', code: 'LZD 2448', max: 8 },
-      { id: 'lzd2877', code: 'LZD 2877', max: 4 },
-      { id: 'lzd2880', code: 'LZD 2880', max: 4 },
+      { id: 'lzd2452', code: 'LZD 2452', max: 8 },
+      { id: 'lzd2875', code: 'LZD 2875/GRAPHITE', max: 4 },
+      { id: 'lzd2876', code: 'LZD 2876', max: 4 },
     ],
   },
   {
@@ -99,22 +104,9 @@ export const CATEGORIES: CategoryDef[] = [
     step: 2,
     color: '#f5a00a',
     products: [
-      { id: 'ld2774', code: 'LD 2774' },
-      { id: 'ld2765', code: 'LD 2765' },
-      { id: 'ld0128', code: 'LD 0128' },
-    ],
-  },
-  {
-    id: 'plate',
-    min: 0,
-    max: 2,
-    step: 1,
-    color: '#f4f7ff',
-    products: [
-      // plaka lambaları plakanın iki yanında çift (çizim HOR 47); LED aydınlatmalı plaka çerçevesi (HOR 160) plakanın yerine tek
-      { id: 'ltd2834', code: 'LTD 2834', fixed: 2 },
-      { id: 'ltd229', code: 'LTD 229', fixed: 2 },
-      { id: 'rtr3366', code: 'RTR 3366', fixed: 1 },
+      // front: eşleşen ön pozisyon (revize Standart Dorse md. 10)
+      { id: 'ld2774', code: 'LD 2774', front: 'ld2773' },
+      { id: 'ld500', code: 'LD 500', front: 'ld499' },
     ],
   },
   {
@@ -125,7 +117,21 @@ export const CATEGORIES: CategoryDef[] = [
     color: '#f4f7ff',
     products: [
       { id: 'ld2773', code: 'LD 2773' },
-      { id: 'ld0127', code: 'LD 0127' },
+      { id: 'ld499', code: 'LD 499' },
+    ],
+  },
+  {
+    id: 'plate',
+    min: 0,
+    max: 2,
+    step: 1,
+    color: '#f4f7ff',
+    products: [
+      // plaka lambaları plakanın iki yanında çift (çizim HOR 47); LED aydınlatmalı plaka çerçevesi (HOR 160) plakanın yerine tek.
+      // LTD 669 da çift varsayıldı (montaj biçimi doğrulanmadı).
+      { id: 'ltd2834', code: 'LTD 2834', fixed: 2 },
+      { id: 'ltd669', code: 'LTD 669', fixed: 2 },
+      { id: 'rtr3366', code: 'RTR 3366', fixed: 1 },
     ],
   },
   {
@@ -135,8 +141,8 @@ export const CATEGORIES: CategoryDef[] = [
     step: 2,
     color: '#f5a00a',
     products: [
-      { id: 'ld2994', code: 'LD 2994 Dragon' },
       { id: 'ldcc2698', code: 'LDCC 2698' },
+      { id: 'ld2994', code: 'LD 2994 Dragon' },
     ],
   },
   {
@@ -145,7 +151,7 @@ export const CATEGORIES: CategoryDef[] = [
     max: 2,
     step: 1,
     color: '#f4f7ff',
-    products: [{ id: 'lrd2679', code: 'LRD 2679' }],
+    products: [{ id: 'lrd2681', code: 'LRD 2681' }],
   },
   {
     id: 'beacon',
@@ -158,14 +164,39 @@ export const CATEGORIES: CategoryDef[] = [
 ];
 
 /** Dorse başına yan marker tavanı (iki yan toplamı): yan rayda çakışmasız yuva sayısı (~1,5 m'de bir). */
-export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 18, lowbed: 18, silo: 10, tanker: 10, damper: 10 };
+export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 20, lowbed: 18, silo: 10, tanker: 10, damper: 10 };
+
+/**
+ * Dorseye özel seçim kuralları (vault Revizeler/<Dorse>.md). hide: listede gösterilmeyen, adedi 0 tutulan kategoriler.
+ * frontFromSide: ön pozisyon modeli seçilmez, yan markerın eşinden gelir (yalnız aç/kapa). plateFrame: plaka çerçevesi
+ * her zaman takılı; plaka kategorisi yalnız çerçeveye ek, isteğe bağlı yan plaka lambalarıdır.
+ */
+export interface TrailerRules {
+  hide?: CategoryId[];
+  frontFromSide?: boolean;
+  plateFrame?: string;
+  /** plakada site adresi yazar (src/config/site.ts plateText) */
+  sitePlate?: boolean;
+}
+export const TRAILER_RULES: Partial<Record<TrailerId, TrailerRules>> = {
+  standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true },
+};
+export const rulesFor = (t: TrailerId): TrailerRules => TRAILER_RULES[t] ?? {};
+/** Konfigüratör listesinde bu dorse için görünen kategoriler */
+export const categoriesFor = (t: TrailerId) => CATEGORIES.filter((c) => !rulesFor(t).hide?.includes(c.id));
+/** Kategoride seçilebilen ürünler (sabit plaka çerçevesi seçenek değildir) */
+export const productsFor = (t: TrailerId, cat: CategoryId) => {
+  const ps = categoryById(cat).products;
+  const frame = cat === 'plate' ? rulesFor(t).plateFrame : undefined;
+  return frame ? ps.filter((p) => p.id !== frame) : ps;
+};
 
 /** Dorse modellerinin boyu (m; tools/blender/<tip>.py). R48 yan marker hesabı için. */
 export const TRAILER_L: Partial<Record<TrailerId, number>> = { standart: 13.7, lowbed: 13.19, silo: 9.385, tanker: 12.41, damper: 8.84 };
 /**
  * UN R48 yan marker: uzunluk > 6 m ise zorunlu; ilki önden ≤ 3 m, sonuncusu arkadan ≤ 1 m, ardışık aralık ≤ 3 m.
  * Site markerları montaj haritasındaki yan rayın (x0 … x1) boyuna eşit aralıkla dizer; açıklık SIDE_SPAN (tools/check-lighting.mjs).
- * Döner: her yanda en az kaç adet (alt sınır DEĞİL: kullanıcı sıfıra inebilir, arayüz uyarı gösterir).
+ * Döner: her yanda en az kaç adet (alt sınır DEĞİL; arayüzde uyarı yok, kullanıcı isteği 2026-10-21: tools/check-lighting.mjs).
  */
 const SIDE_SPAN: Partial<Record<TrailerId, number>> = { standart: 12.4, lowbed: 10.4, silo: 5.0, tanker: 6.16, damper: 5.24 };
 export function sideMinPerSide(t: TrailerId): number {
@@ -212,7 +243,7 @@ export const DEFAULT_CONFIG: Config = {
     plate: { product: 'ltd2834', qty: 2 },
     front: { product: 'ld2773', qty: 2 },
     arm: { product: 'ld2994', qty: 2 },
-    work: { product: 'lrd2679', qty: 0 },
+    work: { product: 'lrd2681', qty: 0 },
     beacon: { product: 'ldo2660', qty: 0 },
   },
 };
@@ -223,10 +254,20 @@ export function normalize(c: Config): Config {
   const length = t.lengths.includes(c.length) ? c.length : t.lengths[0];
   const socket = SOCKETS.includes(c.socket) ? c.socket : '7x2';
   const lamps = {} as Config['lamps'];
+  const rules = rulesFor(t.id);
   for (const cat of CATEGORIES) {
     const cur = c.lamps[cat.id] ?? DEFAULT_CONFIG.lamps[cat.id];
-    const product = cat.products.some((p) => p.id === cur.product) ? cur.product : cat.products[0].id;
+    const opts = productsFor(t.id, cat.id);
+    let product = opts.some((p) => p.id === cur.product) ? cur.product : opts[0].id;
     let qty = Math.round(Number(cur.qty) || 0);
+    if (rules.hide?.includes(cat.id)) qty = 0;
+    // ön pozisyon yan markerın eşi (yan marker ön kategoriden önce işlenir)
+    if (cat.id === 'front' && rules.frontFromSide) {
+      const f = productById('side', lamps.side.product).front;
+      product = f && cat.products.some((p) => p.id === f) ? f : cat.products[0].id;
+    }
+    // sabit çerçeveli dorseye çerçeve seçili gelirse (başka dorseden geçiş): ek plaka lambası yok
+    if (cat.id === 'plate' && rules.plateFrame && cur.product === rules.plateFrame) qty = 0;
     const fixed = productById(cat.id, product).fixed;
     if (fixed) {
       qty = qty > 0 ? fixed : 0; // sabit adetli ürün: ürün değişince de adet ürüne oturur (RTR 3366 → LTD 2834: 1 → 2)
