@@ -10,6 +10,7 @@
 // Montaj noktaları dorse betiğinin yazdığı `mounts` (R48 haritası) varsa ondan, yoksa eski bağlantı noktalarından.
 import * as THREE from 'three';
 import { CATEGORIES, layoutOf, productById, rulesFor, type CategoryId, type Config } from '../data';
+import { WIRE_COLORS } from '../colors';
 import type { Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
@@ -810,8 +811,8 @@ function wireMat(mats: Mats, kind: WireKind) {
     // çalışma / tepe hatları: lejanttaki mor (diğer hatlarla aynı koruge dokusu)
     if (!auxWire) {
       const m = (mats.wire.marker as THREE.MeshStandardMaterial).clone();
-      m.color.set('#a855f7');
-      m.emissive.set('#a855f7');
+      m.color.set(WIRE_COLORS.aux);
+      m.emissive.set(WIRE_COLORS.aux);
       auxWire = m;
     }
     return auxWire;

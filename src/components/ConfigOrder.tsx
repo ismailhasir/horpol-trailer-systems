@@ -6,6 +6,7 @@ import type { CUi } from '../configurator/i18n';
 import { summaryRows } from '../configurator/summary';
 import type { Ui } from '../i18n/ui';
 import type { Lang } from '../lib/labels';
+import QuoteFields, { emptyQuote, validateQuote } from './QuoteFields';
 
 interface Props {
   open: boolean;
@@ -17,11 +18,9 @@ interface Props {
   lang: Lang;
 }
 
-const empty = { company: '', name: '', phone: '', email: '', tax: '', address: '', note: '', ok: false };
-
 export default function ConfigOrder({ open, onClose, cfg, qty, t, ui, lang }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState(emptyQuote);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
 
@@ -46,24 +45,10 @@ export default function ConfigOrder({ open, onClose, cfg, qty, t, ui, lang }: Pr
 
   const submit = (e: Event) => {
     e.preventDefault();
-    if (!form.company.trim() || !form.name.trim() || !form.phone.trim() || !form.email.trim() || !form.tax.trim() || !form.address.trim()) {
-      setError(ui.err_fields);
-      return;
-    }
-    if (!form.ok) {
-      setError(ui.err_consent);
-      return;
-    }
-    setError('');
-    setDone(true);
+    const err = validateQuote(form, ui);
+    setError(err);
+    if (!err) setDone(true);
   };
-
-  const field = (key: 'company' | 'name' | 'phone' | 'email' | 'tax', label: string, type = 'text', auto = '') => (
-    <label>
-      {label}
-      <input class="input" type={type} autocomplete={auto} value={form[key]} required onInput={(e) => setForm((f) => ({ ...f, [key]: (e.target as HTMLInputElement).value }))} />
-    </label>
-  );
 
   return (
     <dialog ref={ref} class="drawer" aria-labelledby="co-title" onClick={(e) => e.target === ref.current && onClose()}>
@@ -104,34 +89,7 @@ export default function ConfigOrder({ open, onClose, cfg, qty, t, ui, lang }: Pr
                     </div>
                   ))}
                 </dl>
-                <div class="order">
-                  {field('company', ui.f_company, 'text', 'organization')}
-                  <div class="two">
-                    {field('name', ui.f_name, 'text', 'name')}
-                    {field('phone', ui.f_phone, 'tel', 'tel')}
-                  </div>
-                  {field('email', ui.f_email, 'email', 'email')}
-                  {field('tax', ui.f_tax, 'text', 'off')}
-                  <label>
-                    {ui.f_address}
-                    <textarea class="input" rows={2} autocomplete="street-address" required value={form.address} onInput={(e) => setForm((f) => ({ ...f, address: (e.target as HTMLTextAreaElement).value }))} />
-                  </label>
-                  <label>
-                    <span>
-                      {ui.f_note} <span class="opt">({ui.f_optional})</span>
-                    </span>
-                    <textarea class="input" rows={2} value={form.note} onInput={(e) => setForm((f) => ({ ...f, note: (e.target as HTMLTextAreaElement).value }))} />
-                  </label>
-                  <label class="consent">
-                    <input type="checkbox" checked={form.ok} onChange={(e) => setForm((f) => ({ ...f, ok: (e.target as HTMLInputElement).checked }))} />
-                    <span>{ui.f_consent}</span>
-                  </label>
-                  {error && (
-                    <p class="err" role="alert">
-                      {error}
-                    </p>
-                  )}
-                </div>
+                <QuoteFields form={form} setForm={setForm} error={error} ui={ui} />
               </div>
               <div class="drawer-foot">
                 <button type="submit" class="btn btn-primary">

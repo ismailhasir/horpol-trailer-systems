@@ -24,6 +24,7 @@ import {
 } from '../configurator/data';
 import { categoryName, socketName, trailerDesc, trailerName, type CUi } from '../configurator/i18n';
 import { summaryRows } from '../configurator/summary';
+import { WIRE_COLORS } from '../configurator/colors';
 import { showToast } from '../lib/cart';
 import ConfigOrder from './ConfigOrder';
 import { numberLocale, type Lang } from '../lib/labels';
@@ -401,12 +402,12 @@ export default function Configurator({ lang, t, ui }: Props) {
         )}
         {system && (
           <ul class="cfg-legend" aria-label={t.system}>
-            <li><i style="background:#3b82f6" />{t.legend_main}</li>
-            <li><i style="background:#f59e0b" />{t.legend_side}</li>
-            <li><i style="background:#ef4444" />{t.legend_rear}</li>
-            <li><i style="background:#e5e7eb" />{t.legend_plate}</li>
-            <li><i style="background:#22c55e" />{t.legend_marker}</li>
-            {cfg.lamps.work.qty + cfg.lamps.beacon.qty > 0 && <li><i style="background:#a855f7" />{t.legend_aux}</li>}
+            <li><i style={`background:${WIRE_COLORS.main}`} />{t.legend_main}</li>
+            <li><i style={`background:${WIRE_COLORS.side}`} />{t.legend_side}</li>
+            <li><i style={`background:${WIRE_COLORS.rear}`} />{t.legend_rear}</li>
+            <li><i style={`background:${WIRE_COLORS.plate}`} />{t.legend_plate}</li>
+            <li><i style={`background:${WIRE_COLORS.marker}`} />{t.legend_marker}</li>
+            {cfg.lamps.work.qty + cfg.lamps.beacon.qty > 0 && <li><i style={`background:${WIRE_COLORS.aux}`} />{t.legend_aux}</li>}
           </ul>
         )}
         <p class="cfg-hint">{touch ? t.hint_touch : t.hint}</p>

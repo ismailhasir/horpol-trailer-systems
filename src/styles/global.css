@@ -774,6 +774,9 @@ html[lang='ar'] body {
   border-radius: var(--r);
   background: var(--surface);
 }
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
 .list-search .input {
   padding-inline-start: 38px;
 }

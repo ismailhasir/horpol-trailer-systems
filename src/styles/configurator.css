@@ -754,7 +754,8 @@ html[lang='ar'] .cs-head h2 {
   box-shadow: 0 10px 30px rgba(13, 27, 48, 0.14);
   max-width: calc(100% - var(--cfg-left) - var(--cfg-right) - 4 * var(--cfg-gap));
 }
-[dir='rtl'] .cfg-tools {
+[dir='rtl'] .cfg-tools,
+[dir='rtl'] .cfg-legend {
   left: calc(50% - (var(--cfg-left) - var(--cfg-right)) / 2);
 }
 .cfg-views {
@@ -956,7 +957,8 @@ html[lang='ar'] .cs-head h2 {
     bottom: 58px;
     max-width: calc(100% - 20px);
   }
-  .cfg-legend {
+  .cfg-legend,
+  [dir='rtl'] .cfg-legend {
     left: 50%;
     top: 10px;
     max-width: calc(100% - 20px);

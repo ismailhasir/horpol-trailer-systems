@@ -6,6 +6,7 @@ import { fmt, type Ui } from '../i18n/ui';
 import type { DetailItem } from '../lib/format';
 import type { Lang } from '../lib/labels';
 import SetVisual, { LampIcon } from './SetVisual';
+import QuoteFields, { emptyQuote, validateQuote } from './QuoteFields';
 
 interface Props {
   /** false: konfigüratör sayfası. Ürün arama ve teklif listesi (sepet) gösterilmez, yalnızca bildirim çalışır. */
@@ -81,7 +82,7 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
   const [cartOpen, setCartOpen] = useState(false);
   const [stage, setStage] = useState<Stage>('list');
   const [toast, setToast] = useState<ToastDetail | null>(null);
-  const [form, setForm] = useState({ company: '', name: '', phone: '', email: '', tax: '', address: '', note: '', ok: false });
+  const [form, setForm] = useState(emptyQuote);
   const [error, setError] = useState('');
   const toastRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number>(0);
@@ -161,16 +162,9 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
 
   const submit = (e: Event) => {
     e.preventDefault();
-    if (!form.company.trim() || !form.name.trim() || !form.phone.trim() || !form.email.trim() || !form.tax.trim() || !form.address.trim()) {
-      setError(ui.err_fields);
-      return;
-    }
-    if (!form.ok) {
-      setError(ui.err_consent);
-      return;
-    }
-    setError('');
-    setStage('done');
+    const err = validateQuote(form, ui);
+    setError(err);
+    if (!err) setStage('done');
   };
 
   const onSearchKey = (e: KeyboardEvent) => {
@@ -187,20 +181,6 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
       setSearchOpen(false);
     }
   };
-
-  const field = (key: 'company' | 'name' | 'phone' | 'email' | 'tax', label: string, type = 'text', auto = '') => (
-    <label>
-      {label}
-      <input
-        class="input"
-        type={type}
-        autocomplete={auto}
-        value={form[key]}
-        required
-        onInput={(e) => setForm((f) => ({ ...f, [key]: (e.target as HTMLInputElement).value }))}
-      />
-    </label>
-  );
 
   return (
     <>
@@ -446,7 +426,7 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
                         </div>
                       </div>
                       <div class="qty">
-                        <button type="button" aria-label={ui.qty_dec} onClick={() => setQty(l.id, l.qty - 1)}>
+                        <button type="button" aria-label={ui.qty_dec} disabled={l.qty <= 1} onClick={() => setQty(l.id, l.qty - 1)}>
                           −
                         </button>
                         <output>{l.qty}</output>
@@ -474,34 +454,7 @@ export default function HeaderTools({ items, ui, lang, shop = true }: Props) {
                   <p class="summary">
                     {fmt(ui.items_count, { n: itemCount })}: {lines.map((l) => `${l.p.code} × ${l.qty * mult}`).join(', ')}
                   </p>
-                  <div class="order">
-                    {field('company', ui.f_company, 'text', 'organization')}
-                    <div class="two">
-                      {field('name', ui.f_name, 'text', 'name')}
-                      {field('phone', ui.f_phone, 'tel', 'tel')}
-                    </div>
-                    {field('email', ui.f_email, 'email', 'email')}
-                    {field('tax', ui.f_tax, 'text', 'off')}
-                    <label>
-                      {ui.f_address}
-                      <textarea class="input" rows={2} autocomplete="street-address" required value={form.address} onInput={(e) => setForm((f) => ({ ...f, address: (e.target as HTMLTextAreaElement).value }))} />
-                    </label>
-                    <label>
-                      <span>
-                        {ui.f_note} <span class="opt">({ui.f_optional})</span>
-                      </span>
-                      <textarea class="input" rows={2} value={form.note} onInput={(e) => setForm((f) => ({ ...f, note: (e.target as HTMLTextAreaElement).value }))} />
-                    </label>
-                    <label class="consent">
-                      <input type="checkbox" checked={form.ok} onChange={(e) => setForm((f) => ({ ...f, ok: (e.target as HTMLInputElement).checked }))} />
-                      <span>{ui.f_consent}</span>
-                    </label>
-                    {error && (
-                      <p class="err" role="alert">
-                        {error}
-                      </p>
-                    )}
-                  </div>
+                  <QuoteFields form={form} setForm={setForm} error={error} ui={ui} />
                 </div>
                 <div class="drawer-foot">
                   <button type="submit" class="btn btn-primary">

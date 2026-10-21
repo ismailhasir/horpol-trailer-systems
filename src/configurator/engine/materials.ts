@@ -1,6 +1,7 @@
 // Paylaşılan malzemeler ve basit doku üreticiler (kodla çizilen parçalar: soketler, modül, tesisat, braketler). Tüm parçalar
 // aynı malzeme örneklerini kullanır (çizim çağrısı ve bellek tasarrufu). Dorse ve lambalar kendi GLB malzemeleriyle gelir.
 import * as THREE from 'three';
+import { WIRE_COLORS as W } from '../colors';
 
 export interface Mats {
   chassis: THREE.MeshStandardMaterial;
@@ -78,11 +79,11 @@ export function createMaterials(logoWhite: THREE.Texture | null): Mats {
     outline: new THREE.LineBasicMaterial({ color: '#6f8fbd', transparent: true, opacity: 0.7 }),
     connWhite: std({ color: '#d9dee6', roughness: 0.45, metalness: 0.05 }),
     wire: {
-      main: wire('#3b82f6', 0.35),
-      side: wire('#f59e0b', 0.3),
-      rear: wire('#ef4444', 0.3),
-      plate: wire('#e5e7eb', 0.15),
-      marker: wire('#22c55e', 0.3),
+      main: wire(W.main, 0.35),
+      side: wire(W.side, 0.3),
+      rear: wire(W.rear, 0.3),
+      plate: wire(W.plate, 0.15),
+      marker: wire(W.marker, 0.3),
       sheath: std({ color: '#1b1d20', map: rib, bumpMap: rib, bumpScale: 1.2, roughness: 0.6, metalness: 0.1 }),
     },
   };
