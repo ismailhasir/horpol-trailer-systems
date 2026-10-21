@@ -593,7 +593,6 @@ export default function Configurator({ lang, t, ui }: Props) {
                         <button type="button" role="radio" class="lpc" aria-checked={on} onClick={() => pickProduct(cat.id, p.id)} key={p.id}>
                           <LampIcon id={p.set ?? p.id} lit={lights} size="card" />
                           <span class="lpc-code mono ltr">{p.code}</span>
-                          {p.codeR && <small class="lpc-pair mono ltr">{p.codeR}</small>}
                           {on && ch.qty > 0 && (
                             <b class="lpc-qty mono ltr" aria-hidden="true">
                               ×{ch.qty}

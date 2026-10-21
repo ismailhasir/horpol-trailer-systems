@@ -186,9 +186,14 @@ export interface TrailerRules {
   plateFrame?: string;
   /** plakada site adresi yazar (src/config/site.ts plateText) */
   sitePlate?: boolean;
+  /**
+   * arka lastik kol, lambada takma noktası (MOUNT_arm: LZD 3194, LZD 2854) yoksa kasaya değil stop lambalarının taşıyıcı
+   * plakasının (tamponun) dış kenarına (montaj haritası armRearAlt). Revizeler/Standart Dorse md. 14
+   */
+  armOnCarrier?: boolean;
 }
 export const TRAILER_RULES: Partial<Record<TrailerId, TrailerRules>> = {
-  standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true },
+  standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true },
 };
 export const rulesFor = (t: TrailerId): TrailerRules => TRAILER_RULES[t] ?? {};
 /** Konfigüratör listesinde bu dorse için görünen kategoriler */

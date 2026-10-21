@@ -470,14 +470,6 @@ html[lang='ar'] .cfg-label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lpc-pair {
-  max-width: 100%;
-  font-size: 0.7rem;
-  color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .lpc-qty {
   position: absolute;
   inset-block-start: 8px;

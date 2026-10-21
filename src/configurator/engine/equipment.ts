@@ -82,6 +82,7 @@ interface MountsLike {
   };
   front?: P3 & { bracket?: Bracket };
   armRear?: P3 & { wallZ?: number; bracket?: Bracket };
+  armRearAlt?: P3 & { wallZ?: number; bracket?: Bracket };
   armFront?: P3 & { wallZ?: number; bracket?: Bracket };
   /** rise: kablonun dikey çıktığı [x, |z|, yanal geçiş y?] (dar kule/travers önü gibi; yoksa en yakın köşe) */
   work?: (P3 & { dir?: [number, number, number]; bracket?: Bracket; rise?: number[] })[];
@@ -564,7 +565,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
 
   // =========================== LASTİK KOL ===========================
   const ar = c.lamps.arm;
-  const AR: P3 & { wallZ?: number; bracket?: Bracket } = M.armRear ?? a.armRear;
+  // lambada kol takma noktası yoksa (LUNA, CUBE …) dorse kuralına göre taşıyıcı plakanın dış kenarı (kasa köşesi değil)
+  const onCarrier = rulesFor(c.trailer).armOnCarrier && !Object.keys(armMount).length && M.armRearAlt;
+  const AR: P3 & { wallZ?: number; bracket?: Bracket } = onCarrier ? M.armRearAlt! : (M.armRear ?? a.armRear);
   const AF: P3 & { wallZ?: number; bracket?: Bracket } = M.armFront ?? a.armFront;
   const armSpots = ar.qty >= 4 ? [AR, AF] : ar.qty >= 2 ? [AR] : [];
   for (const sp of armSpots) {
