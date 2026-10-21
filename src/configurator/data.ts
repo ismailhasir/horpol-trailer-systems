@@ -282,7 +282,7 @@ export const DEFAULT_CONFIG: Config = {
     side: { product: 'ld2774', qty: 12 },
     plate: { product: 'ltd2834', qty: 2 },
     front: { product: 'ld2773', qty: 2 },
-    arm: { product: 'ld2994', qty: 2 },
+    arm: { product: 'ldcc2698', qty: 2 }, // varsayılan stop LZD 3194: kolu lambaya takılı LDCC 2698
     work: { product: 'lrd2681', qty: 0 },
     beacon: { product: 'ldo2660', qty: 0 },
   },

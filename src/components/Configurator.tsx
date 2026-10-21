@@ -100,17 +100,21 @@ function LampIcon({ id, lit, size = 'thumb' }: { id: string | string[]; lit: boo
 }
 
 const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e', work: '#a5b4fc', beacon: '#f59e0b' };
+/** kategori → kameranın döndüğü görünüm düğmesi (Engine.focusCategory ile aynı yön; diğerleri özel poz) */
+const CAT_VIEW: Partial<Record<CategoryId, View>> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front' };
 const FN_LIST: FnToggle[] = ['position', 'stop', 'turn', 'reverse', 'fog', 'work', 'beacon'];
 
 export default function Configurator({ lang, t, ui }: Props) {
   const [cfg, setCfg] = useState<Config>(() => {
     if (typeof location !== 'undefined' && location.search) return fromQuery(location.search);
-    return structuredClone(DEFAULT_CONFIG);
+    // varsayılan da kurallardan geçer (ör. standart dorsede LZD 3194 → LDCC 2698 kilidi, RTR çerçevesi)
+    return normalize(structuredClone(DEFAULT_CONFIG));
   });
   const [status, setStatus] = useState<'loading' | 'ready' | 'fail'>('loading');
   // tip değişiminde seçilen dorsenin 3D modeli indiriliyor mu (mevcut dorse görünür kalır)
   const [modelState, setModelState] = useState<'loading' | 'ready' | 'error'>('ready');
-  const [view, setView] = useState<View>('overview');
+  // seçili görünüm düğmesi; kategoriye odaklanınca kameranın baktığı yöne göre (rear/side/front) ya da hiçbiri (null)
+  const [view, setView] = useState<View | null>('overview');
   const [system, setSystem] = useState(false);
   const [lights, setLights] = useState(false);
   const [openCat, setOpenCat] = useState<CategoryId | null>('stop');
@@ -141,7 +145,7 @@ export default function Configurator({ lang, t, ui }: Props) {
           onPick: (c) => {
             setOpenCat(c);
             setTab('lamps');
-            eng.focusCategory(c);
+            focusRef.current(c);
           },
           onModelState: setModelState,
         });
@@ -269,6 +273,14 @@ export default function Configurator({ lang, t, ui }: Props) {
     }
   };
 
+  /** Kategoriye odaklan: kamera o lambalara döner, görünüm düğmeleri kameranın yönünü gösterir */
+  const focus = (cat: CategoryId) => {
+    if (system) return;
+    engineRef.current?.focusCategory(cat);
+    setView(CAT_VIEW[cat] ?? null);
+  };
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
   const step = (cat: CategoryId, dir: 1 | -1) => {
     const def = CATEGORIES.find((c) => c.id === cat)!;
     update((c) => {
@@ -286,7 +298,7 @@ export default function Configurator({ lang, t, ui }: Props) {
       c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), cur + dir * d));
       return c;
     });
-    engineRef.current?.focusCategory(cat);
+    focus(cat);
   };
   const pickProduct = (cat: CategoryId, id: string) => {
     update((c) => {
@@ -295,11 +307,11 @@ export default function Configurator({ lang, t, ui }: Props) {
       if (c.lamps[cat].qty === 0) c.lamps[cat].qty = pr.fixed ?? qtyOptions(pr)?.[1] ?? pr.step ?? CATEGORIES.find((x) => x.id === cat)!.step;
       return c;
     });
-    engineRef.current?.focusCategory(cat);
+    focus(cat);
   };
   const toggleCat = (cat: CategoryId) => {
     setOpenCat((o) => (o === cat ? null : cat));
-    engineRef.current?.focusCategory(cat);
+    focus(cat);
   };
   const go = (v: View) => {
     setView(v);
@@ -328,7 +340,7 @@ export default function Configurator({ lang, t, ui }: Props) {
   };
   const fnAvail = (f: FnToggle) => (f === 'work' ? cfg.lamps.work.qty > 0 : f === 'beacon' ? cfg.lamps.beacon.qty > 0 : f === 'position' || cfg.lamps.stop.qty > 0);
   const reset = () => {
-    setCfg(structuredClone(DEFAULT_CONFIG));
+    setCfg(normalize(structuredClone(DEFAULT_CONFIG)));
     setOrderQty(1);
     setView('overview');
     engineRef.current?.setView('overview');
@@ -567,7 +579,7 @@ export default function Configurator({ lang, t, ui }: Props) {
             return (
               <section class={`lc ${open && !auto ? 'open' : ''} ${ch.qty === 0 && !frame ? 'off' : ''}`} key={cat.id}>
                 <div class="lc-head">
-                  <button type="button" class={`lc-toggle${auto ? ' static' : ''}`} aria-expanded={auto ? undefined : open} onClick={() => (auto ? engineRef.current?.focusCategory(cat.id) : toggleCat(cat.id))}>
+                  <button type="button" class={`lc-toggle${auto ? ' static' : ''}`} aria-expanded={auto ? undefined : open} onClick={() => (auto ? focus(cat.id) : toggleCat(cat.id))}>
                     <span class="lc-thumb">
                       <LampIcon id={thumb} lit={lights && (ch.qty > 0 || !!frame)} />
                       <i class="lc-dot" style={`background:${CAT_DOT[cat.id]}`} />
