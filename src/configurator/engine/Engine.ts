@@ -15,7 +15,7 @@ import { setPlateLight } from './plateLight';
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
 /** Arayüz düğmeleri dışında motorun kendi kullandığı kamera pozları */
-type Pose = View | 'arm' | 'system' | 'extra';
+type Pose = View | 'arm' | 'beacon' | 'system' | 'extra';
 /** lamba yüklemesi bitince setConfig'i tekrarlamak için */
 const LAMP_RETRY = Symbol('lampRetry');
 
@@ -472,7 +472,20 @@ export class Engine {
         return [V(-L - 6.2 * k, 2.9, 3.6 * k), V(-L + 0.6, 1.7, 0)];
       case 'top':
         return [V(cx + 0.01, (L * 1.08 + 4) * k, 0.02), V(cx, 0.5, 0)];
-      case 'arm':
+      case 'arm': {
+        // lastik kollar: takılı kolların gerçek yerine bak (standart dorsede tampon kenarı, eskiden kasanın üst köşesi
+        // sanılıyordu); kol yoksa ya da modeli yüklenmemişse arka tampon yüksekliği
+        const arms = this.equip?.lampsByCat.arm ?? [];
+        const t = new THREE.Vector3();
+        if (arms.length) {
+          for (const o of arms) t.add(o.getWorldPosition(new THREE.Vector3()));
+          t.multiplyScalar(1 / arms.length);
+        } else t.set(-0.5, a.rear.lampY, 0);
+        const rear = t.x > cx; // arka kollar → arkadan, yalnız önde ise önden
+        return [V(t.x + (rear ? 2.9 : -2.9) * k, t.y + 0.55, 2.1 * k), V(t.x, t.y, 0)];
+      }
+      case 'beacon':
+        // tepe lambaları: üst arka köşe (eski "arm" pozu)
         return [V(4.6 * k, a.topY + 1.4, 4.6 * k), V(-0.8, a.topY - 0.6, 0)];
       case 'system':
         return [V(cx + L * 0.28, (L * 0.78 + 2) * k, L * 0.42 * k), V(cx + 0.3, 0.9, 0)];
@@ -553,7 +566,7 @@ export class Engine {
   }
 
   focusCategory(cat: CategoryId) {
-    const map: Record<CategoryId, Pose> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', work: 'extra', beacon: 'arm' };
+    const map: Record<CategoryId, Pose> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', work: 'extra', beacon: 'beacon' };
     if (this.system) return;
     this.setView(map[cat]);
   }

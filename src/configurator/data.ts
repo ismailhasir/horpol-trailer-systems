@@ -206,9 +206,19 @@ export interface TrailerRules {
    * plakasının (tamponun) dış kenarına (montaj haritası armRearAlt). Revizeler/Standart Dorse md. 14
    */
   armOnCarrier?: boolean;
+  /** lastik kol tavanı (ör. 2: yalnız arka çift, seçim 0 ya da 2) */
+  armMax?: number;
+  /** stop lambası → zorunlu lastik kol modeli (lambaya takılan kol; ör. LZD 3194 → LDCC 2698), panelde model seçilmez */
+  armForStop?: Record<string, string>;
+}
+/** Bu yapılandırmada lastik kol modeli stop lambasından geliyorsa o modelin id'si */
+export function lockedArm(c: Pick<Config, 'trailer' | 'lamps'>): string | undefined {
+  const st = c.lamps.stop;
+  return st && st.qty > 0 ? rulesFor(c.trailer).armForStop?.[st.product] : undefined;
 }
 export const TRAILER_RULES: Partial<Record<TrailerId, TrailerRules>> = {
-  standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true },
+  // armForStop / armMax: kullanıcı 2026-10-21 (LZD 3194'ün kol adaptörü LDCC 2698 ile; lastik kol yalnız arka çift)
+  standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
 };
 export const rulesFor = (t: TrailerId): TrailerRules => TRAILER_RULES[t] ?? {};
 /** Konfigüratör listesinde bu dorse için görünen kategoriler */
@@ -242,6 +252,7 @@ export function maxQty(c: Pick<Config, 'trailer' | 'lamps'>, cat: CategoryId): n
   const prod = productById(cat, c.lamps[cat]?.product ?? def.products[0].id);
   let m = Math.min(def.max, prod.fixed ?? prod.max ?? def.max);
   if (cat === 'side') m = Math.min(m, SIDE_MAX[c.trailer] ?? def.max);
+  if (cat === 'arm') m = Math.min(m, rulesFor(c.trailer).armMax ?? def.max);
   if (cat === 'beacon') m = Math.min(m, BEACON_MAX[c.trailer] ?? def.max);
   return m;
 }
@@ -294,6 +305,11 @@ export function normalize(c: Config): Config {
     if (cat.id === 'front' && rules.frontFromSide) {
       const f = productById('side', lamps.side.product).front;
       product = f && cat.products.some((p) => p.id === f) ? f : cat.products[0].id;
+    }
+    // lastik kol modeli stop lambasından (stop kategorisi kol kategorisinden önce işlenir)
+    if (cat.id === 'arm') {
+      const la = lockedArm({ trailer: t.id, lamps });
+      if (la && cat.products.some((p) => p.id === la)) product = la;
     }
     // sabit çerçeveli dorseye çerçeve seçili gelirse (başka dorseden geçiş): ek plaka lambası yok
     if (cat.id === 'plate' && rules.plateFrame && cur.product === rules.plateFrame) qty = 0;

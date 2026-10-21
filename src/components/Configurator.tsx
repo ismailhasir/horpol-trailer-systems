@@ -15,6 +15,7 @@ import {
   productsFor,
   qtyOptions,
   rulesFor,
+  lockedArm,
   toQuery,
   type CategoryId,
   type Config,
@@ -557,7 +558,8 @@ export default function Configurator({ lang, t, ui }: Props) {
             const open = openCat === cat.id;
             const max = maxQty(cfg, cat.id);
             // ön pozisyon yan markerın eşi (model seçilmez, yalnız aç/kapa); plaka çerçevesi sabit, lambalar ona ek
-            const auto = cat.id === 'front' && !!rules.frontFromSide;
+            const armLock = cat.id === 'arm' ? lockedArm(cfg) : undefined;
+            const auto = (cat.id === 'front' && !!rules.frontFromSide) || !!armLock;
             const frame = cat.id === 'plate' ? rules.plateFrame : undefined;
             const frameCode = frame ? productById('plate', frame).code : '';
             const thumb = frame && !ch.qty ? frame : (prod.set ?? prod.id);
@@ -573,7 +575,7 @@ export default function Configurator({ lang, t, ui }: Props) {
                     <span class="lc-name">
                       <b>{categoryName(t, cat.id)}</b>
                       <small class="mono">{code}</small>
-                      {auto && <small class="lc-auto">{t.front_auto}</small>}
+                      {auto && <small class="lc-auto">{armLock ? fmtT(t.arm_auto, { code: productById('stop', cfg.lamps.stop.product).code }) : t.front_auto}</small>}
                     </span>
                     {!auto && <Ico d={IC.chevron} size={16} />}
                   </button>
