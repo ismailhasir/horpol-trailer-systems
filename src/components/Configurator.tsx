@@ -13,6 +13,7 @@ import {
   categoriesFor,
   productById,
   productsFor,
+  qtyOptions,
   rulesFor,
   toQuery,
   type CategoryId,
@@ -272,8 +273,16 @@ export default function Configurator({ lang, t, ui }: Props) {
     update((c) => {
       // sabit adetli ürünlerde (plaka lambası çifti, plaka çerçevesi) adım ürünün adedi: 0 ↔ sabit adet
       const pr = productById(cat, c.lamps[cat].product);
+      const opts = qtyOptions(pr);
+      const cur = c.lamps[cat].qty;
+      if (opts) {
+        // dizilimli ürün (LUNA seti): seçilebilir adetler arasında bir sonraki / bir önceki
+        const nx = dir > 0 ? opts.find((v) => v > cur) : [...opts].reverse().find((v) => v < cur);
+        c.lamps[cat].qty = nx ?? cur;
+        return c;
+      }
       const d = pr.fixed ?? pr.step ?? def.step;
-      c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), c.lamps[cat].qty + dir * d));
+      c.lamps[cat].qty = Math.max(0, Math.min(maxQty(c, cat), cur + dir * d));
       return c;
     });
     engineRef.current?.focusCategory(cat);
@@ -282,7 +291,7 @@ export default function Configurator({ lang, t, ui }: Props) {
     update((c) => {
       c.lamps[cat].product = id;
       const pr = productById(cat, id);
-      if (c.lamps[cat].qty === 0) c.lamps[cat].qty = pr.fixed ?? pr.step ?? CATEGORIES.find((x) => x.id === cat)!.step;
+      if (c.lamps[cat].qty === 0) c.lamps[cat].qty = pr.fixed ?? qtyOptions(pr)?.[1] ?? pr.step ?? CATEGORIES.find((x) => x.id === cat)!.step;
       return c;
     });
     engineRef.current?.focusCategory(cat);

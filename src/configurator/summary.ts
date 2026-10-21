@@ -1,5 +1,5 @@
 // Sipariş özeti: ekran, teklif listesi ve gönderim aynı fonksiyonu kullanır (tek kaynak).
-import { categoriesFor, productById, rulesFor, type Config } from './data';
+import { categoriesFor, layoutOf, productById, rulesFor, type Config } from './data';
 import { categoryName, socketName, summaryLabel, trailerName, type CUi } from './i18n';
 import { numberLocale, type Lang } from '../lib/labels';
 
@@ -25,7 +25,10 @@ export function summaryRows(c: Config, t: CUi, lang: Lang, setQty = 1): SummaryR
     if (!ch.qty) continue;
     const pr = productById(cat.id, ch.product);
     // set: bileşenler ayrı ayrı (ör. 2 × LZD 2448 + 2 × LZD 2452)
-    const value = pr.setCodes ? pr.setCodes.map((code) => `${ch.qty / pr.setCodes!.length} × ${code}`).join(' + ') : `${ch.qty} × ${pr.code}`;
+    const lay = layoutOf(pr, ch.qty / 2);
+    const value = lay && pr.set && pr.setCodes
+      ? pr.set.map((id, i) => `${2 * lay.filter((x) => x === id).length} × ${pr.setCodes![i]}`).join(' + ')
+      : `${ch.qty} × ${pr.code}`;
     rows.push({ label: summaryLabel(t, cat.id), value, mono: true });
   }
   if (setQty > 1) rows.push({ label: t.set_qty, value: String(setQty) });

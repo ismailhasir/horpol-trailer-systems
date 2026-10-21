@@ -69,8 +69,22 @@ export interface LampProduct {
    */
   set?: string[];
   setCodes?: string[];
-  /** adet adımı (kategorininkinden farklıysa; ör. set: her yanda bir set = 4 lamba) */
+  /** adet adımı (kategorininkinden farklıysa) */
   step?: number;
+  /**
+   * yanda lamba sayısına göre dizilim (dıştan içe): yalnız bu sayılar seçilebilir (toplam adet = 2 × anahtar). Ör. LUNA seti:
+   * 3 → 2448, 2448, 2452; 4 → 2448, 2448, 2448, 2452
+   */
+  layouts?: Record<number, string[]>;
+}
+
+/** Ürünün seçilebilir toplam adetleri (dizilimli ürün: 0 ve dizilimler; yoksa null) */
+export function qtyOptions(p: LampProduct): number[] | null {
+  return p.layouts ? [0, ...Object.keys(p.layouts).map((k) => 2 * Number(k)).sort((a, b) => a - b)] : null;
+}
+/** Dizilimli üründe bir yandaki lambalar (dıştan içe) */
+export function layoutOf(p: LampProduct, perSide: number): string[] | null {
+  return p.layouts?.[perSide] ?? null;
 }
 
 export interface CategoryDef {
@@ -99,9 +113,10 @@ export const CATEGORIES: CategoryDef[] = [
       // yanda 2. LZD 2854'ün sağ eşi LZD 2855 (ürün sayfası: "Side right").
       { id: 'lzd3194', code: 'LZD 3194/AMP', codeR: 'LZD 3195/AMP', max: 2 },
       { id: 'lzd2854', code: 'LZD 2854', codeR: 'LZD 2855', max: 2 },
-      // LUNA seti (kullanıcı 2026-10-21): her yanda dışta LZD 2448 (sinyal dış kenara yakın, R48), içte LZD 2452; sağda aynaları
-      // LZD 2449 / LZD 2453. Adet = toplam lamba; her yanda en çok iki set
-      { id: 'luna', code: 'LZD 2448 + LZD 2452', codeR: 'LZD 2449 + LZD 2453', set: ['lzd2448', 'lzd2452'], setCodes: ['LZD 2448', 'LZD 2452'], step: 4, max: 8 },
+      // LUNA seti (kullanıcı 2026-10-21): her yanda en az 3 (dıştan 2 × LZD 2448, en içte LZD 2452), en çok 4 (3 × LZD 2448 +
+      // LZD 2452); sağda aynaları LZD 2449 / LZD 2453. Seçilebilir toplam: 0, 6, 8
+      { id: 'luna', code: 'LZD 2448 + LZD 2452', codeR: 'LZD 2449 + LZD 2453', set: ['lzd2448', 'lzd2452'], setCodes: ['LZD 2448', 'LZD 2452'], max: 8,
+        layouts: { 3: ['lzd2448', 'lzd2448', 'lzd2452'], 4: ['lzd2448', 'lzd2448', 'lzd2448', 'lzd2452'] } },
       { id: 'lzd2875', code: 'LZD 2875/GRAPHITE', max: 4 },
       { id: 'lzd2876', code: 'LZD 2876', max: 4 },
     ],
@@ -286,9 +301,12 @@ export function normalize(c: Config): Config {
     if (fixed) {
       qty = qty > 0 ? fixed : 0; // sabit adetli ürün: ürün değişince de adet ürüne oturur (RTR 3366 → LTD 2834: 1 → 2)
     } else {
-      const step = productById(cat.id, product).step ?? cat.step;
+      const pr = productById(cat.id, product);
+      const step = pr.step ?? cat.step;
+      const opts = qtyOptions(pr);
       qty = Math.max(cat.min, Math.min(maxQty({ trailer: t.id, lamps: { ...c.lamps, [cat.id]: { product, qty } } }, cat.id), qty));
-      qty = qty > 0 ? Math.max(step, cat.min + Math.round((qty - cat.min) / step) * step) : qty;
+      if (opts) qty = qty > 0 ? opts.filter((v) => v > 0).reduce((b, v) => (Math.abs(v - qty) < Math.abs(b - qty) ? v : b)) : 0;
+      else qty = qty > 0 ? Math.max(step, cat.min + Math.round((qty - cat.min) / step) * step) : qty;
     }
     lamps[cat.id] = { product, qty };
   }

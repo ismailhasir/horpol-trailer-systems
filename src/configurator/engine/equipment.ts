@@ -9,7 +9,7 @@
 //   Çalışma ve tepe lambaları (HOR-1001 şeması): modülün boş portlarından; ayrı 2×1 besleme hattı soketten modüle.
 // Montaj noktaları dorse betiğinin yazdığı `mounts` (R48 haritası) varsa ondan, yoksa eski bağlantı noktalarından.
 import * as THREE from 'three';
-import { CATEGORIES, productById, rulesFor, type CategoryId, type Config } from '../data';
+import { CATEGORIES, layoutOf, productById, rulesFor, type CategoryId, type Config } from '../data';
 import type { Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
@@ -402,9 +402,10 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const rx = R?.faceX ?? R?.x ?? a.rear.x;
   const ly = R?.y ?? a.rear.lampY;
   // set (ör. LUNA): her yanda dıştan içe bileşenler sırayla
-  const stopSet = productById('stop', stop.product).set ?? [stop.product];
-  const zEdge = R ? R.zOuter : Math.min(W2 - 0.03, a.rear.lampZ[0] + (LAMP_W[stopSet[0]] ?? 0.3) / 2);
   const perSide = Math.floor(stop.qty / 2);
+  // dizilimli set (LUNA: dıştan 2–3 × LZD 2448, en içte LZD 2452); yoksa tek ürün
+  const stopSet = layoutOf(productById('stop', stop.product), perSide) ?? productById('stop', stop.product).set ?? [stop.product];
+  const zEdge = R ? R.zOuter : Math.min(W2 - 0.03, a.rear.lampZ[0] + (LAMP_W[stopSet[0]] ?? 0.3) / 2);
   // her yan: dıştan içe dizilen lambalar [z merkezi, yarı genişlik]
   const rearLamps: { s: number; z: number; hw: number }[] = [];
   /** dıştaki arka lambanın lastik kol takma noktası (modelde MOUNT_arm varsa; ör. LZD 3194 MAVIC) */
