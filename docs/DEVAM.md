@@ -2,6 +2,15 @@
 
 Bu dosya, başka bir bilgisayardaki Claude Code oturumunun kaldığımız yerden devam etmesi içindir. Önce `CLAUDE.md`'yi oku.
 
+## Güncel (2026-10-21 gece)
+- `main` = `04d93bd` (lamba CAD modelleri, LUNA seti, standart dorse kuralları; GitHub'da).
+- Dal **`project-milestone-check`** (yerelde, push / merge yok, 14 commit): yayın öncesi inceleme. Hata düzeltmeleri, ölü kod temizliği,
+  tek teklif formu (`src/components/QuoteFields.tsx`), tesisat renkleri tek kaynak (`src/configurator/colors.ts`),
+  `npm run check` + `npm test` (21 test), Open Graph / 404 / robots.txt, klavye ve Arapça düzeltmeleri.
+  Ayrıntılı rapor vault'ta: `Proje Kilometre Taşı İncelemesi.md`. Birleştirme kararı kullanıcının.
+- Yayın engelleri: teklif gönderimi yok (ADR-010 önerilen), KVKK metni yok, alan adı belli değil (`astro.config.mjs` `site`).
+- Aşağıdaki bölümler 2026-10-19 durumudur (tarihsel).
+
 ## Durum
 Konfigüratördeki **5 dorse tipinin hepsi** Blender'da betikle modellenip pişirilen GLB'dir (kodla çizilen model kalmadı):
 standart (K.SBT), lowbed (K.SLS), silo (**K.SSL 33**, 9,385 m, 2 kapak; 2026-10-19'da yanlış referans K.SSL 38'den düzeltildi), tanker (K.STB E 45), damper (K.SKS B 27).
