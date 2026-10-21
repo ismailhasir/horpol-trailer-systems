@@ -559,6 +559,19 @@ html[lang='ar'] .cfg-label {
 .lglyph.ph {
   border: 1px dashed var(--line-strong);
 }
+/* 3D modeli (ve simgesi) henüz hazır olmayan ürün: boş kart yerine sönük genel lamba çizgisi */
+.lglyph.ph::after {
+  content: '';
+  position: absolute;
+  inset: 36% 30%;
+  background: var(--faint);
+  opacity: 0.3;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24' fill='none' stroke='%23000' stroke-width='1.6'%3E%3Crect x='1.5' y='3.5' width='45' height='17' rx='4'/%3E%3Ccircle cx='11' cy='12' r='4.2'/%3E%3Ccircle cx='24' cy='12' r='4.2'/%3E%3Crect x='32' y='7.8' width='9.5' height='8.4' rx='1.6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24' fill='none' stroke='%23000' stroke-width='1.6'%3E%3Crect x='1.5' y='3.5' width='45' height='17' rx='4'/%3E%3Ccircle cx='11' cy='12' r='4.2'/%3E%3Ccircle cx='24' cy='12' r='4.2'/%3E%3Crect x='32' y='7.8' width='9.5' height='8.4' rx='1.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.lglyph.thumb.ph::after {
+  inset: 32% 18%;
+}
 @media (prefers-reduced-motion: reduce) {
   .lglyph img {
     transition: none;

@@ -31,7 +31,7 @@ const tr = {
   hero_f1: 'Teklif usulü',
   hero_f2: 'Üyelik gerekmez',
   hero_f3: '3D önizleme',
-  hero_alt: 'Horpol logolu perdeli dorsenin 3D önizlemesi',
+  hero_alt: 'Horpol logolu kapalı kasa dorsenin 3D konfigüratördeki önizlemesi',
   hero_cap: 'Dorseni interaktif oluştur',
   hero_open: '3D konfigüratör',
 
@@ -154,7 +154,7 @@ const en: Ui = {
   hero_f1: 'Quote-based',
   hero_f2: 'No account needed',
   hero_f3: '3D preview',
-  hero_alt: '3D preview of a curtainside trailer with the Horpol logo',
+  hero_alt: '3D configurator preview of a dry freight box trailer with the Horpol logo',
   hero_cap: 'Build your trailer interactively',
   hero_open: '3D configurator',
 
@@ -275,7 +275,7 @@ const ru: Ui = {
   hero_f1: 'Цена по запросу',
   hero_f2: 'Без регистрации',
   hero_f3: '3D-просмотр',
-  hero_alt: '3D-модель тентованного полуприцепа с логотипом Horpol',
+  hero_alt: '3D-модель фургона с логотипом Horpol в конфигураторе',
   hero_cap: 'Соберите прицеп в интерактивном режиме',
   hero_open: '3D-конфигуратор',
 
@@ -396,7 +396,7 @@ const ar: Ui = {
   hero_f1: 'بعرض سعر',
   hero_f2: 'بدون حساب',
   hero_f3: 'معاينة ثلاثية الأبعاد',
-  hero_alt: 'معاينة ثلاثية الأبعاد لمقطورة بستائر جانبية تحمل شعار Horpol',
+  hero_alt: 'معاينة ثلاثية الأبعاد في المُهيّئ لمقطورة بصندوق مغلق تحمل شعار Horpol',
   hero_cap: 'صمّم مقطورتك بشكل تفاعلي',
   hero_open: 'المُهيّئ ثلاثي الأبعاد',
 
