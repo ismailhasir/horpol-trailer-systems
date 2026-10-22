@@ -82,6 +82,16 @@ test('standart dorse: lastik kol 0 ya da 2', () => {
   assert.equal(normalize(withLamps({ arm: { qty: 0 } })).lamps.arm.qty, 0);
 });
 
+test('lowbed: sınırlar standart dorseyle aynı, yalnız tepe lambası takılabilir (kullanıcı 2026-10-22)', () => {
+  const lb = { trailer: 'lowbed' };
+  assert.ok(categoriesFor('lowbed').some((c) => c.id === 'beacon'));
+  assert.equal(normalize(withLamps({ beacon: { qty: 2 } }, lb)).lamps.beacon.qty, 2);
+  assert.equal(normalize(withLamps({ arm: { qty: 4 } }, lb)).lamps.arm.qty, 2);
+  assert.equal(normalize(withLamps({ stop: { product: 'lzd3194', qty: 2 }, arm: { product: 'ld2994', qty: 2 } }, lb)).lamps.arm.product, 'ldcc2698');
+  assert.equal(normalize(withLamps({ side: { product: 'ld500' }, front: { product: 'ld2773' } }, lb)).lamps.front.product, 'ld499');
+  assert.ok(!productsFor('lowbed', 'plate').some((p) => p.id === 'rtr3366'));
+});
+
 test('LUNA seti: toplam yalnız 0, 6 ya da 8', () => {
   const luna = productById('stop', 'luna');
   assert.deepEqual(qtyOptions(luna), [0, 6, 8]);

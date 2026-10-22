@@ -14,7 +14,7 @@ npm run models:pack -- lamp      # gltfpack; lambalarda -kn -km (düğüm ve mal
 - `tools/blender/lamps.py`: ortak çatı (geometri yardımcıları, malzeme kütüphanesi, dokular, dışa aktarma, simge render'ı) ve LZD 3194 MAVIC.
 - `tools/blender/lamps_rear.py`: LZD 2856, 2423, 2448, 2877, 2880.
 - `tools/blender/lamps_small.py`: LD 2774, 2773, 2765, 0128, 0127, LTD 2834, 229.
-- `tools/blender/lamps_aux.py`: LD 2994 Dragon, LDCC 2698, LRD 2679, LDO 2660.
+- `tools/blender/lamps_aux.py`: LD 2994 Dragon, LDCC 2698, LRD 2679, LRD 2681 (geçici, çizimden; aynı HOR 111 gövdesi), LDO 2660.
 - `tools/blender/lamps_cad.py`: üretici CAD verisinden modeller: LZD 3194, LDCC 2698, LD 2994 (bkz. bölüm 7–8). CAD STL'leri yoksa el modeline düşer.
 - Çıktılar: `src/assets/models/lamp-<id>.glb` (sitede ilk kullanımda indirilir), `src/assets/lamps/<id>-off.webp` / `-on.webp` (ürün simgeleri).
 
@@ -93,6 +93,7 @@ Boyutlar paketli GLB (Meshopt). Ölçüler teknik çizimlerden; "doğrulanmadı"
 | LD 2994 Dragon | lastik kol | uzanım 200,8, yük. 179; plaka 35 × 105 | outline: beyaz öne, kırmızı arkaya, turuncu yana | 4 272 | 71 KB |
 | LDCC 2698 | lastik kol | uzanım 168,8, yük. 177, gen. 37 | outline: beyaz / kırmızı neon halka, turuncu yan | 6 176 | 90 KB |
 | LRD 2679 | çalışma | 101 × 100 × 50,5; U braket, M8 | work (12 küçük + 3 büyük LED) | 7 044 | 92 KB |
+| LRD 2681 (geçici) | çalışma + geri vites | LRD 2679 gövdesi (aynı çizim) | work (12 küçük), work+reverse (3 büyük; doğrulanmadı) | 7 044 | 93 KB |
 | LDO 2660 | tepe | flanş Ø150,5, kubbe Ø114, yük. 122,8 | beacon (16 LED, 2,1 Hz çift flaş) | 8 095 | 96 KB |
 
 Toplam: 17 ürün, 1,4 MB (gzip 0,9 MB); bir yapılandırmada yalnız seçilen ürünler indirilir.

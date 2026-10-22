@@ -107,26 +107,47 @@ HOLDER_Z0, HOLDER_Z1 = 0.36, 1.25  # box2 'lamp_holder' z (her yan), y 0,33–0,
 PLATE_HOLDER_X = -0.005  # plaka tutucunun arka yüzü (y 0,405–0,56)
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y_DECK = 0.74  # platform yan kirişinde (0,676–0,875) kazık ceplerinin (≥ 0,785) altı
-SIDE_Y_ARCH = 0.835  # tekerlek kemerlerinin (üstü 0,795) üstünde
+SIDE_Y_NECK = 1.39  # boyun yan kirişinin ortası (1,265–1,507)
 SIDE_X0, SIDE_X1, SIDE_N = -11.0, -0.6, 9  # ilk marker boyunda (önden 2,19 m), son arkadan 0,6 m; yan başına en çok 9 (1,3 m)
-FRONT_LAMP_Y = HEAD_TOP - 0.08  # başlığın ön ÜST köşeleri, öne bakar (kullanıcı isteği 2026-10-20)
+# Yan markerlar iki sabit seviyede (kullanıcı 2026-10-22): platformda 0,74, boyunda 1,39. Tekerlek kemerlerinin (yay ± marker yarı
+# boyu) ve kaz boynu eğiminin üstüne marker konmaz; eşit aralıklı yer bu bölgelere düşerse site en yakın kenara kaydırır (avoid).
+MARKER_HL = 0.055  # LD 2774 yarı boyu
+# kaz boynunda (pahın başladığı XN_T'den boyun arka duvarına, XG) marker yok (kullanıcı 2026-10-22)
+SIDE_NECK_X1 = round(XN_T - MARKER_HL - 0.005, 3)  # boyun seviyesinin son x'i: marker pahın başlangıcından önce biter
+SIDE_DECK_X0 = round(XG + 0.06, 3)  # platform seviyesinin ilk x'i: marker boyun arka duvarının arkasında başlar
+# ön pozisyon: boynun ön ALT köşeleri, öne bakar (standart dorse gibi; kullanıcı 2026-10-22). LD 2773 en alt noktası tutucu
+# merkezinin 37,6 mm altı: yan kirişin altını (NECK_BOT) geçmez; tutucu boyun ön kirişinin ön yüzüne oturur
+FRONT_LAMP_Y = NECK_BOT + 0.038
 ARM_FRONT_Y = NECK_BOT + 0.10  # lastik kollar kasanın 4 ALT köşesi: önde boyun yan kirişinin alt köşesi
 ARM_REAR_X, ARM_REAR_Y = -0.06, SIDE_BOT + 0.08  # arkada platform yan kirişinin alt köşesi
 # arka uyarı levhaları (direkli) kullanıcı isteğiyle kaldırıldı (2026-10-20)
-WORK_Y, WORK_Z = 0.565, 0.62  # çalışma lambaları: arka travers yüzünde, plaka ile kırmızı kontur bandı (y 0,70) arasında
-BEACON_Z = 1.0
+# çalışma lambaları: lamba tutucusunda stop ile plaka arası (standart dorse gibi; site seçime göre z'yi hesaplar). WORK_Z yalnız
+# yedek değer (LZD 3194 + RTR 3366 ile çıkan yer)
+WORK_X, WORK_Z = XR + 0.016, 0.555
+# tepe lambaları: başlığın üst köşelerinde kaynaklı taban sacı (alçak yükleyicilerde yaygın yer: önden ve arkadan görünür,
+# rampa hareketli olduğu için arkada sabit yüksek yer yok); taban Ø150 dorse genişliğini geçmez
+BEACON_X, BEACON_Z, BEACON_PLATE = XF + 0.04, W2 - 0.08, 0.01
 TRUNK_Z = BZ - 0.035  # kiriş gövdesinin iç yanı
-MODULE_X = -1.3  # son aksın arkasında, iki travers arasında
+MODULE_X = -1.05  # son aksın arkasında, -1,0 traversinin üstüne oturur (tesisat görünümü)
 REAR_JX = -0.16  # arka traversin önü
+LAST_CROSS_X = -0.45  # son platform traversinin arka yüzü (x -0,5 … -0,45)
+SIDE_TURN_X = round((LAST_CROSS_X + REAR_JX) / 2, 3)  # yan hatların yana döndüğü x: son traversle arka dağıtım arasının ortası
 
 
 def side_marker_profile():
-    """Yan marker yükseklik profili: boyunda levha ortası, kaz boynunda eğik levha, platformda kazık ceplerinin altı;
-    tekerlek kemerlerinin üstünde kemer tepesinin üstüne çıkar (her konumda levha üzerinde, kemer ve ceplerle çakışmaz)."""
-    p = [[XF, 1.39], [XN_B, 1.39], [-9.62, 1.22], [-9.30, 0.95], [XG + 0.04, SIDE_Y_DECK]]
-    for a in AXLES:
-        p += [[a - 0.32, SIDE_Y_DECK], [a - 0.26, SIDE_Y_ARCH], [a + 0.26, SIDE_Y_ARCH], [a + 0.32, SIDE_Y_DECK]]
-    return p + [[XR, SIDE_Y_DECK]]
+    """Yan marker yükseklik profili: boyunda levha ortası, platformda kazık ceplerinin altı (iki düz seviye; arası avoid)"""
+    return [[XF, SIDE_Y_NECK], [SIDE_NECK_X1, SIDE_Y_NECK], [SIDE_DECK_X0, SIDE_Y_DECK], [XR, SIDE_Y_DECK]]
+
+
+def side_avoid():
+    """Marker merkezinin giremeyeceği x aralıkları: kaz boynu eğimi, tekerlek kemerleri (yay + marker yarı boyu + pay)"""
+    return [[SIDE_NECK_X1, SIDE_DECK_X0]] + [[round(a - ARCH_R - MARKER_HL, 3), round(a + ARCH_R + MARKER_HL, 3)] for a in AXLES]
+
+
+def top_profile():
+    """Şasi üstü (tesisat görünümünde yatay hatların yüzeyi): boyun traversleri, pahlı kiriş başlığı, arka duvarın arkasından
+    platform traverslerine iniş"""
+    return [[XF, NFR_TOP], [XN_T, NFR_TOP], [XG - 0.03, CH_Y], [XG + 0.02, CH_Y], [XG + 0.12, FR_TOP], [XR, FR_TOP]]
 
 
 def mounts_dict():
@@ -136,24 +157,26 @@ def mounts_dict():
         'plate': {'x': PLATE_HOLDER_X, 'y': round(PLATE_Y + PLATE_H / 2 + 0.02, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_marker_profile(), 'z': W2 + 0.001, 'maxPerSide': SIDE_N,
-                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None},
-        'front': {'x': XF, 'y': FRONT_LAMP_Y, 'z': W2 - 0.06, 'bracket': None},
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': side_avoid(), 'brackets': None},
+        'front': {'x': XF, 'y': round(FRONT_LAMP_Y, 3), 'z': W2 - 0.06, 'bracket': None},
         'armFront': {'x': XF + 0.04, 'y': ARM_FRONT_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRear': {'x': ARM_REAR_X, 'y': ARM_REAR_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRearAlt': {'x': -0.05, 'y': LAMP_Y, 'z': HOLDER_Z1, 'wallZ': HOLDER_Z1, 'bracket': None},
-        'work': [{'x': XR + 0.02, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.15, 0], 'bracket': None} for s in (1, -1)],
-        'beacon': [{'x': XF + 0.04, 'y': HEAD_TOP, 'z': s * BEACON_Z, 'bracket': [[XF, HEAD_TOP, s * BEACON_Z], [XF + 0.12, HEAD_TOP, s * BEACON_Z]]}
-                   for s in (1, -1)],
+        'work': [{'x': WORK_X, 'y': LAMP_Y, 'z': s * WORK_Z, 'dir': [1, 0, 0], 'bracket': None, 'between': True} for s in (1, -1)],
+        'beacon': [{'x': BEACON_X, 'y': HEAD_TOP + BEACON_PLATE, 'z': s * BEACON_Z, 'bracket': None} for s in (1, -1)],
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': hp, 'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
+                    'top': {'y': FR_TOP, 'sideZ': round(W2 - 0.115, 3), 'turnX': SIDE_TURN_X, 'profile': top_profile()},
                     'notes': 'Boyunda traverslerin gövdesinden (y 1,40), kaz boynunda kiriş alt eğrisinin ~0,1 m üstünden iner, '
-                             'platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında.'},
-        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
-                    'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
+                             'platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında. Tesisat '
+                             'görünümünde yatay hatlar şasinin üstünde (top.profile: boyun, pah, platform).'},
+        'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'body', 'armRear': 'body',
+                    'armRearAlt': 'chassis', 'work': 'chassis', 'beacon': 'body', 'harness': 'chassis'},
         'notes': 'Rampalar hareketli; lamba konmaz. Arka köşe uyarı levhaları kaldırıldı (kullanıcı, 2026-10-20). Arka lambalar alçak '
-                 'tutucularda y 0,45. Yan markerlar dış yan kiriş levhasında. Ön pozisyon başlığın ön üst köşelerinde, öne bakar. '
-                 'Lastik kollar kasanın 4 alt köşesinde: arkada platform yan kirişinin alt köşesi, önde boyun yan kirişinin alt köşesi '
-                 '(2 adet seçilirse arka, 4 adette ön de). Çalışma lambaları arka travers yüzünde, plaka ile kırmızı kontur bandı arasında. '
-                 'Tepe lambaları başlık üst kuşağında; kabloları başlığın arkasından köşe dikmesini izler (önden görünmez).',
+                 'tutucularda y 0,45. Yan markerlar dış yan kiriş levhasında iki düz seviyede (platform 0,74, boyun 1,39); kemer ve '
+                 'kaz boynu üstüne gelmez. Ön pozisyon boynun ön alt köşelerinde, öne bakar. Lastik kollar arkada lamba tutucusunun '
+                 'iki ucunda ya da stop lambasının kol yuvasında (standart dorse kuralı, yalnız arka çift). Çalışma lambaları lamba '
+                 'tutucusunda stop ile plaka arasında. Tepe lambaları başlığın üst köşelerindeki taban saclarında; kabloları başlığın '
+                 'arkasından köşe dikmesini izler (önden görünmez).',
     }
 
 
@@ -185,7 +208,8 @@ def anchors_dict():
         'armRear': {'x': -0.75, 'y': 0.80, 'z': W2},
         'extra': {'x': XR, 'y': 0.66, 'z0': 1.0, 'z1': 0.6},
         'socket': {'x': XF - 0.008, 'y': SOCKET_Y},
-        'harness': {'y': HARNESS_Y, 'frontX': XF + 0.3, 'trunkZ': 0.6, 'rearZ': 0.38, 'profile': hp},
+        # frontX: soket kablolarının boyuna indiği x (boyun ön kirişi ile ilk travers arası)
+        'harness': {'y': HARNESS_Y, 'frontX': XF + 0.2, 'trunkZ': 0.6, 'rearZ': 0.38, 'profile': hp},
         'contact': {'x0': CS[0], 'x1': CS[1], 'z0': CS[2], 'z1': CS[3]},
         'sections': sections,
         'mounts': mounts_dict(),
@@ -213,8 +237,6 @@ M = {
     'red': material('ReflRed', '#c8101a', 0.3, 0.05),
     'yellow': material('ReflYellow', '#f2b600', 0.3, 0.05),
     'air': material('AirLine', '#24262a', 0.6, 0.0),
-    'airRed': material('AirLineRed', '#9c1d1d', 0.55, 0.0),
-    'airYellow': material('AirLineYellow', '#b58a12', 0.55, 0.0),
 }
 MW = {
     'tire': material('Tire', '#161719', 0.88, 0.0),
@@ -475,8 +497,7 @@ for z in (-0.2, 0.2):
 EBS = (-6.9, 0.64, -0.22)
 box(C, 'ebs', (0.28, 0.18, 0.26), EBS, M['dark'], 0.015)
 box2(C, 'ebs_bracket', EBS[0] - 0.15, EBS[0] + 0.15, 0.725, 0.735, -0.36, -0.08, P, 0.002)
-for col, dz in ((M['airRed'], 0.0), (M['airYellow'], 0.022)):
-    poly_tube(C, 'air_line', [(XF + 0.15, NECK_H + 0.02, -0.36 - dz), (XN_B, NECK_H + 0.02, -0.36 - dz), (-9.90, 1.27, -0.36 - dz), (-9.62, 1.1, -0.36 - dz), (-9.45, 0.92, -0.36 - dz), (XG - 0.06, HARNESS_Y - 0.02, -0.36 - dz), (EBS[0] - 0.4, HARNESS_Y - 0.02, -0.36 - dz), (EBS[0] - 0.15, 0.68, -0.25 - dz)], 0.007, col, 2)
+# kırmızı / sarı hava hatları kaldırıldı (kullanıcı 2026-10-22: tesisatla ilgisiz ek kablo; standart dorseyle aynı)
 poly_tube(C, 'air_tank_line', [(-8.1, 0.64, -0.2), (-7.9, 0.74, -0.3), (EBS[0] - 0.3, 0.74, -0.3), (EBS[0] - 0.15, 0.66, -0.22)], 0.008, M['air'], 2)
 for xa in AXLES:
     for s in (-1, 1):
@@ -516,6 +537,9 @@ B = Parts()
 for z0, z1 in ((W2 - 0.08, W2), (-W2, -(W2 - 0.08)), (0.39, 0.45), (-0.45, -0.39)):
     box2(B, 'head_post', XF, XF + 0.08, NECK_TOP - 0.01, HEAD_TOP, z0, z1, MB['paint'], 0.008)
 box2(B, 'head_top', XF, XF + 0.08, HEAD_TOP - 0.07, HEAD_TOP, -W2, W2, MB['paint'], 0.01)
+# tepe lambası taban sacları (üst köşeler, kaynaklı; lamba seçilmese de yerinde)
+for s in (-1, 1):
+    box2(B, 'beacon_plate', BEACON_X - 0.08, BEACON_X + 0.08, HEAD_TOP, HEAD_TOP + BEACON_PLATE, s * (BEACON_Z - 0.08), s * (BEACON_Z + 0.075), MB['paint'], 0.003)
 box2(B, 'head_panel', XF + 0.03, XF + 0.05, NECK_TOP, HEAD_TOP - 0.07, -(W2 - 0.08), W2 - 0.08, MB['paint'], 0.002)
 for y in (1.66, 1.8):
     box2(B, 'head_rib', XF + 0.01, XF + 0.03, y - 0.02, y + 0.02, -(W2 - 0.08), W2 - 0.08, MB['paint'], 0.004)
@@ -528,7 +552,8 @@ for z in (-(W2 - 0.06), 0.0, W2 - 0.06):
 for z in (-0.6, 0.6):
     box2(B, 'box_handle', BOX_X1, BOX_X1 + 0.02, 1.70, 1.73, z - 0.1, z + 0.1, MB['galv'], 0.006)
     box2(B, 'box_lock', BOX_X1, BOX_X1 + 0.015, 1.60, 1.66, z - 0.02, z + 0.02, MB['dark'], 0.004)
-# rampalar (dik duran iki rampa): yan raylar, uç sacı, alt çerçeve, orta ray, hidrolik silindir, R70 plakası
+# rampalar (dik duran iki rampa): yan raylar, uç sacı, alt çerçeve, orta ray, hidrolik silindir, R70 plakası. Silindirin
+# hortumları kaldırıldı (kullanıcı 2026-10-22: çalışma lambalarının önüne sarkıyordu)
 h = RAMP_W / 2
 for s in (-1, 1):
     zc = s * RAMP_Z
@@ -544,7 +569,6 @@ for s in (-1, 1):
     cylinder(B, 'cyl_body', 0.045, (0.235, 0.58, zy), (0.235, 1.24, zy), MB['cyl'], 20, 0.006)
     cylinder(B, 'cyl_rod', 0.024, (0.235, 1.24, zy), (0.235, 1.78, zy), MB['chrome'], 16, 0.0)
     box2(B, 'cyl_lug_top', RAMP_X1, 0.27, 1.74, 1.82, zy - 0.035, zy + 0.035, MB['paint'], 0.006)
-    hose(B, 'cyl_hose', [(0.26, 0.62, zy + s * 0.03), (0.28, 0.5, zy + s * 0.08), (0.12, 0.42, zy + s * 0.12)], 0.009, MB['dark'], 2)
     box2(B, 'r70_red', RAMP_X1, RAMP_X1 + 0.002, 1.495, 1.635, zc - 0.2825, zc + 0.2825, MB['red'], 0.0)
     box2(B, 'r70_yellow', RAMP_X1 + 0.002, RAMP_X1 + 0.003, 1.51, 1.62, zc - 0.2525, zc + 0.2525, MB['yellow'], 0.0)
 

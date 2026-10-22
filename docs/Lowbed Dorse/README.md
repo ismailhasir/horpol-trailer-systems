@@ -211,3 +211,15 @@ Rampalar hareketli, lamba yeri değil. Başlık ve arka uyarı direkleri kaynakl
 - **Ön pozisyon:** başlığın ön ÜST köşeleri, öne bakar (y 1,92).
 - **Çalışma lambaları:** arka travers yüzünde, plaka ile kırmızı kontur bandı (y 0,70) arasında (y 0,565; z ±0,62), arkaya bakar.
 - **Tepe lambası kabloları:** ön paneli delmez; başlığın arkasından köşe dikmesini izleyerek lambaya çıkar (önden görünmez).
+
+## Revize (2026-10-22, kullanıcı isteği)
+
+Önceki revizeyi ve montaj tablosunu geçersiz kılan değişiklikler (sayılar `tools/blender/lowbed.py`):
+- **Kurallar standart dorseyle aynı** (`src/configurator/data.ts` TRAILER_RULES): RTR 3366 plaka çerçevesi sabit (LTD 2834 / LTD 669 isteğe bağlı ek), ön pozisyon yan markerın eşi, lastik kol yalnız arka çift (LZD 3194 → LDCC 2698). Fark: tepe lambası seçilebilir.
+- **Çalışma lambaları:** lamba tutucusunda stop ile plaka arasında (`between`; site seçime göre z hesaplar), y 0,45, düz arkaya.
+- **Rampa silindirlerinin hortumları kaldırıldı** (çalışma lambalarının önüne sarkıyordu). **Kırmızı / sarı hava hatları kaldırıldı** (standart dorsedeki gibi).
+- **Lastik kollar:** standart kuralı: stop lambasının kol yuvası (LZD 3194, LZD 2854) yoksa lamba tutucusunun iki ucu (`armRearAlt`). Ön kollar kalktı.
+- **Yan markerlar iki düz seviyede:** boyunda y 1,39, platformda y 0,74. Tekerlek kemerleri (aks ± 0,47) ve kaz boynu (pahın başından boyun arka duvarının arkasına, x −10,06 … −9,18; kullanıcı işaretledi) `avoid` bölgesi: eşit aralıklı yer oraya düşerse site en yakın kenara kaydırır.
+- **Ön pozisyon:** boynun ön ALT köşeleri (x −13,19; y 1,303), öne bakar.
+- **Tepe lambaları:** başlığın üst köşelerinde kaynaklı taban sacı (x −13,15; y 2,01; z ±1,195). Alçak yükleyicilerde yaygın yer; rampalar hareketli olduğu için arkada sabit yüksek yer yok. Kablo modülün ön yüzündeki Superseal'den öne, başlığın arkasından yükselir.
+- **Tesisat yeni şemada** (standart dorseyle aynı): `harness.top.profile` ile tesisat görünümünde hatlar boyun, pah ve platform boyunca şasinin üstünden gider. Modül x −1,05 (−1,0 traversinin üstü), yan hat dönüşü x −0,305.

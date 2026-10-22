@@ -57,6 +57,8 @@ interface MountsLike {
     y: [number, number][];
     z: number;
     brackets?: { x0: number; x1: number; from: [number, number]; to: [number, number] } | null;
+    /** marker merkezinin giremeyeceği x aralıkları (ör. tekerlek kemeri): eşit aralıklı yer buraya düşerse en yakın kenara kayar */
+    avoid?: [number, number][];
     /** sabit marker yuvaları [x, y], arkadan öne (ör. lastik ortaları); verilirse eşit aralık yerine bunlar kullanılır */
     slots?: [number, number][];
     /** yan hat rayın/rafın içinde tek düz hat: z (iç yüz), y profili, arkada yükselme [x, z|null], önde kirişe giriş [x, y] */
@@ -88,8 +90,8 @@ interface MountsLike {
     rearJunctionX?: number;
     /** arka 7×1 hattın lamba barına indiği yer (|z|) ve barın içinde yanal gittiği x: arkadan bakınca dikme kabloyu örter */
     rearDrop?: { z: number; innerX: number };
-    /** yeni şema: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y) ve yan hattın |z|'si */
-    top?: { y: number; sideZ: number; turnX?: number };
+    /** yeni şema: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y; değişkense profile [x, y]) ve yan hattın |z|'si */
+    top?: { y: number; sideZ: number; turnX?: number; profile?: [number, number][] };
   };
 }
 
@@ -326,7 +328,16 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     }
     sideXs.sort((p, q) => p - q);
   } else {
-    for (let i = 0; i < per; i++) sideXs.push(per === 1 ? (sx0 + sx1) / 2 : sx0 + ((sx1 - sx0) * i) / (per - 1));
+    const avoid = S?.avoid ?? [];
+    const snap = (x: number) => {
+      for (let k = 0; k < avoid.length; k++) {
+        const r = avoid.find(([p, q]) => x > p && x < q);
+        if (!r) break;
+        x = x - r[0] < r[1] - x ? r[0] : r[1];
+      }
+      return x;
+    };
+    for (let i = 0; i < per; i++) sideXs.push(snap(per === 1 ? (sx0 + sx1) / 2 : sx0 + ((sx1 - sx0) * i) / (per - 1)));
   }
   const markerY = (x: number) => slotY.get(x) ?? sideY(x);
   for (const x of sideXs) {
@@ -471,7 +482,27 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   function schemeHarness(show: boolean) {
     const out = new THREE.Group();
     const B = CAT_BIT;
-    const Y = show ? TOP!.y + 0.03 : hy;
+    // Yatay hatların seviyesi x'e göre değişebilir (lowbed: boyun, kaz boynu, platform). Noktalar Y = LV yer tutucusuyla kurulur;
+    // y'si LV'ye yakın her nokta sonunda lvl(x) + (y − LV) olur, iki seviye noktası arasına profil kırılmaları eklenir.
+    const LV = 100;
+    const Y = LV;
+    const lvlProf: [number, number][] = show ? (TOP!.profile ?? [[-a.L, TOP!.y], [0, TOP!.y]]).map(([x, y]) => [x, y + 0.03]) : prof;
+    const lvl = (x: number) => profileAt(lvlProf, x);
+    const onLv = (p: THREE.Vector3) => Math.abs(p.y - LV) < 1;
+    const lift = (p: THREE.Vector3) => (onLv(p) ? V(p.x, lvl(p.x) + p.y - LV, p.z) : p);
+    const level = (pts: THREE.Vector3[]) => {
+      const res: THREE.Vector3[] = [];
+      pts.forEach((p, i) => {
+        const q = pts[i - 1];
+        if (q && onLv(q) && onLv(p) && Math.abs(p.y - q.y) < 1e-6 && Math.abs(p.x - q.x) > 1e-6) {
+          const bx = lvlProf.filter(([x]) => x > Math.min(q.x, p.x) + 1e-6 && x < Math.max(q.x, p.x) - 1e-6);
+          if (p.x < q.x) bx.reverse();
+          for (const [x, y] of bx) res.push(V(x, y + p.y - LV, q.z + ((p.z - q.z) * (x - q.x)) / (p.x - q.x)));
+        }
+        res.push(lift(p));
+      });
+      return res;
+    };
     const busZ = show ? TOP!.sideZ : tz;
     const ws: Wire[] = [];
     const cn: Conn[] = [];
@@ -481,7 +512,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
 
     // --- modül: port ağızları kablo yüksekliğinde ---
     const mod = moduleModel(mats);
-    mod.position.set(xm, Y - modulePort('front', 0).y, 0);
+    mod.position.set(xm, lvl(xm) - modulePort('front', 0).y, 0);
     out.add(mod);
     const port = (face: 'front' | 'rear', z: number) => modulePort(face, z).add(mod.position);
     const toModule = V(1, 0, 0);
@@ -499,8 +530,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     /**
      * Önden gelip x'te yana dönen koşu (zA → zB); crossings'teki z'lerde üstteki kablonun altından geçer (yakın kesişmeler tek
      * çukur). Kesişme dönüş noktasına yakınsa kablo dönmeden hemen önce (son traversin arkasında) alçalır, yana alçaktan döner.
+     * ax: kablonun x'te geliş yönü (1: önden arkaya, −1: arkadan öne).
      */
-    const lateral = (x: number, y: number, zA: number, zB: number, crossings: number[] = []) => {
+    const lateral = (x: number, y: number, zA: number, zB: number, crossings: number[] = [], ax = 1) => {
       const d = Math.sign(zB - zA);
       const pts = [V(x, y, zA)];
       // gizli güzergâhta kablolar şasinin içinde, kesişme görünmez: çukur yalnız tesisat görünümünde
@@ -510,7 +542,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         while (j + 1 < cs.length && (cs[j + 1] - cs[j]) * d < 0.25) j++;
         // düz dip üstteki kablonun iki yanından taşar (köşe yuvarlaması dibi yükseltmesin), çıkış yokuşu yumuşak
         if ((cs[i] - zA) * d > 0.2) pts.push(V(x, y, cs[i] - d * 0.2), V(x, y - DIP, cs[i] - d * 0.075));
-        else pts.splice(0, 1, V(x - 0.08, y, zA), V(x, y - DIP, zA));
+        else pts.splice(0, 1, V(x - ax * 0.08, y, zA), V(x, y - DIP, zA));
         pts.push(V(x, y - DIP, cs[j] + d * 0.075), V(x, y, cs[j] + d * 0.2));
         i = j + 1;
       }
@@ -645,18 +677,31 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     // yukarı; tepe lambası çalışma hattından biraz içeride
     const auxRoute = (sp: P3, cat: 'work' | 'beacon', k: number) => {
       const s = sp.z >= 0 ? 1 : -1;
+      if (sp.x < -a.L / 2) {
+        // öndeki (başlık üstü) lamba: modülün ön yüzündeki Superseal'den (sol +z, sağ −z en sağdaki küçük port) öne; sağdaki ana
+        // beslemenin altından geçer, yan hattın içinde (traverslerin üstünde) öne gider, başlığın arkasında yükselir
+        const pz = s > 0 ? zS1 : zS3;
+        const P = port('front', pz);
+        plug('ssPlug', P, toModule);
+        const x1 = P.x - 0.25;
+        const lane = s * (show ? busZ - 0.45 : tz - 0.1); // gizli güzergâhta kirişlerin arasında
+        const xr = sp.x + 0.06;
+        const top = sp.y - 0.04;
+        wire('aux', 0.008, [P, ...lateral(x1, Y, pz, lane, s < 0 ? [zR] : [], -1), V(xr, Y, lane), V(xr, top, lane), V(xr, top, sp.z), V(sp.x + 0.03, sp.y + 0.005, sp.z)], B[cat], 2, { ...toLamp, type: 'ss' });
+        return;
+      }
       const P = port('rear', zS2);
       plug('ssPlug', P, fromModule);
       const xa = (xb + xDrop) / 2;
       const cx = Math.min(sp.x, rx) - 0.04 - k * 0.03;
       const cz = s * (W2 - 0.05 - k * 0.035);
-      const top = sp.y > Y + 0.6 ? sp.y - 0.04 : sp.y + 0.04;
+      const top = sp.y > lvl(sp.x) + 0.6 ? sp.y - 0.04 : sp.y + 0.04;
       wire('aux', 0.008, [P, V(xa, Y, zS2), ...lateral(xa, Y, zS2, cz, s < 0 ? rearLanes : []), V(cx, Y, cz), V(cx, top, cz), V(cx, top, sp.z), V(sp.x - 0.01, top, sp.z)], B[cat], 2, { ...toLamp, type: 'ss' });
     };
     workSpots.filter((sp) => !sp.between).forEach((sp) => auxRoute(sp, 'work', 0));
     beaconSpots.forEach((sp) => auxRoute(sp, 'beacon', 1));
 
-    out.add(drawHarness(ws, cn, mats, { sheath: !show, pickers: show }));
+    out.add(drawHarness(ws.map((w) => ({ ...w, pts: level(w.pts) })), cn.map((q) => ({ ...q, pos: lift(q.pos) })), mats, { sheath: !show, pickers: show }));
     return out;
   }
 

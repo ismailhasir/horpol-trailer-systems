@@ -50,7 +50,7 @@
   },
   "harness": {
     "y": 0.8,
-    "frontX": -12.89,
+    "frontX": -12.99,
     "trunkZ": 0.6,
     "rearZ": 0.38,
     "profile": [
@@ -134,22 +134,8 @@
       "x1": -0.6,
       "y": [
         [-13.19, 1.39],
-        [-10.3, 1.39],
-        [-9.62, 1.22],
-        [-9.3, 0.95],
-        [-9.2, 0.74],
-        [-5.46, 0.74],
-        [-5.4, 0.835],
-        [-4.88, 0.835],
-        [-4.82, 0.74],
-        [-4.1, 0.74],
-        [-4.04, 0.835],
-        [-3.52, 0.835],
-        [-3.46, 0.74],
-        [-2.74, 0.74],
-        [-2.68, 0.835],
-        [-2.16, 0.835],
-        [-2.1, 0.74],
+        [-10.06, 1.39],
+        [-9.18, 0.74],
         [0.0, 0.74]
       ],
       "z": 1.276,
@@ -159,12 +145,17 @@
         "lastFromRear": 1.0,
         "maxGap": 3.0
       },
-      "avoid": [],
+      "avoid": [
+        [-10.06, -9.18],
+        [-5.61, -4.67],
+        [-4.25, -3.31],
+        [-2.89, -1.95]
+      ],
       "brackets": null
     },
     "front": {
       "x": -13.19,
-      "y": 1.92,
+      "y": 1.303,
       "z": 1.215,
       "bracket": null
     },
@@ -191,38 +182,34 @@
     },
     "work": [
       {
-        "x": 0.02,
-        "y": 0.565,
-        "z": 0.62,
-        "dir": [1, -0.15, 0],
-        "bracket": null
+        "x": 0.016,
+        "y": 0.45,
+        "z": 0.555,
+        "dir": [1, 0, 0],
+        "bracket": null,
+        "between": true
       },
       {
-        "x": 0.02,
-        "y": 0.565,
-        "z": -0.62,
-        "dir": [1, -0.15, 0],
-        "bracket": null
+        "x": 0.016,
+        "y": 0.45,
+        "z": -0.555,
+        "dir": [1, 0, 0],
+        "bracket": null,
+        "between": true
       }
     ],
     "beacon": [
       {
         "x": -13.15,
-        "y": 2.0,
-        "z": 1.0,
-        "bracket": [
-          [-13.19, 2.0, 1.0],
-          [-13.07, 2.0, 1.0]
-        ]
+        "y": 2.01,
+        "z": 1.195,
+        "bracket": null
       },
       {
         "x": -13.15,
-        "y": 2.0,
-        "z": -1.0,
-        "bracket": [
-          [-13.19, 2.0, -1.0],
-          [-13.07, 2.0, -1.0]
-        ]
+        "y": 2.01,
+        "z": -1.195,
+        "bracket": null
       }
     ],
     "harness": {
@@ -237,22 +224,35 @@
         [-9.3, 0.8],
         [0.0, 0.8]
       ],
-      "moduleX": -1.3,
+      "moduleX": -1.05,
       "rearJunctionX": -0.16,
-      "notes": "Boyunda traverslerin gövdesinden (y 1,40), kaz boynunda kiriş alt eğrisinin ~0,1 m üstünden iner, platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında."
+      "top": {
+        "y": 0.83,
+        "sideZ": 1.16,
+        "turnX": -0.305,
+        "profile": [
+          [-13.19, 1.462],
+          [-10.0, 1.462],
+          [-9.27, 1.33],
+          [-9.22, 1.33],
+          [-9.12, 0.83],
+          [0.0, 0.83]
+        ]
+      },
+      "notes": "Boyunda traverslerin gövdesinden (y 1,40), kaz boynunda kiriş alt eğrisinin ~0,1 m üstünden iner, platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında. Tesisat görünümünde yatay hatlar şasinin üstünde (top.profile: boyun, pah, platform)."
     },
     "parents": {
       "rear": "chassis",
       "plate": "chassis",
       "side": "chassis",
-      "front": "body",
+      "front": "chassis",
       "armFront": "body",
       "armRear": "body",
       "armRearAlt": "chassis",
-      "work": "body",
+      "work": "chassis",
       "beacon": "body",
       "harness": "chassis"
     },
-    "notes": "Rampalar hareketli; lamba konmaz. Arka köşe uyarı levhaları kaldırıldı (kullanıcı, 2026-10-20). Arka lambalar alçak tutucularda y 0,45. Yan markerlar dış yan kiriş levhasında. Ön pozisyon başlığın ön üst köşelerinde, öne bakar. Lastik kollar kasanın 4 alt köşesinde: arkada platform yan kirişinin alt köşesi, önde boyun yan kirişinin alt köşesi (2 adet seçilirse arka, 4 adette ön de). Çalışma lambaları arka travers yüzünde, plaka ile kırmızı kontur bandı arasında. Tepe lambaları başlık üst kuşağında; kabloları başlığın arkasından köşe dikmesini izler (önden görünmez)."
+    "notes": "Rampalar hareketli; lamba konmaz. Arka köşe uyarı levhaları kaldırıldı (kullanıcı, 2026-10-20). Arka lambalar alçak tutucularda y 0,45. Yan markerlar dış yan kiriş levhasında iki düz seviyede (platform 0,74, boyun 1,39); kemer ve kaz boynu üstüne gelmez. Ön pozisyon boynun ön alt köşelerinde, öne bakar. Lastik kollar arkada lamba tutucusunun iki ucunda ya da stop lambasının kol yuvasında (standart dorse kuralı, yalnız arka çift). Çalışma lambaları lamba tutucusunda stop ile plaka arasında. Tepe lambaları başlığın üst köşelerindeki taban saclarında; kabloları başlığın arkasından köşe dikmesini izler (önden görünmez)."
   }
 }

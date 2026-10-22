@@ -221,6 +221,8 @@ export function lockedArm(c: Pick<Config, 'trailer' | 'lamps'>): string | undefi
 export const TRAILER_RULES: Partial<Record<TrailerId, TrailerRules>> = {
   // armForStop / armMax: kullanıcı 2026-10-21 (LZD 3194'ün kol adaptörü LDCC 2698 ile; lastik kol yalnız arka çift)
   standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
+  // lowbed (kullanıcı 2026-10-22): sınırlar standart dorseyle aynı, yalnız tepe lambası takılabilir
+  lowbed: { frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
 };
 export const rulesFor = (t: TrailerId): TrailerRules => TRAILER_RULES[t] ?? {};
 /** Konfigüratör listesinde bu dorse için görünen kategoriler */

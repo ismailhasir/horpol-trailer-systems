@@ -50,10 +50,19 @@ try {
   SIDE_MAX = {};
 }
 
-/** Yan markerlar n adet (yan başına), sitedeki gibi x0 → x1 eşit aralıklı */
+/** Yan markerlar n adet (yan başına), sitedeki gibi x0 → x1 eşit aralıklı; yasak bölgeye (avoid) düşen en yakın kenarına kayar */
 function sidePositions(S, n) {
-  if (n === 1) return [(S.x0 + S.x1) / 2];
-  return Array.from({ length: n }, (_, i) => S.x0 + ((S.x1 - S.x0) * i) / (n - 1));
+  const avoid = S.avoid ?? [];
+  const snap = (x) => {
+    for (let k = 0; k < avoid.length; k++) {
+      const r = avoid.find(([p, q]) => x > p && x < q);
+      if (!r) break;
+      x = x - r[0] < r[1] - x ? r[0] : r[1];
+    }
+    return x;
+  };
+  if (n === 1) return [snap((S.x0 + S.x1) / 2)];
+  return Array.from({ length: n }, (_, i) => snap(S.x0 + ((S.x1 - S.x0) * i) / (n - 1)));
 }
 function evalSide(S, L, n) {
   const xs = sidePositions(S, n);

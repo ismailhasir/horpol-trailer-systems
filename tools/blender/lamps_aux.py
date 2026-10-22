@@ -1,4 +1,4 @@
-# Yardımcı lambalar: lastik kollar (LD 2994 DRAGON, LDCC 2698), çalışma lambası (LRD 2679), tepe lambası (LDO 2660).
+# Yardımcı lambalar: lastik kollar (LD 2994 DRAGON, LDCC 2698), çalışma lambaları (LRD 2679, LRD 2681), tepe lambası (LDO 2660).
 # lamps.py tarafından exec ile yüklenir (lamps.py'nin global yardımcıları burada doğrudan kullanılır).
 # Ölçüler teknik çizimlerden (.claude/ref/lamps/<KOD>/attachments), biçim ve ışık desenleri fotoğraflardan.
 # Tüm ölçüler builder içinde mm yazılır, MM ile metreye çevrilir.
@@ -437,6 +437,19 @@ def build_ldcc2698(L):
 # ---------------------------------------------------------------------
 @product('lrd2679', 'LRD 2679', 'work', 'Çalışma lambası HOR 111, 12 W, 12/24 V')
 def build_lrd2679(L):
+    hor111(L, 'work')
+
+
+# LRD 2681 — geri vites işlevli çalışma lambası (HOR 111; ürün sayfası: 15 LED, 3 × 0,75 mm² kablo, "AR 1,1/1,3 W WL 12 W").
+# GEÇİCİ model: çizim ve fotoğraflardan, LRD 2679 ile aynı gövde (aynı çizim: 101 × 127 × 50,5, M8 × 30). STEP gelince yeniden.
+# Ortadaki 3 büyük LED geri vites işlevinde de yanar (hangi LED'lerin geri vites olduğu doğrulanmadı).
+@product('lrd2681', 'LRD 2681', 'work', 'Geri vites işlevli çalışma lambası HOR 111, 12 W, 12/24 V (geçici, çizimden)')
+def build_lrd2681(L):
+    hor111(L, 'work+reverse')
+
+
+def hor111(L, center_fn):
+    """HOR 111 çalışma lambası gövdesi; center_fn: ortadaki 3 büyük LED'in işlevi (çevredeki 12 LED çalışma)"""
     Hc = 77.0
     hous, ss = mat('Housing'), mat('Stainless')
     O = rrect(101, 100, 14, 6, 0, Hc)
@@ -486,7 +499,7 @@ def build_lrd2679(L):
         p = (x * MM, (Hc + 3) * MM)
         cyl(L.inner, 'cup_big', 0.0026, (p[0], p[1], 0.0233), (p[0], p[1], 0.0276), mat('Chrome'), 32, r2=0.0076, caps=False)
         cyl(L.inner, 'chip_base', 0.0026, (p[0], p[1], 0.0231), (p[0], p[1], 0.0235), mat('Pcb'), 12)
-        box(L.E('work'), 'chip', p[0] - 0.0015, p[0] + 0.0015, p[1] - 0.0015, p[1] + 0.0015, 0.0234, 0.0240, E('work', 'white'))
+        box(L.E('work'), 'chip', p[0] - 0.0015, p[0] + 0.0015, p[1] - 0.0015, p[1] + 0.0015, 0.0234, 0.0240, E(center_fn, 'white'))
     # şeffaf yastık optikli lens
     prism(L.lens, 'lens', mp(offset(W, -0.8)), 0.0310, 0.0334, mat('Lens.clear'), 0.0008, 2)
 
