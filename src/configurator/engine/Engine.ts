@@ -10,6 +10,7 @@ import { loadedModel, loadModel } from './models';
 import { buildEquipment, disposeEquipment, lampIds, setHarnessHighlight, type EquipmentBuild } from './equipment';
 import { lampFailed, lampReady, lampUrl, loadLamp, needsAnimation, setLampState, tickLamps, type FnToggle } from './lampfx';
 import { setPlateLight } from './plateLight';
+import { ALL_CATS, CAT_BIT, harnessFx, pickCategory } from './harness';
 
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
@@ -297,6 +298,7 @@ export class Engine {
     canvas.addEventListener('pointerdown', this.onDown);
     canvas.addEventListener('pointerup', this.onUp);
     canvas.addEventListener('pointermove', this.onMove);
+    canvas.addEventListener('pointerleave', this.onLeave);
     // bağlam kaybı (mobilde arka plan, sürücü sıfırlaması): three.js dokuları ve gölgelendiricileri kendisi yeniden yükler;
     // GPU'da pişirilen ortam haritası ve gölge haritası kaybolur, onlar yeniden pişirilir
     canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
@@ -572,6 +574,8 @@ export class Engine {
   // ---------- modlar ----------
   setSystem(on: boolean) {
     this.system = on;
+    this.pinned = 0;
+    this.hover = 0;
     this.applySystem();
     this.setView(on ? 'system' : 'overview');
   }
@@ -580,8 +584,26 @@ export class Engine {
     setGhost(this.trailer, this.system);
     this.trailer.outline.visible = this.system;
     if (this.equip) setHarnessHighlight(this.equip.harness, this.mats, this.system);
+    this.syncHarnessFx();
     this.shadowDirty = 3;
     this.invalidate();
+  }
+
+  // ---------- tesisat görünümü: devre vurgusu ve akım akışı ----------
+  /** listeden seçilen kategorinin devresi (CAT_BIT) ve fareyle üzerine gelinen devre (öncelikli) */
+  private pinned = 0;
+  private hover = 0;
+  /** Tesisat görünümünde bir kategorinin devresini vurgular (null: vurgu yok) */
+  highlightCategory(cat: CategoryId | null) {
+    this.pinned = cat ? CAT_BIT[cat] : 0;
+    this.syncHarnessFx();
+    this.invalidate();
+  }
+  private syncHarnessFx() {
+    harnessFx.uFlow.value = this.system && this.lights && !this.opts.reducedMotion ? 1 : 0;
+    // ışıklar modunda tesisat enerjili: takılı bütün devrelerde akış (kullanıcı 2026-10-22; çalışma hattı da, düğmesi kapalıyken)
+    harnessFx.uActive.value = this.lights ? ALL_CATS : 0;
+    harnessFx.uHi.value = this.system ? this.hover || this.pinned : 0;
   }
 
   setLights(on: boolean) {
@@ -599,6 +621,7 @@ export class Engine {
     this.invalidate();
   }
   private applyLights() {
+    this.syncHarnessFx();
     if (!this.mats) return;
     setLampState(this.lights, this.fns);
   }
@@ -689,6 +712,11 @@ export class Engine {
     if (needsAnimation()) {
       // sinyal ~1,5 Hz, tepe lambası 2,1 Hz flaş: faz lampfx'te, burada yalnız sürekli çizim
       tickLamps(now / 1000);
+      busy = true;
+    }
+    if (harnessFx.uFlow.value && harnessFx.uActive.value) {
+      // tesisat görünümünde ışıklar açık: kablolarda akım darbeleri (sürekli çizim yalnız bu sırada)
+      harnessFx.uTime.value = now / 1000;
       busy = true;
     }
     if (this.tween) {
@@ -855,15 +883,24 @@ export class Engine {
   }
 
   // ---------- seçim (lambaya tıkla) ----------
-  private pick(e: PointerEvent): CategoryId | null {
+  /**
+   * İmlecin altındaki lamba ya da (tesisat görünümünde) kablo: cat tıklanınca açılacak kategori, mask vurgulanacak devre.
+   * Kablolar için görünmez kalın kopyalar (picker) denenir; ana hat gibi ortak kabloların kategorisi yok (yalnız vurgu).
+   */
+  private pick(e: PointerEvent): { cat: CategoryId | null; mask: number } | null {
     if (!this.equip) return null;
     const r = this.canvas.getBoundingClientRect();
     const p = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.raycaster.setFromCamera(p, this.camera);
     const hits = this.raycaster.intersectObjects(this.equip.group.children, true);
     for (const h of hits) {
-      const c = h.object.userData.category;
-      if (c && c !== 'socket' && h.object.visible) return c as CategoryId;
+      const o = h.object;
+      if (o.userData.picker) {
+        if (!this.system || !o.parent?.parent?.visible) continue;
+        return { cat: pickCategory(o.userData.cats), mask: o.userData.cats };
+      }
+      const c = o.userData.category as string | undefined;
+      if (c && c in CAT_BIT && o.visible) return { cat: c as CategoryId, mask: CAT_BIT[c as CategoryId] };
     }
     return null;
   }
@@ -875,8 +912,9 @@ export class Engine {
     const moved = Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y);
     this.down = null;
     if (moved > 5) return;
-    const c = this.pick(e);
-    if (c) this.opts.onPick?.(c);
+    const h = this.pick(e);
+    if (h?.cat) this.opts.onPick?.(h.cat);
+    else if (this.system) this.highlightCategory(null); // boşa tıklama vurguyu kaldırır
   };
   private lastMove = 0;
   private onMove = (e: PointerEvent) => {
@@ -884,8 +922,17 @@ export class Engine {
     const now = performance.now();
     if (now - this.lastMove < 60) return;
     this.lastMove = now;
-    this.canvas.style.cursor = this.pick(e) ? 'pointer' : 'grab';
+    const h = this.pick(e);
+    this.canvas.style.cursor = h?.cat ? 'pointer' : 'grab';
+    this.setHover(this.system ? (h?.mask ?? 0) : 0);
   };
+  private onLeave = () => this.setHover(0);
+  private setHover(mask: number) {
+    if (mask === this.hover) return;
+    this.hover = mask;
+    this.syncHarnessFx();
+    this.invalidate();
+  }
 
   /** Geliştirme/test: anlık görüntü (JPEG data URL) */
   snapshot(): string {

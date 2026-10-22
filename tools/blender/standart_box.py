@@ -100,7 +100,7 @@ FRONT_LAMP_Y = max(CH_TOP - 0.035, NECK_BOT + 0.038)
 FRONT_LAMP_X = XF + 0.01  # ön traversin ön yüzü (box2 'front_cross')
 REAR_GAP = 0.0  # stop lambaları taşıyıcının dış ucuna dayalı (kullanıcı 2026-10-20: önceki 0,09 m boşluk geri alındı)
 POST_D = 0.13  # ön/arka köşe dikmesinin yan yüz derinliği
-WORK_Y, WORK_Z = Y_TOP - 0.07, 0.80  # arka başlık (y 3,88–4,02) ortası
+WORK_Z = 0.565  # çalışma lambası: plaka lambasının dış kenarı (0,347) ile LZD 3194'ün iç kenarı (0,78) arası
 BEACON_Z = 1.0
 TRUNK_Z = BZ - 0.035  # ana demet: kiriş gövdesinin iç yanı, üst başlığın altında
 MODULE_X = -2.2  # Horpol modülü: hava tanklarının önünde, kirişlerin arasında
@@ -119,20 +119,25 @@ def mounts_dict():
         'armFront': {'x': XF + POST_D / 2, 'y': ARM_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRear': {'x': XR - POST_D / 2, 'y': ARM_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRearAlt': {'x': -0.14, 'y': LAMP_Y, 'z': CARRIER_Z, 'wallZ': CARRIER_Z, 'bracket': None},
-        'work': [{'x': XR, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'bracket': None} for s in (1, -1)],
+        # çalışma lambaları: lamba taşıyıcıda stop ile plaka arasında (kullanıcı 2026-10-22; model gelene kadar). z varsayılan,
+        # 'between': site arka lambaların iç kenarı ile plaka lambalarının dış kenarının ortasına yerleştirir (set seçimine göre)
+        'work': [{'x': CARRIER_X, 'y': LAMP_Y, 'z': s * WORK_Z, 'dir': [1, 0, 0], 'bracket': None, 'between': True} for s in (1, -1)],
         'beacon': [{'x': XR - 0.065, 'y': Y_TOP, 'z': s * BEACON_Z, 'bracket': [[XR - 0.13, Y_TOP, s * BEACON_Z], [XR + 0.02, Y_TOP, s * BEACON_Z]]}
                    for s in (1, -1)],
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]], 'moduleX': MODULE_X,
                     'rearJunctionX': REAR_JX,
+                    # tesisat görünümü: yatay hatlar kiriş ve traverslerin ÜSTÜNDEN (kasa gizli), yan hat dış rayın iç yanında
+                    'top': {'y': CH_TOP, 'sideZ': round(RAIL_Z - 0.115, 3)},
                     'notes': 'Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst '
-                             'başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner.'},
+                             'başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner. Tesisat görünümünde '
+                             '(top) aynı hatlar şasinin üstünden gösterilir.'},
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
-                    'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
-        'notes': 'Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol, çalışma ve tepe lambaları kasaya bağlanır. '
+                    'armRearAlt': 'chassis', 'work': 'chassis', 'beacon': 'body', 'harness': 'chassis'},
+        'notes': 'Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol ve tepe lambaları kasaya bağlanır. '
                  'Ön pozisyon ön traversin ön yüzünde, alt köşede, yan markerla aynı yükseklikte (y 1,19). Lastik kollar köşe dikmelerinin '
                  'yan yüzünde, kasanın alt köşelerinde (y 1,36). Yan markerlar şasinin '
                  'dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır '
-                 '1,5 m). Çalışma lambaları arka başlığın arka yüzünde, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için '
+                 '1,5 m). Çalışma lambaları lamba taşıyıcıda stop ile plaka arasında, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için '
                  'adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli).',
     }
 
@@ -179,8 +184,6 @@ M = {
     'red': material('ReflRed', '#c8101a', 0.3, 0.05),
     'amber': material('Amber', '#f29a0c', 0.25, 0.0),
     'air': material('AirLine', '#24262a', 0.6, 0.0),
-    'airRed': material('AirLineRed', '#9c1d1d', 0.55, 0.0),
-    'airYellow': material('AirLineYellow', '#b58a12', 0.55, 0.0),
 }
 MW = {
     'tire': material('Tire', '#17181a', 0.9, 0.0),
@@ -409,9 +412,8 @@ box(C, 'ebs', (0.3, 0.2, 0.3), EBS, M['dark'], 0.015)
 box2(C, 'ebs_bracket', EBS[0] - 0.17, EBS[0] + 0.17, 1.13, CH_TOP - 0.08, -0.43, -0.11, K, 0.003)
 for i, dz in enumerate((-0.08, 0.0, 0.08)):
     cylinder(C, 'ebs_port', 0.018, (EBS[0] + 0.15, 1.0, EBS[2] + dz), (EBS[0] + 0.19, 1.0, EBS[2] + dz), M['plastic'], 10, 0.0)
-# besleme (kırmızı) ve fren (sarı) hatları: ön traversten EBS'ye, sağ kirişin iç yüzü boyunca
-for col, dz in ((M['airRed'], 0.0), (M['airYellow'], 0.022)):
-    poly_tube(C, 'air_line', [(XF + 0.15, 1.19, -0.42 - dz), (XF + 0.5, 1.19, -0.47 - dz), (XN1 + 0.2, 1.19, -0.47 - dz), (XN0 + 0.4, 1.19, -0.47 - dz), (EBS[0] - 0.4, 1.19, -0.47 - dz), (EBS[0] - 0.16, 1.06, -0.3 - dz)], 0.007, col, 2)
+# Ön traversten EBS'ye giden kırmızı / sarı hava hatları kaldırıldı (kullanıcı 2026-10-22): tesisat görünümünde sitenin
+# renk kodlu kablolarıyla (arka hat kırmızı, yan hat turuncu) karışıyordu.
 poly_tube(C, 'air_tank_line', [(-1.95, 0.97, -0.3), (-2.1, 1.12, -0.42), (EBS[0] + 0.4, 1.17, -0.44), (EBS[0] + 0.16, 1.05, -0.3)], 0.008, M['air'], 2)
 for xa in AXLES:
     for s in (-1, 1):

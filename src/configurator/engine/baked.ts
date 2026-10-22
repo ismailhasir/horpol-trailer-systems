@@ -65,7 +65,8 @@ export interface BakedMounts {
   /** tepe lambaları (en çok 2): taban yatay yüzeyde, y taban yüksekliği */
   beacon: (P3 & { bracket: BakedBracket })[];
   /** ana demet: kirişin iç yanında korumalı güzergâh; profile [x, y] (x artan), modül ve arka dağıtım x'i */
-  harness: { trunkY: number; trunkZ: number; profile: number[][]; moduleX: number; rearJunctionX: number; notes: string };
+  /** top: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y) ve yan hattın |z|'si (yalnız yeni şemalı dorseler) */
+  harness: { trunkY: number; trunkZ: number; profile: number[][]; moduleX: number; rearJunctionX: number; top?: { y: number; sideZ: number }; notes: string };
   /** montajın bağlı olduğu sabit parça: 'chassis' (şasi GLB) | 'body' (sabit üst yapı: kapalı kasa, başlık, kule, korkuluk) */
   parents: Record<string, string>;
   notes: string;

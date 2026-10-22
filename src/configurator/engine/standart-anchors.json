@@ -182,18 +182,20 @@
     },
     "work": [
       {
-        "x": 0.0,
-        "y": 3.95,
-        "z": 0.8,
-        "dir": [1, -0.35, 0],
-        "bracket": null
+        "x": -0.08,
+        "y": 0.86,
+        "z": 0.565,
+        "dir": [1, 0, 0],
+        "bracket": null,
+        "between": true
       },
       {
-        "x": 0.0,
-        "y": 3.95,
-        "z": -0.8,
-        "dir": [1, -0.35, 0],
-        "bracket": null
+        "x": -0.08,
+        "y": 0.86,
+        "z": -0.565,
+        "dir": [1, 0, 0],
+        "bracket": null,
+        "between": true
       }
     ],
     "beacon": [
@@ -225,7 +227,11 @@
       ],
       "moduleX": -2.2,
       "rearJunctionX": -0.185,
-      "notes": "Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner."
+      "top": {
+        "y": 1.225,
+        "sideZ": 1.15
+      },
+      "notes": "Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner. Tesisat görünümünde (top) aynı hatlar şasinin üstünden gösterilir."
     },
     "parents": {
       "rear": "chassis",
@@ -235,10 +241,10 @@
       "armFront": "body",
       "armRear": "body",
       "armRearAlt": "chassis",
-      "work": "body",
+      "work": "chassis",
       "beacon": "body",
       "harness": "chassis"
     },
-    "notes": "Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol, çalışma ve tepe lambaları kasaya bağlanır. Ön pozisyon ön traversin ön yüzünde, alt köşede, yan markerla aynı yükseklikte (y 1,19). Lastik kollar köşe dikmelerinin yan yüzünde, kasanın alt köşelerinde (y 1,36). Yan markerlar şasinin dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır 1,5 m). Çalışma lambaları arka başlığın arka yüzünde, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli)."
+    "notes": "Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol ve tepe lambaları kasaya bağlanır. Ön pozisyon ön traversin ön yüzünde, alt köşede, yan markerla aynı yükseklikte (y 1,19). Lastik kollar köşe dikmelerinin yan yüzünde, kasanın alt köşelerinde (y 1,36). Yan markerlar şasinin dış C rayında y 1,19: boyun (ön 4 m) ve tekerlek bölgesinde 0,9 m altında sabit yüzey yok (R48 6.18 üst sınır 1,5 m). Çalışma lambaları lamba taşıyıcıda stop ile plaka arasında, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli)."
   }
 }

@@ -295,7 +295,8 @@ export default function Configurator({ lang, t, ui }: Props) {
 
   /** Kategoriye odaklan: kamera o lambalara döner, görünüm düğmeleri kameranın yönünü gösterir */
   const focus = (cat: CategoryId) => {
-    if (system) return;
+    // tesisat görünümünde kamera yerinde kalır; seçilen kategorinin devresi vurgulanır
+    if (system) return engineRef.current?.highlightCategory(cat);
     engineRef.current?.focusCategory(cat);
     setView(CAT_VIEW[cat] ?? null);
   };
