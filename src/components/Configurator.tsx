@@ -79,6 +79,7 @@ const IC = {
   send: ['M4 12 20 4l-4 16-4-6-8-2Z', 'm12 14 8-10'],
   collapse: ['M4 14h6v6', 'M20 10h-6V4', 'm14 10 7-7', 'm3 21 7-7'],
   expand: ['M15 3h6v6', 'M9 21H3v-6', 'm21 3-7 7', 'm3 21 7-7'],
+  back: ['M19 12H5', 'm11 6-6 6 6 6'],
 };
 
 // Ürün simgeleri: Blender'da lamba modelinden render (tools/blender/lamps.py --icons), sönük ve yanık hâl
@@ -141,6 +142,12 @@ export default function Configurator({ lang, t, ui }: Props) {
   const [ddOpen, setDdOpen] = useState(false);
   const [ddIdx, setDdIdx] = useState(0);
   const [tab, setTab] = useState<'trailer' | 'lamps' | 'summary'>('trailer');
+  /** sağ panel: ürün seçenekleri (varsayılan) ya da yalnız sipariş özeti (sepet düğmesiyle); mobilde Lambalar / Özet sekmesiyle eş */
+  const [panel, setPanel] = useState<'options' | 'cart'>('options');
+  const showPanel = (p: 'options' | 'cart') => {
+    setPanel(p);
+    setTab(p === 'cart' ? 'summary' : 'lamps');
+  };
   const [touch, setTouch] = useState(false);
   /** sol panel: ayrıntılı (varsayılan) ya da yalnızca seçimleri gösteren sade şerit */
   const [compact, setCompact] = useState(false);
@@ -165,6 +172,7 @@ export default function Configurator({ lang, t, ui }: Props) {
           onPick: (c) => {
             setOpenCat(c);
             setTab('lamps');
+            setPanel('options');
             focusRef.current(c);
           },
           onModelState: setModelState,
@@ -253,6 +261,20 @@ export default function Configurator({ lang, t, ui }: Props) {
   /** aynı siparişten kaç set (tüm yapılandırma bu sayıyla çarpılır) */
   const [orderQty, setOrderQty] = useState(1);
   const rows = summaryRows(cfg, t, lang, orderQty);
+  /** sepetteki ürün (kalem) sayısı: özetteki ürün satırları (plaka çerçevesi dahil, set bir kalem) */
+  const cartCount = rows.filter((r) => r.mono).length;
+  const cartBtn = (
+    <button
+      type="button"
+      class="icon-btn cfg-cart"
+      aria-pressed={panel === 'cart'}
+      aria-label={fmtT(t.cart_open, { n: cartCount })}
+      onClick={() => showPanel(panel === 'cart' ? 'options' : 'cart')}
+    >
+      <Ico d={IC.cart} size={20} />
+      {cartCount > 0 && <span class="badge">{cartCount}</span>}
+    </button>
+  );
   const rules = rulesFor(cfg.trailer);
   const stepper = (
     <div class="qty" role="group" aria-label={t.set_qty} title={t.set_qty}>
@@ -467,7 +489,7 @@ export default function Configurator({ lang, t, ui }: Props) {
       {/* ---------- mobil sekmeler ---------- */}
       <div class="cfg-tabs" role="tablist">
         {(['trailer', 'lamps', 'summary'] as const).map((k) => (
-          <button type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
+          <button type="button" role="tab" aria-selected={tab === k} onClick={() => (k === 'trailer' ? setTab(k) : showPanel(k === 'summary' ? 'cart' : 'options'))}>
             {k === 'trailer' ? t.tab_trailer : k === 'lamps' ? t.tab_lamps : t.tab_summary}
           </button>
         ))}
@@ -583,8 +605,8 @@ export default function Configurator({ lang, t, ui }: Props) {
         </>)}
       </aside>
 
-      {/* ---------- sağ: lambalar + özet ---------- */}
-      <aside class="cfg-card cfg-right" aria-label={t.lamps_title}>
+      {/* ---------- sağ: ürün seçenekleri ya da (sepet düğmesiyle) yalnız sipariş özeti ---------- */}
+      <aside class="cfg-card cfg-right" data-panel={panel} aria-label={panel === 'cart' ? t.summary_title : t.lamps_title}>
         <div class="cfg-lamps">
           {categoriesFor(cfg.trailer).map((cat) => {
             const ch = cfg.lamps[cat.id];
@@ -667,6 +689,9 @@ export default function Configurator({ lang, t, ui }: Props) {
 
         <div class="cfg-summary" aria-live="polite">
           <div class="cs-head">
+            <button type="button" class="cfg-ic sm cs-back" data-tip={t.back_options} aria-label={t.back_options} onClick={() => showPanel('options')}>
+              <Ico d={IC.back} size={18} />
+            </button>
             <h2>{t.summary_title}</h2>
             <button type="button" class="cfg-ic sm" data-tip={t.pdf_download} onClick={downloadPdf} disabled={pdfBusy} aria-label={t.pdf_download}>
               <Ico d={IC.download} size={17} />
@@ -680,12 +705,13 @@ export default function Configurator({ lang, t, ui }: Props) {
               </div>
             ))}
           </dl>
-          <div class="cs-actions">
-            {stepper}
-            <button type="button" class="btn btn-primary" onClick={send}>
-              {t.get_quote}
-            </button>
-          </div>
+        </div>
+        <div class="cs-actions">
+          {stepper}
+          <button type="button" class="btn btn-primary" onClick={send}>
+            {t.get_quote}
+          </button>
+          {cartBtn}
         </div>
       </aside>
 
@@ -701,6 +727,7 @@ export default function Configurator({ lang, t, ui }: Props) {
         <button type="button" class="btn btn-primary" onClick={send}>
           {t.get_quote}
         </button>
+        {cartBtn}
       </div>
       <ConfigOrder open={orderOpen} onClose={closeOrder} cfg={cfg} qty={orderQty} t={t} ui={ui} lang={lang} />
     </div>
