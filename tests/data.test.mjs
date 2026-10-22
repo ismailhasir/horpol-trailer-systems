@@ -114,6 +114,13 @@ test('plaka: sabit çerçeve seçenek değildir, plaka lambaları çift', () => 
 
 test('dorseye uymayan uzunluk ilk uygun uzunluğa döner', () => {
   assert.equal(normalize({ ...base(), trailer: 'silo', length: '13.6' }).length, '12');
+  assert.equal(normalize({ ...base(), trailer: 'damper', length: '13.6' }).length, '9');
+  assert.equal(normalize({ ...base(), trailer: 'standart', length: '9' }).length, '13.6');
+});
+
+test('dorse başına seçilebilir set uzunlukları (kullanıcı 2026-10-22)', () => {
+  const lengths = Object.fromEntries(TRAILER_LIST.map((t) => [t.id, t.lengths]));
+  assert.deepEqual(lengths, { standart: ['13.6'], lowbed: ['13.6', '9'], silo: ['12', '9'], tanker: ['12'], damper: ['9'] });
 });
 
 test('adres satırı: gidiş dönüş aynı yapılandırmayı verir', () => {

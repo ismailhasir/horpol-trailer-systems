@@ -30,14 +30,14 @@ export interface TrailerDef {
 }
 
 // Sıra = konfigüratör listesindeki sıra: en çok istenen altı tip en üstte.
-// Silobas uzunlukları ÖRNEK (doğrulanmadı), satış ekibiyle kesinleşecek.
+// Görünen tiplerin uzunlukları kullanıcıdan (2026-10-22); seçilemeyenler listede çapraz çizgiyle devre dışı görünür.
 export const TRAILERS: TrailerDef[] = [
-  { id: 'standart', lengths: ['13.6', '12', '9'] },
+  { id: 'standart', lengths: ['13.6'] },
   { id: 'frigo', lengths: ['13.6', '12'], hidden: true },
-  { id: 'lowbed', lengths: ['13.6', '12'] },
+  { id: 'lowbed', lengths: ['13.6', '9'] },
   { id: 'silo', lengths: ['12', '9'] },
-  { id: 'tanker', lengths: ['13.6', '12', '9'] },
-  { id: 'damper', lengths: ['12', '9'] },
+  { id: 'tanker', lengths: ['12'] },
+  { id: 'damper', lengths: ['9'] },
   { id: 'kapali', lengths: ['13.6', '12', '9'], hidden: true },
   { id: 'flatbed', lengths: ['13.6', '12', '9'], hidden: true },
   { id: 'stepdeck', lengths: ['13.6', '12'], hidden: true },
