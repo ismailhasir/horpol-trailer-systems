@@ -221,3 +221,9 @@ Eski lamba taşıyıcı kutusu kaldırıldı; yerine Horpol sac tamponu (`tools/
 - **Tozluk (md. 11):** logolu levha kaldırıldı; alt koruma demirinin yalnız alt kenarına kenetli tek parça kauçuk, üzerinde TRAILER SYSTEMS (geometri yazı, Arial Bold).
 - **Yakın inceleme (md. 13):** kamera 0,6 m'ye kadar yaklaşır, tekerlek imlecin gösterdiği yere yakınlaştırır.
 - Varsayımlar (doğrulanmadı): sac kalınlığı 3 mm, renk eski taşıyıcıyla aynı beyaz, tampon AO'suz (gölgeyi sahne verir).
+
+## Tesisat bağlantıları (2026-10-22)
+
+- **Gerçek ölçü:** kablolar ve konnektörler artık büyütülmüş değil (önceden 1,7 / 1,5 kat). Çaplar koruge boru dış çapı: ana hat Ø 21 (NW17), soket kolu Ø 16, 7×1 Ø 13 (NW10), yan hat Ø 10 (NW7), dallar Ø 7–8. Modül 0,74 kat (gerçek ölçüsü doğrulanmadı).
+- **Lambaya bağlantı:** kablolar lambanın modelinden ölçülen bağlantı noktasına (`equipment.ts` LAMP_PORTS) gerçek konnektörle takılır. LZD 3194 (Horpol ürün föyü: AMP 7 pin + 4 Superseal = 2 × pozisyon, sinyal yanıp sönmeli pozisyon, geri vites): AMP soketi rakor somununa doğrudan oturur (kablosuz, kullanıcı kararı), 7×1 hattın dişi AMP'si buna takılır. Dış blok: lastik kol ve plaka (pozisyon), iç blok: çalışma lambası LRD 2681 (geri vites) ve kör tapalı boş çıkış. Soket blokları ürün fotoğraflarına göre yeniden modellendi (`lamps_cad.py` superseal_pair, amp_socket). LZD 2854: kısa kablosunda hat içi AMP çifti. LUNA, yan marker, ön pozisyon, LTD 2834, LRD 2681, RTR 3366: kısa kablolarının ucunda Superseal çifti. Soketi olmayan lambada plaka ve kol 7×1'in T'sinden.
+- **Doğrulanmadı:** kablo kesitleri ve kılıf tipi (hepsi koruge çizildi), LZD 3194'ün hangi Superseal soketinin hangi devre olduğu, LUNA ve marker fişlerinin gerçek tipi.

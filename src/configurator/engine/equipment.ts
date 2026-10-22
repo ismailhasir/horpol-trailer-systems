@@ -116,6 +116,49 @@ function bumperKind(c: Config, M: MountsLike): string | undefined {
   return B.default;
 }
 
+/**
+ * Lamba bağlantı noktaları (lamba yerelinde, m; lambanın modelinden ölçüldü, tools/blender/out/lamp-*.glb, 2026-10-22). p: fiş
+ * yüzü / soket ağzı / kısa kablonun ucu, d: kablonun lambadan çıkış yönü.
+ *   amp: lambanın AMP 7 pin soketi (LZD 3194: rakor somununa doğrudan, tools/blender/lamps_cad.py amp_socket); tesisatın dişi
+ *        AMP'si takılır
+ *   ss: gövdedeki Superseal çıkışları (Horpol ürün föyü LZD 3194/AMP: 2 × pozisyon, sinyal yanıp sönmeli pozisyon, geri vites;
+ *       dış uçtaki ikili blok POSITION / POSITION, içteki ? / REVERSE). pos1 lastik kol, pos2 plaka, rev çalışma lambası (LRD 2681
+ *       geri vites işlevli), flash boş (kör tapa)
+ *   tail: lambanın kısa kablosunun ucu; tesisatla hat içi fiş çifti (pin7: AMP 7 pin, değilse Superseal)
+ */
+type Port = { p: [number, number, number]; d: [number, number, number] };
+type SsOut = 'pos1' | 'pos2' | 'rev' | 'flash';
+const LAMP_PORTS: Record<string, { amp?: Port; ss?: Partial<Record<SsOut, Port>>; tail?: Port; pin7?: boolean }> = {
+  lzd3194: {
+    amp: { p: [0, 0, -0.072], d: [0, 0, -1] },
+    ss: {
+      pos1: { p: [-0.13475, -0.0005, -0.025], d: [0, 0, -1] },
+      pos2: { p: [-0.11525, -0.0005, -0.025], d: [0, 0, -1] },
+      rev: { p: [0.11525, -0.0005, -0.025], d: [0, 0, -1] },
+      flash: { p: [0.13475, -0.0005, -0.025], d: [0, 0, -1] },
+    },
+  },
+  lzd2854: { tail: { p: [0, -0.01, -0.036], d: [0, -0.2, -1] }, pin7: true },
+  lzd2448: { tail: { p: [0, -0.04, -0.0237], d: [0, -0.33, -0.94] } },
+  lzd2452: { tail: { p: [0, -0.04, -0.0237], d: [0, -0.33, -0.94] } },
+  ltd2834: { tail: { p: [0, -0.03, -0.026], d: [0, -0.96, -0.27] } },
+  ld2774: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
+  ld2773: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
+  lrd2681: { tail: { p: [0, 0.04, -0.058], d: [0, -0.707, -0.707] } },
+  // RTR 3366: kısa kablo alt kenardan iner; tesisat çifti çerçevenin arkasından dorseye doğru (tamponun açık sırtından)
+  rtr3366: { tail: { p: [0, -0.115, 0.002], d: [0, 0, -1] } },
+};
+type PortW = { p: THREE.Vector3; d: THREE.Vector3 };
+/** Bağlantı noktası dünyada (grup ekseni; grup henüz sahnede değil). Yer tutucu ya da tabloda yoksa undefined */
+function portOf(o: THREE.Object3D | undefined, id: string, which: 'amp' | 'tail' | SsOut): PortW | undefined {
+  if (!o || o.userData.placeholder) return undefined;
+  const P = LAMP_PORTS[id];
+  const pt = which === 'amp' || which === 'tail' ? P?.[which] : P?.ss?.[which];
+  if (!pt) return undefined;
+  o.updateMatrixWorld(true);
+  return { p: V(...pt.p).applyMatrix4(o.matrixWorld), d: V(...pt.d).transformDirection(o.matrixWorld) };
+}
+
 // Tampondaki çalışma lambası L braketi (3 mm sac): dik kolu webe iki M8 cıvatayla (somunları webin arkasında), yatay kolu lambanın
 // U braketinin altında. Lamba webden WORK_OFF kadar önde (gövde arkası dik kola dayanır).
 const WORK_OFF = 0.02;
@@ -124,6 +167,7 @@ const WB = {
   foot: markShared(new THREE.BoxGeometry(0.036, 0.005, 0.05)),
   nut: markShared(new THREE.CylinderGeometry(0.0075, 0.0075, 0.0065, 6).rotateZ(Math.PI / 2)),
   washer: markShared(new THREE.CylinderGeometry(0.0085, 0.0085, 0.0016, 18).rotateZ(Math.PI / 2)),
+  grommet: markShared(new THREE.CylinderGeometry(0.0065, 0.0065, 0.004, 18).rotateZ(Math.PI / 2)),
 };
 
 // ---------- yer tutucu (model yüklenene kadar) ----------
@@ -273,7 +317,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const stopSet = layoutOf(productById('stop', stop.product), perSide) ?? productById('stop', stop.product).set ?? [stop.product];
   const zEdge = R ? R.zOuter : Math.min(W2 - 0.03, a.rear.lampZ[0] + (LAMP_W[stopSet[0]] ?? 0.3) / 2);
   // her yan: dıştan içe dizilen lambalar [z merkezi, yarı genişlik]
-  const rearLamps: { s: number; z: number; hw: number }[] = [];
+  const rearLamps: { s: number; z: number; hw: number; id: string; obj: THREE.Object3D }[] = [];
   /** dıştaki arka lambanın lastik kol takma noktası (modelde MOUNT_arm varsa; ör. LZD 3194 MAVIC) */
   const armMount: Record<number, THREE.Vector3> = {};
   for (const s of [1, -1]) {
@@ -292,7 +336,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         o.updateMatrixWorld(true);
         armMount[s] = mp.getWorldPosition(V(0, 0, 0)); // grup ekseni (grup henüz sahnede değil, birim dönüşüm)
       }
-      rearLamps.push({ s, z, hw: w / 2 });
+      rearLamps.push({ s, z, hw: w / 2, id: sid, obj: o });
       edge = z - w / 2 - 0.025;
     }
   }
@@ -303,7 +347,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const plateCy = P?.plateY ?? a.rear.plateY; // plakanın merkez yüksekliği
   const PLATE_HALF_W = 0.26;
   /** Her plaka lambası: konum, yönlendirme (lens plakaya bakar) ve kablonun girdiği nokta */
-  type PlateSpot = { id: string; pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3 };
+  type PlateSpot = { id: string; pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3; obj?: THREE.Object3D };
   const plateSpots: PlateSpot[] = [];
   let plateLight: PlateLight = null;
   /** plaka çerçevesinde plakanın yeni yeri (yoksa taşıyıcıdaki yerinde kalır) */
@@ -348,6 +392,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     const o = mount('plate', sp.id, sp.pos, (obj) => {
       obj.quaternion.copy(sp.q);
     });
+    sp.obj = o;
     if (sp.id === frameOn) {
       const mp = o.getObjectByName('MOUNT_plate');
       o.updateMatrixWorld(true);
@@ -412,12 +457,14 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     }
   }
   const markerY = (x: number) => slotY.get(x) ?? sideY(x);
+  const sideObj = new Map<string, THREE.Object3D>();
   for (const x of sideXs) {
     const y = markerY(x);
     for (const s of [1, -1]) {
-      mount('side', sd.product, V(x, y, s * sideZ), (o) => {
+      const o = mount('side', sd.product, V(x, y, s * sideZ), (o) => {
         if (s < 0) o.rotation.y = Math.PI;
       });
+      sideObj.set(`${x}|${s}`, o);
     }
     // marker braketi (tanker önü, damper): kirişten (from: [y, z]) yan düzleme (to: [y, z]) uzanan kol + lamba tablası
     const sb = S?.brackets;
@@ -446,9 +493,10 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   // =========================== ÖN POZİSYON ===========================
   const fr = c.lamps.front;
   const F: P3 & { bracket?: Bracket } = M.front ?? a.front;
+  const frontObj: Record<number, THREE.Object3D> = {};
   if (fr.qty > 0) {
     for (const s of [1, -1]) {
-      mount('front', fr.product, V(F.x, F.y, s * F.z), (o) => {
+      frontObj[s] = mount('front', fr.product, V(F.x, F.y, s * F.z), (o) => {
         o.rotation.y = -Math.PI / 2;
       });
     }
@@ -470,9 +518,20 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       // arka kol: lambada takma noktası (MOUNT_arm) varsa kol plakası lambanın ucundaki adaptöre DÖNDÜRMEDEN oturur (kolun
       // kendi biçimi yukarı eğik; LZD 3194 STEP'indeki LDCC 2698 montajıyla aynı); yoksa montaj haritasındaki yerine (duvara dik)
       const lm = sp === AR ? armMount[s] : undefined;
-      mount('arm', ar.product, lm ? lm.clone() : V(sp.x, sp.y, s * wz), (o) => {
+      const o = mount('arm', ar.product, lm ? lm.clone() : V(sp.x, sp.y, s * wz), (o) => {
         if (s < 0) o.scale.z = -1;
       });
+      // tamponun uç sacında: kolun tamamı sacın ortasına (derinlik ve yükseklikte; modelin orijini taban plakasının altında, kol
+      // yukarı uzandığı için ortalanmazsa kolun başı tamponun üst kenarından taşar)
+      if (!lm && sp === AR && BK && AR !== AR0 && !o.userData.placeholder) {
+        o.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(o, true);
+        if (!bb.isEmpty()) {
+          const c = bb.getCenter(V(0, 0, 0));
+          o.position.x += sp.x - c.x;
+          o.position.y += sp.y - c.y;
+        }
+      }
     }
     if (sp.bracket) brackets.push(sp.bracket);
   }
@@ -489,13 +548,14 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       const plateOuter = Math.max(0, ...plateSpots.map((p) => Math.abs(p.pos.z) + (p.id === frameOn ? RTR_HALF_W : 0.035)));
       return { ...sp, x: BK ? BK.faceX + WORK_OFF : sp.x, z: s * (inner + plateOuter) / 2 };
     });
+  const workObj: THREE.Object3D[] = [];
   for (const sp of workSpots) {
     const d0 = sp.dir ?? [1, -0.25, 0];
     // yatay yön korunur, aşağı eğim hafifletilir (dik montajlı braket); yuvarlanma yok: lambanın üstü dünya Y'ye bakar
     const d = V(d0[0], Math.max(-0.12, Math.min(0, d0[1] * 0.5)), d0[2]).normalize();
-    mount('work', wk.product, V(sp.x, sp.y, sp.z), (o) => {
+    workObj.push(mount('work', wk.product, V(sp.x, sp.y, sp.z), (o) => {
       o.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(d, V(0, 0, 0), V(0, 1, 0)));
-    });
+    }));
     if (sp.bracket) brackets.push(sp.bracket);
     if (BK && sp.between) {
       const fx = BK.faceX;
@@ -506,6 +566,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         group.add(o);
       };
       add(WB.up, mats.darkMetal, fx + 0.002, sp.y + 0.022, sp.z);
+      // lamba kablosu webden geçer (rakorun hemen altı): webin arkasında lastik rakor
+      add(WB.grommet, mats.plastic, fx - 0.003 - 0.002, sp.y + 0.06, sp.z);
       add(WB.foot, mats.darkMetal, fx + 0.004 + 0.018, sp.y - 0.0025, sp.z);
       for (const dz of [-0.015, 0.015]) {
         add(WB.nut, mats.socketGrey, fx + 0.004 + 0.00325, sp.y + 0.03, sp.z + dz); // cıvata başı (önde)
@@ -616,7 +678,6 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     // altlarından kısa bir çukurla geçer: yukarıdan bakınca çukur kırmızı hatların arkasında kalır, kırmızılar düz görünür.
     const [zS1, zS2, zS3] = MODULE.small;
     const zR = MODULE.big;
-    const rearLanes = rearLamps.length ? [zR - 0.035, zR + 0.035] : [];
     /**
      * Önden gelip x'te yana dönen koşu (zA → zB); crossings'teki z'lerde üstteki kablonun altından geçer (yakın kesişmeler tek
      * çukur). Kesişme dönüş noktasına yakınsa kablo dönmeden hemen önce (son traversin arkasında) alçalır, yana alçaktan döner.
@@ -645,51 +706,80 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     const PF = port('front', zR);
     plug('roundPlug', PF, toModule);
     const J = V(fx + 0.75, Y, zR); // ayrılma noktasındaki büyük ara fiş
-    const JH = 0.16 * 1.5 * 0.65; // fiş çiftinin yarı boyu (ölçek 1,3)
+    const JH = (0.16 * 1.3) / 2; // fiş çiftinin yarı boyu (ölçek 1,3: 15 damarlı ana hat fişi)
     plug('round', J, V(1, 0, 0), undefined, 1.3);
-    wire('main', 0.018, [V(J.x + JH, Y, zR), V(PF.x - 0.3, Y, zR), PF], ALL_CATS, 1);
+    // ana hat: 15 damarlı kablo NW17 koruge içinde (dış Ø 21 mm)
+    wire('main', 0.0106, [V(J.x + JH, Y, zR), V(PF.x - 0.3, Y, zR), PF], ALL_CATS, 1);
     kinds.forEach((_, i) => {
       const z = socketZ(i);
       // kollar ayırıcının girişine yan yana (demet) girer
       const off = (i - (kinds.length - 1) / 2) * 0.016;
       const xi = J.x - JH;
-      wire('main', 0.009, [V(a.socket.x + 0.02, a.socket.y, z), V(fx, a.socket.y, z), V(fx, Y, z), V(xi - 0.32, Y, z), V(xi - 0.07, Y, zR + off), V(xi + 0.01, Y, zR + off)], ALL_CATS, 0);
+      // soket kolu: 7 damarlı kablo NW13 koruge (Ø 16 mm)
+      wire('main', 0.008, [V(a.socket.x + 0.02, a.socket.y, z), V(fx, a.socket.y, z), V(fx, Y, z), V(xi - 0.32, Y, z), V(xi - 0.07, Y, zR + off), V(xi + 0.01, Y, zR + off)], ALL_CATS, 0);
     });
 
-    // --- arka lambalar lamba taşıyıcı kutusunun içine oturur: 7×1 hat arka dağıtımda (xd) kutunun üstünden iner, AMP fişi ve
-    // Superseal soketleri kutunun içinde (görünmez; çizilmez), plaka ve kol kabloları kutunun içinden çıkar ---
+    // --- lamba bağlantıları: kablo lambanın fişine / soketine / kısa kablosuna gerçek konnektörle takılır (LAMP_PORTS) ---
+    /** Konnektörü kurar; döner [yakın yaklaşım, kablonun bittiği yer] (kablo bu sırayla lambaya varır) */
+    const plugEnd = (q: PortW, type: 'amp' | 'ampPair' | 'ssPlug' | 'ss') => {
+      const D = q.d.clone().normalize();
+      let tail: THREE.Vector3;
+      if (type === 'amp' || type === 'ssPlug') {
+        // dişi fiş lambanın fişine / soketine takılı: yüzü q.p'de, gövdesi kablo yönünde
+        plug(type, q.p.clone(), D.clone().negate());
+        tail = q.p.clone().addScaledVector(D, type === 'amp' ? 0.08 : 0.038);
+      } else {
+        // hat içi çift: lambanın kısa kablosunun ucunda
+        const half = type === 'ampPair' ? 0.075 : 0.038;
+        plug(type, q.p.clone().addScaledVector(D, half), D.clone());
+        tail = q.p.clone().addScaledVector(D, 2 * half);
+      }
+      return [tail.clone().addScaledVector(D, 0.025), tail];
+    };
+    /** arka lambanın ana bağlantısı: AMP fişi, yoksa kısa kablosu (7 pin lambada AMP çifti, değilse Superseal) */
+    const rearEnd = (r: (typeof rearLamps)[number]) => {
+      const q = portOf(r.obj, r.id, 'amp');
+      if (q) return plugEnd(q, 'amp');
+      const t = portOf(r.obj, r.id, 'tail');
+      return t ? plugEnd(t, LAMP_PORTS[r.id]?.pin7 ? 'ampPair' : 'ss') : [V(rx - 0.075, ly, r.s * r.z), V(rx - 0.075, ly, r.s * r.z)];
+    };
     const xDrop = xd;
-    const ssOut = (r: (typeof rearLamps)[number]) => V(rx - 0.035, ly - 0.03, r.s * (r.z + r.hw * 0.6));
-    const ssIn = (r: (typeof rearLamps)[number]) => V(rx - 0.035, ly - 0.03, r.s * (r.z - r.hw * 0.6));
     const needSide = sideXs.length > 0 || fr.qty > 0 || ar.qty >= 4;
     /** yan hatların yana döndüğü x: dorse betiğinin verdiği travers boşluğu; yoksa en arkadaki markerın arkası */
     const xb = TOP!.turnX ?? (sideXs.length ? Math.min(Math.max(...sideXs) + 0.12, xDrop - 0.2) : xDrop - 0.25);
+    // her yanda lambaların uçları (dıştan içe) ve 7×1'in yana döndüğü x: fişlere önden (dorse tarafından) girecek kadar önde,
+    // son traversin arkasında
+    const rearSide = [1, -1].map((s) => {
+      const mine = rearLamps.filter((r) => r.s === s).sort((p, q) => q.z - p.z);
+      const ends = mine.map(rearEnd);
+      const xL = ends.length ? Math.max(xb - 0.08, Math.min(...ends.map((e) => e[0].x)) - 0.03) : xDrop;
+      return { s, mine, ends, xL };
+    });
+    // sağ yan hat 7×1 kollarını yalnız 7×1 yan hatların dönüşünün arkasında yana dönüyorsa keser (çukur gerekir)
+    const rightL = rearSide[1];
+    const rearLanes = rightL.mine.length && rightL.xL > xb ? [zR - 0.035, zR + 0.035] : [];
 
-    // --- 7×1 arka hat: modül → (şerit −0,13) → Y ayırıcı → her yanda dıştaki lambaya (içtekiler hattaki T'den) ---
+    // --- 7×1 arka hat (NW10, Ø 13): modül → Y ayırıcı → her yanda dıştaki lambanın fişine; içteki lambalar (LUNA) hattın yanal
+    // kısmındaki T'den kendi kısa kablolarının çiftine ---
+    // 7×1 çalışma lambalarını da besler (LZD 3194'ün geri vites çıkışı)
+    const wv = workSpots.some((sp) => sp.between) && rearLamps.some((r) => LAMP_PORTS[r.id]?.ss?.rev) ? B.work : 0;
     const R0 = port('rear', zR);
     const ySplit = R0.x + 0.3;
     if (rearLamps.length) {
       plug('roundPlug', R0, fromModule);
       plug('ysplit', V(ySplit, Y, zR), V(1, 0, 0));
-      wire('rear', 0.014, [R0, V(ySplit - 0.045, Y, zR)], B.stop | B.plate | B.arm, 2);
+      wire('rear', 0.0065, [R0, V(ySplit - 0.045, Y, zR)], B.stop | B.plate | B.arm | wv, 2);
     }
-    for (const s of [1, -1]) {
-      const mine = rearLamps.filter((r) => r.s === s).sort((p, q) => q.z - p.z);
+    for (const { s, mine, ends, xL } of rearSide) {
       if (!mine.length) continue;
       const lane = zR + s * 0.035;
-      const o = mine[0];
-      wire(
-        'rear',
-        0.013,
-        [V(ySplit + 0.06, Y, zR + s * 0.032), V(xDrop - 0.06, Y, lane), ...lateral(xDrop, Y, lane, s * o.z), V(xDrop, ly, s * o.z), V(rx - 0.075, ly, s * o.z)],
-        B.stop | B.plate | B.arm,
-        2,
-      );
-      for (const r of mine.slice(1)) {
-        // içteki lambalar (LUNA): hattın yanal kısmındaki T bağlantıdan iner
-        plug('tee', V(xDrop, Y, s * r.z), V(0, 0, s), V(0, -1, 0));
-        wire('rear', 0.011, [V(xDrop, Y - 0.02, s * r.z), V(xDrop, ly, s * r.z), V(rx - 0.075, ly, s * r.z)], B.stop, 3);
-      }
+      const [n0, t0] = ends[0];
+      wire('rear', 0.0065, [V(ySplit + 0.06, Y, zR + s * 0.032), V(xL - 0.06, Y, lane), ...lateral(xL, Y, lane, n0.z), V(xL, n0.y, n0.z), n0, t0], B.stop | B.plate | B.arm | wv, 2);
+      mine.slice(1).forEach((r, k) => {
+        const [n, t] = ends[k + 1];
+        plug('tee', V(xL, Y, n.z), V(0, 0, s), V(0, -1, 0));
+        wire('rear', 0.004, [V(xL, Y - 0.012, n.z), V(xL, n.y, n.z), n, t], B.stop, 3);
+      });
     }
 
     // --- yan hatlar (2×0,5): modülün arka yüzünden önce arkaya, yana ve öne; markerlar T bağlantıdan 0,6 m dalla ---
@@ -699,69 +789,112 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         const pz = s > 0 ? zS1 : zS3;
         const P = port('rear', pz);
         plug('ssPlug', P, fromModule);
-        // sağ yan hat (−z) 7×1 şeridinin üstünden geçer
-        wire('side', 0.01, [P, ...lateral(xb, Y, pz, s * busZ, s < 0 ? rearLanes : []), V(xFront, Y, s * busZ)], B.side | B.front | (ar.qty >= 4 ? B.arm : 0), 2);
+        // yan hat 2×0,5 NW7 koruge (Ø 10); sağ yan hat (−z) 7×1 şeridinin üstünden geçer
+        wire('side', 0.005, [P, ...lateral(xb, Y, pz, s * busZ, s < 0 ? rearLanes : []), V(xFront, Y, s * busZ)], B.side | B.front | (ar.qty >= 4 ? B.arm : 0), 2);
         const zp = s * (sideZ - 0.03);
         for (const x of sideXs) {
           const y = markerY(x);
           plug('tee', V(x, Y, s * busZ), V(-1, 0, 0), V(0, 0, s));
-          wire('side', 0.007, [V(x, Y, s * (busZ + 0.03)), V(x, Y, zp), V(x, y, zp), V(x, y, s * (sideZ + 0.005))], B.side, 3);
+          // dal (2×0,5, Ø 7) markerın kısa kablosunun Superseal çiftine
+          const t = portOf(sideObj.get(`${x}|${s}`), sd.product, 'tail');
+          const [n, e] = t ? plugEnd(t, 'ss') : [V(x, y, zp), V(x, y, s * (sideZ + 0.005))];
+          wire('side', 0.0035, [V(x, Y, s * (busZ + 0.03)), V(x, Y, n.z), V(x, n.y, n.z), n, e], B.side, 3);
         }
         if (fr.qty > 0) {
-          // ön pozisyon: hattın ucundaki Superseal'den kısa dal
+          // ön pozisyon: hattın ucundaki Superseal'den kısa dal, lambanın kısa kablosunun çiftine
+          const t = portOf(frontObj[s], fr.product, 'tail');
           const fz = s * (F.z - 0.02);
-          wire('marker', 0.008, [V(xFront, Y, s * busZ), V(F.x + 0.12, Y, s * busZ), V(F.x + 0.12, Y, fz), V(F.x + 0.12, F.y, fz), V(F.x + 0.03, F.y, fz)], B.front, 3, { d: 0.05, fromEnd: false, type: 'ss' });
+          const [n, e] = t ? plugEnd(t, 'ss') : [V(F.x + 0.06, F.y, fz), V(F.x + 0.03, F.y, fz)];
+          wire('marker', 0.0035, [V(xFront, Y, s * busZ), V(n.x + 0.04, Y, s * busZ), V(n.x + 0.04, Y, n.z), V(n.x + 0.04, n.y, n.z), n, e], B.front, 3, { d: 0.05, fromEnd: false, type: 'ss' });
         }
         if (ar.qty >= 4) {
           const wz = AF.wallZ ?? AF.z;
           plug('tee', V(AF.x + 0.05, Y, s * busZ), V(-1, 0, 0), V(0, 0, s));
-          wire('marker', 0.008, [V(AF.x + 0.05, Y, s * (busZ + 0.03)), V(AF.x + 0.05, Y, s * (wz - 0.04)), V(AF.x + 0.05, AF.y, s * (wz - 0.04)), V(AF.x, AF.y, s * (wz - 0.01))], B.arm, 3);
+          wire('marker', 0.0035, [V(AF.x + 0.05, Y, s * (busZ + 0.03)), V(AF.x + 0.05, Y, s * (wz - 0.04)), V(AF.x + 0.05, AF.y, s * (wz - 0.04)), V(AF.x, AF.y, s * (wz - 0.01))], B.arm, 3);
         }
       }
     }
 
-    // --- plaka (1,5 m) ve arka lastik kol: arka lambanın arkasındaki Superseal'den ---
-    for (const s of [1, -1]) {
-      const mine = rearLamps.filter((r) => r.s === s);
-      const outer = [...mine].sort((p, q) => q.z - p.z)[0];
-      const inner = [...mine].sort((p, q) => p.z - q.z)[0];
+    // --- plaka (1,5 m, 2×0,75) ve arka lastik kol: içteki / dıştaki lambanın Superseal soketinden; soketi olmayan lambada 7×1'in
+    // yanal kısmındaki T'den ---
+    for (const { s, mine, xL } of rearSide) {
+      const outer = mine[0];
+      const inner = mine[mine.length - 1];
       const myPlates = plateSpots.filter((sp) => (sp.entry.z < 0 ? -1 : 1) === s || (plateSpots.length === 1 && s === 1));
       for (const sp of myPlates) {
-        const z = sp.entry.z;
-        if (inner) {
-          const from = ssIn(inner);
-          const xl = rx - 0.06;
-          wire('plate', 0.008, [from, V(xl, from.y, from.z), V(xl, from.y, z), V(xl, sp.entry.y, z), sp.entry.clone()], B.plate, 3);
+        const t = portOf(sp.obj, sp.id, 'tail');
+        const [pn, pt] = t ? plugEnd(t, 'ss') : [sp.entry.clone().add(V(-0.03, 0, 0)), sp.entry.clone()];
+        const src = outer && portOf(outer.obj, outer.id, 'pos2');
+        if (src) {
+          // pozisyon çıkışından (dış blok): AMP fişinin ve 7×1'in altından (5,5 cm) plakaya
+          const [sn, st] = plugEnd(src, 'ssPlug');
+          const xp = Math.max(sn.x, pn.x) - 0.02;
+          const yl = ly - 0.055;
+          wire('plate', 0.004, [st, sn, V(xp, yl, sn.z), V(xp, yl, pn.z), V(xp, pn.y, pn.z), pn, pt], B.plate, 3);
+        } else if (inner) {
+          plug('tee', V(xL, Y, pn.z), V(0, 0, s), V(0, -1, 0));
+          wire('plate', 0.004, [V(xL, Y - 0.012, pn.z), V(xL, pn.y, pn.z), pn, pt], B.plate, 3);
         } else {
           // arka lamba yoksa plaka modülün 7×1 çıkışından
           plug('roundPlug', R0, fromModule);
-          wire('plate', 0.008, [R0, V(xDrop, Y, R0.z), V(xDrop, Y, z), V(xDrop, sp.entry.y, z), sp.entry.clone()], B.plate, 1);
+          wire('plate', 0.004, [R0, V(xDrop - 0.08, Y, R0.z), V(xDrop - 0.08, Y, pn.z), V(xDrop - 0.08, pn.y, pn.z), pn, pt], B.plate, 1);
         }
       }
       if (ar.qty >= 2 && outer) {
-        const from = ssOut(outer);
         const mp = armMount[s];
-        if (mp) {
-          // lambaya takılı kol (LZD 3194 + LDCC 2698): lambanın arkasından kolun plakasına kısa kablo
-          wire('marker', 0.006, [from, V(from.x - 0.012, from.y, from.z), V(from.x - 0.012, mp.y, mp.z - s * 0.008)], B.arm, 3);
+        const src = portOf(outer.obj, outer.id, 'pos1');
+        const wz = AR.wallZ ?? AR.z;
+        // kol tabanı: lambanın adaptöründe (MOUNT_arm) ya da tamponun uç sacında; kablo tabanın arkasından girer
+        const end = mp ? V(mp.x - 0.012, mp.y, mp.z - s * 0.008) : V(AR.x, AR.y, s * (wz - 0.004));
+        const zc = s * (wz + 0.012); // kablo uç sacın dışından kola (lambaya takılı kolda adaptörün arkasından)
+        if (src) {
+          const [sn, st] = plugEnd(src, 'ssPlug');
+          wire('marker', 0.0035, [st, sn, V(sn.x - 0.02, sn.y, zc), V(end.x - 0.03, end.y, zc), end], B.arm, 3);
         } else {
-          const wz = AR.wallZ ?? AR.z;
-          const xb = Math.min(AR.x, rx) - 0.08;
-          wire('marker', 0.008, [from, V(xb, from.y, from.z), V(xb, from.y, s * (wz - 0.04)), V(xb, AR.y, s * (wz - 0.04)), V(AR.x, AR.y, s * (wz - 0.01))], B.arm, 3);
+          // soketi olmayan lamba: 7×1'in yanal kısmının ucundaki T'den, tamponun kanalı içinden uç sacına (rakorla geçer)
+          const zt = s * (Math.abs(rearSide.find((q) => q.s === s)!.ends[0][0].z) - 0.06);
+          plug('tee', V(xL, Y, zt), V(0, 0, s), V(0, -1, 0));
+          wire('marker', 0.0035, [V(xL, Y - 0.012, zt), V(xL, AR.y + 0.03, zt), V(xL, AR.y + 0.03, s * (wz - 0.03)), V(AR.x, AR.y + 0.03, s * (wz - 0.03)), V(AR.x, AR.y, s * (wz - 0.004))], B.arm, 3);
         }
       }
     }
 
-    // --- çalışma lambaları (HOR-1001'den): modülün arka yüzündeki orta Superseal'den tek hat arkaya; 7×1'in yanal kolunun
-    // önünde (kesişmeden) iner, lamba taşıyıcının içine girer, içeride ikiye ayrılıp stop ile plaka arasındaki lambalara ---
-    const yIn = ly + 0.1; // taşıyıcının içindeki yanal koşu (7×1 inişlerinden yüksekte, kutunun tavanının altında)
+    // --- çalışma lambaları (HOR-1001'den; 3×0,75): modülün arka yüzündeki orta Superseal'den tek hat arkaya; 7×1'in yanal
+    // kolunun önünde (kesişmeden) iner, ikiye ayrılıp stop ile plaka arasındaki lambaların kısa kablolarına (Superseal çifti) ---
     const inCarrier = workSpots.filter((sp) => sp.between);
-    if (inCarrier.length) {
+    // LRD 2681 geri vites işlevli: aynı yandaki arka lambanın REVERSE Superseal çıkışından (LZD 3194); plakanın üstünden, 7×1'in
+    // önünden iner, lambanın kısa kablosunun çiftine
+    const revOf = (sp: (typeof workSpots)[number]) => {
+      const lamp = rearSide.find((q) => q.s === (sp.z >= 0 ? 1 : -1))?.mine[0];
+      return lamp && portOf(lamp.obj, lamp.id, 'rev');
+    };
+    const fromLamp = inCarrier.length > 0 && inCarrier.every(revOf);
+    if (fromLamp) {
+      for (const sp of inCarrier) {
+        const [sn, st] = plugEnd(revOf(sp)!, 'ssPlug');
+        const t = portOf(workObj[workSpots.indexOf(sp)], wk.product, 'tail');
+        const [wn, wt] = t ? plugEnd(t, 'ss') : [V(rx - 0.06, sp.y, sp.z), V(rx - 0.03, sp.y, sp.z)];
+        const xq = Math.min(sn.x, wn.x) - 0.035;
+        wire('aux', 0.0035, [st, sn, V(xq, sn.y, sn.z), V(xq, wn.y, sn.z), V(xq, wn.y, wn.z), wn, wt], B.work, 3);
+      }
+    }
+    // boş çıkış (sinyal yanıp sönmeli pozisyon): kör tapa
+    for (const { mine } of rearSide) {
+      const q = mine[0] && portOf(mine[0].obj, mine[0].id, 'flash');
+      if (q) plug('ssCap', q.p.clone(), q.d.clone().negate());
+    }
+    if (inCarrier.length && !fromLamp) {
       const P = port('rear', zS2);
       plug('ssPlug', P, fromModule);
       const xw = xDrop - 0.075;
-      wire('aux', 0.009, [P, V(xw, Y, zS2), V(xw, yIn, zS2), V(xDrop, yIn, zS2)], B.work, 2);
-      for (const sp of inCarrier) wire('aux', 0.008, [V(xDrop, yIn, zS2), V(xDrop, yIn, sp.z), V(xDrop, sp.y, sp.z), V(rx - 0.03, sp.y, sp.z)], B.work, 3);
+      const ends = inCarrier.map((sp) => {
+        const t = portOf(workObj[workSpots.indexOf(sp)], wk.product, 'tail');
+        return t ? plugEnd(t, 'ss') : [V(rx - 0.06, sp.y, sp.z), V(rx - 0.03, sp.y, sp.z)];
+      });
+      const yA = Math.min(...ends.map((e) => e[0].y)) + 0.02; // kolların ayrıldığı yükseklik
+      wire('aux', 0.005, [P, V(xw, Y, zS2), V(xw, yA, zS2)], B.work, 2);
+      plug('tee', V(xw, yA, zS2), V(0, -1, 0), V(0, 0, 1));
+      ends.forEach(([n, t]) => wire('aux', 0.0035, [V(xw, yA, zS2), V(xw, yA, n.z), V(xw, n.y, n.z), n, t], B.work, 3));
     }
     // yüksekteki çalışma / tepe lambası (başlık üstü): aynı porttan yan hatla arka hat arasında yana, arka köşe dikmesi boyunca
     // yukarı; tepe lambası çalışma hattından biraz içeride

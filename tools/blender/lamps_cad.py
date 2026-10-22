@@ -337,6 +337,8 @@ def build_lzd3194_cad(L):
             return 'bracket'  # geniş uçta lastik kol adaptörü (lambanın parçası; dışındaki kol plakası ve kol CAD'de LDCC 2698)
         if not e or z < -26.0 or x > 207.0 or x < -203.0 or abs(y) > 84.0:
             return None  # iç yüzeyler, kablo, CAD'deki kolun kendisi (sitede seçilen ürün takılır) ve kablo artıkları atılır
+        if abs(abs(x) - SS_X) < 23.0 and abs(y) < 21.0 and z < -0.8:
+            return None  # Superseal blokları: aşağıda ürün fotoğraflarına göre yeniden modellenir
         return 'lens' if z > SEAM and -205.0 < x < 205.0 else 'body'
     zones = [zone(f, e) for f, e in zip(bm.faces, ext)]
     lens_bm = _subset(bm, lambda f: zones[f.index] == 'lens')
@@ -535,10 +537,64 @@ def build_lzd3194_cad(L):
             sb = _stl(p)
             _simplify(sb, 2.0)
             _mesh_obj(f'cad_screw{i}', sb, [mat('Housing')], L.inner, 35, decimate=None if FAST else 160)
-    # AMP 7 pin: CAD rakorun bittiği yerden kısa koruge + fiş (CAD fişi 0,3 m kablonun ucunda; sitede kısa tutulur)
-    tube(L.body, 'conduit', [(0.0, -0.004, -0.024), (-0.004, -0.018, -0.042), (-0.026, -0.034, -0.056), (-0.042, -0.040, -0.060)], 0.0055,
-         mat('Conduit'), 4, smooth=True)
-    amp7(L, -0.052, -0.040, -0.060, 0.045)
+    # AMP 7 pin soket rakorun somununa doğrudan oturur (kablosuz; kullanıcı 2026-10-22). Ürün föyündeki 0,3 m kablo kullanılmaz.
+    amp_socket(L, 0.0, 0.0, -0.026)
+    # 4 Superseal çıkış (Horpol ürün föyü: 2 × pozisyon, sinyal yanıp sönmeli pozisyon, geri vites): iki ikili blok, eksenler
+    # ±125 mm (çizim 250), blok genişliği 39, gövdeden 25 mm çıkıntı. Dış uçtaki blok POSITION / POSITION, içteki ? / REVERSE
+    # (ürün fotoğraflarındaki kabartma yazılar)
+    for sx in (-1, 1):
+        superseal_pair(L, sx * SS_X * MM, 0.0)
+
+
+SS_X = 125.0  # mm: Superseal bloklarının ekseni (yerel |x|)
+
+
+def amp_socket(L, x, y, z0):
+    """AMP 7 pin yuvarlak soket (lamba tarafı): rakor somununa kenetli altıgen flanş, sırtlı gövde, iki yeşil conta halkası, ağzın
+    içinde 7 pin. Ağız z0 − 0,046'da, −Z'ye bakar (tesisatın dişi fişi buraya takılır)."""
+    blk = mat('ConnBlack')
+    cyl(L.body, 'amp_flange', 0.0128, (x, y, z0), (x, y, z0 - 0.006), blk, 6, bevel=0.0006)
+    prof = [(0.0005, -0.006), (0.0136, -0.006), (0.0136, -0.0095)]
+    for i in range(6):
+        h = -0.0105 - i * 0.0036
+        prof += [(0.0158, h), (0.0158, h - 0.0021), (0.0146, h - 0.0024), (0.0146, h - 0.0036)]
+    prof += [(0.0150, -0.0335), (0.0162, -0.0345), (0.0162, -0.0455), (0.0150, -0.046), (0.0118, -0.046), (0.0118, -0.040),
+             (0.0005, -0.040)]
+    lathe(L.body, 'amp_body', [(r, h) for r, h in prof], blk, 40, axis='z', center=(x, y, z0))
+    for h0 in (-0.0355, -0.0405):
+        cyl(L.body, 'amp_seal', 0.0168, (x, y, z0 + h0), (x, y, z0 + h0 - 0.0022), mat('ConnGreen'), 40, bevel=0.0004)
+    for k in range(7):
+        a = 2 * math.pi * k / 6
+        px, py = (0.0, 0.0) if k == 6 else (0.0072 * math.cos(a), 0.0072 * math.sin(a))
+        cyl(L.body, 'amp_pin', 0.0009, (x + px, y + py, z0 - 0.040), (x + px, y + py, z0 - 0.0445), mat('Brass'), 10)
+    # kodlama dili (ağızda, üstte)
+    box(L.body, 'amp_key', x - 0.0015, x + 0.0015, y + 0.0108, y + 0.0122, z0 - 0.046, z0 - 0.036, blk, 0.0002)
+
+
+def superseal_pair(L, cx, cy):
+    """İkili Superseal 1.5 soket bloğu (lamba tarafı, ürün fotoğrafları LZD3194AMP_3 / _4): gövdeye gömülü kare oturma plakası,
+    iki soket kulesi (her birinde tek oval ağız, içinde 2 pin), ağızda conta, üstte kilit dili, kuleleri saran yaylı U klips.
+    Ağızlar z −0,025'te, −Z'ye bakar."""
+    blk, seal = mat('ConnBlack'), mat('Seal')
+    X, Y = cx / MM, cy / MM
+    frame(L.body, 'ss_base', mp(rrect(46, 40, 5, 4, X, Y)), mp(rrect(41, 35, 3, 4, X, Y)), -0.0016, 0.0, blk, 0.0003, 1)
+    prism(L.body, 'ss_plate', mp(rrect(41, 35, 3, 4, X, Y)), -0.0008, 0.0, blk)
+    for dx in (-9.75, 9.75):
+        tx = X + dx
+        prism(L.body, 'ss_tower', mp(rrect(17.0, 15.0, 3.2, 4, tx, Y - 0.5)), -0.0215, -0.0008, blk, 0.0006, 2)
+        frame(L.body, 'ss_mouth', mp(rrect(16.2, 14.2, 3.0, 4, tx, Y - 0.5)), mp(stadium(6.9, 12.6, 4, tx, Y - 0.5)), -0.025, -0.0215, blk, 0.0004, 1)
+        prism(L.body, 'ss_cavity', mp(stadium(6.9, 12.6, 6, tx, Y - 0.5)), -0.0215, -0.020, seal)
+        frame(L.body, 'ss_lip', mp(stadium(6.9, 12.6, 6, tx, Y - 0.5)), mp(stadium(5.4, 11.1, 6, tx, Y - 0.5)), -0.0235, -0.0225, seal)
+        for py in (-3.0, 3.0):
+            cyl(L.inner, 'ss_pin', 0.0005, ((tx) * MM, (Y - 0.5 + py) * MM, -0.0205), ((tx) * MM, (Y - 0.5 + py) * MM, -0.0225), mat('Brass'), 8)
+        # kilit dili (fişin mandalı buna takılır)
+        box(L.body, 'ss_latch', (tx - 2.5) * MM, (tx + 2.5) * MM, (Y + 7.0) * MM, (Y + 9.2) * MM, -0.0235, -0.0125, blk, 0.0003)
+        box(L.body, 'ss_ramp', (tx - 2.5) * MM, (tx + 2.5) * MM, (Y + 9.2) * MM, (Y + 10.0) * MM, -0.0215, -0.0175, blk, 0.0002)
+    # yaylı U klips: iki kulenin dışını saran bant ve yan kulakları
+    box(L.body, 'ss_clip', (X - 19.8) * MM, (X + 19.8) * MM, (Y - 8.5) * MM, (Y - 7.2) * MM, -0.0225, -0.0160, blk, 0.0002)
+    for sx in (-1, 1):
+        box(L.body, 'ss_ear', (X + sx * 19.0 - 0.8) * MM, (X + sx * 19.0 + 0.8) * MM, (Y - 8.5) * MM, (Y + 6.5) * MM, -0.0225, -0.0160, blk, 0.0002)
+        box(L.body, 'ss_ear_tab', (X + sx * 20.6 - 0.8) * MM, (X + sx * 20.6 + 0.8) * MM, (Y - 2.5) * MM, (Y + 2.5) * MM, -0.0215, -0.0185, blk, 0.0002)
 
 
 # =====================================================================

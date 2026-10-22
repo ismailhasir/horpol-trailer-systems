@@ -70,7 +70,7 @@ function flowMaterial<T extends THREE.MeshStandardMaterial>(m: T): T {
 // Kablo türleri (tesisat görünümündeki renk kodu; eğitsel görselleştirme, gerçek kablo renkleri değildir):
 // main = soket→modül ana hat, rear = modül→arka lamba 7×1, side = 2×0,5 yan hat, plate = plaka, marker = ön/kontur dalları, aux = çalışma/tepe
 export type WireKind = 'main' | 'side' | 'rear' | 'plate' | 'marker' | 'aux';
-export type ConnType = 'round' | 'roundPlug' | 'ss' | 'ssPlug' | 'amp' | 'tee' | 'ysplit';
+export type ConnType = 'round' | 'roundPlug' | 'ss' | 'ssPlug' | 'ssCap' | 'amp' | 'ampPair' | 'tee' | 'ysplit';
 export interface Wire {
   kind: WireKind;
   r: number;
@@ -92,13 +92,14 @@ export interface Conn {
   scale?: number;
 }
 
-export const WIRE_SCALE = 1.7;
+// Kablolar ve konnektörler gerçek ölçüde (kullanıcı 2026-10-22; önceden okunurluk için 1,7 / 1,5 kat büyüktü). Çaplar
+// equipment.ts'de: koruge boru dış çapı (NW17 ana hat, NW10 7×1, NW7 yan hat; doğrulanmadı)
+export const WIRE_SCALE = 1;
 const BEND = 0.14;
 const RIBS_PER_M = 75;
 const CLIP_STEP = 0.5;
 const RADIAL = 10;
-/** konnektörler kablolarla aynı oranda belirgin (gerçek ölçünün katı) */
-const CONN_SCALE = 1.5;
+const CONN_SCALE = 1;
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
@@ -254,7 +255,7 @@ export function drawHarness(input: Wire[], conns: Conn[], mats: Mats, opts: Harn
       pickGeo.push(pg);
     }
     const len = cum[cum.length - 1];
-    if (w.r >= 0.012) {
+    if (w.r >= 0.0065) {
       for (let d = 0.35; d < len - 0.3; d += CLIP_STEP) clips.push({ ...along(pts, d, false), r: w.r * WIRE_SCALE });
     }
     if (w.conn) {
@@ -388,30 +389,53 @@ function connGeo(type: ConnType) {
       c.black = merge([plugBody]);
       c.grey = merge([nut]);
     }
-  } else if (type === 'ss' || type === 'ssPlug') {
-    // Superseal 1.5 (2 pin): dişi gövde + kilit dili, erkek gövde + gri kilit yuvası, iki uçta sırtlı conta
+  } else if (type === 'ssPlug' || type === 'ssCap') {
+    // Superseal 1.5 2 pin fiş (TE 282080 benzeri): lambanın soket ağzına (16 × 14 mm) oturan yuvarlatılmış gövde, üstte soketin
+    // kilit diline geçen mandal (kol + kanca), arkada sırtlı tel contası ve kablo körüğü. ssCap: kablosuz kör tapa (boş çıkış).
+    // Yüz x = 0'da sokete dayanır, gövde −X
+    const body = new RoundedBoxGeometry(0.024, 0.0142, 0.0162, 2, 0.0025);
+    body.translate(-0.012, 0, 0);
+    const lever = box(0.017, 0.0022, 0.0062, -0.0115, 0.0085);
+    const hook = box(0.0035, 0.0032, 0.0062, -0.0018, 0.0094);
+    const grip = box(0.003, 0.0034, 0.0075, -0.0205, 0.0091);
+    if (type === 'ssPlug') {
+      const seal = latheX([[-0.024, 0], [-0.024, 0.0058], ...ribs(-0.0262, -0.0242, 0.0052, 0.0008, 2), [-0.0262, 0.0052], [-0.0262, 0]]);
+      const tail = boot(-0.026, -0.038, 0.0055, 0.0040);
+      c.black = merge([body, lever, hook, grip, seal, tail]);
+    } else {
+      const capBody = new RoundedBoxGeometry(0.010, 0.0142, 0.0162, 2, 0.0025);
+      capBody.translate(-0.005, 0, 0);
+      const pull = box(0.006, 0.004, 0.009, -0.013, 0);
+      c.black = merge([capBody, pull, hook]);
+    }
+  } else if (type === 'ss') {
+    // Superseal 1.5 hat içi çift (lambanın kısa kablosunun ucunda): dişi gövde + kilit dili, erkek gövde + kilit yuvası, iki uçta
+    // sırtlı conta
     const bootA = boot(0, 0.014, 0.0045, 0.0062);
     const fem = box(0.028, 0.016, 0.021, 0.028);
     const latch = box(0.012, 0.0035, 0.008, 0.033, 0.0095);
     const ramp = box(0.004, 0.0025, 0.012, 0.04, 0.0088);
-    if (type === 'ss') {
-      const male = box(0.02, 0.019, 0.024, 0.052);
-      const lock = box(0.006, 0.02, 0.025, 0.044);
-      const bootB = boot(0.076, 0.062, 0.0045, 0.0062);
-      for (const g of [bootA, fem, latch, ramp, male, lock, bootB]) g.translate(-0.038, 0, 0);
-      c.black = merge([bootA, fem, male, bootB]);
-      c.grey = merge([latch, ramp, lock]);
-    } else {
-      for (const g of [bootA, fem, latch, ramp]) g.translate(-0.042, 0, 0);
-      c.black = merge([bootA, fem]);
-      c.grey = merge([latch, ramp]);
-    }
-  } else if (type === 'amp') {
-    // AMP 7 pin (arka lamba fişi): sırtlı yuvarlak gövde, yeşil conta; ön yüz x = 0'da lambaya dayanır
+    const male = box(0.02, 0.019, 0.024, 0.052);
+    const lock = box(0.006, 0.02, 0.025, 0.044);
+    const bootB = boot(0.076, 0.062, 0.0045, 0.0062);
+    for (const g of [bootA, fem, latch, ramp, male, lock, bootB]) g.translate(-0.038, 0, 0);
+    c.black = merge([bootA, fem, male, bootB]);
+    c.grey = merge([latch, ramp, lock]);
+  } else if (type === 'amp' || type === 'ampPair') {
+    // AMP 7 pin dişi fiş (tesisat tarafı): lambanın soketinin yeşil contalarının üstüne oturan sırtlı bağlantı somunu, gövde,
+    // koni ve sırtlı kablo körüğü (Ø 13 kablo); ön yüz x = 0'da sokete dayanır. ampPair: hat içi erkek + dişi çift, ortası x = 0
     const body = latheX([[-0.075, 0], [-0.075, 0.0062], [-0.062, 0.0075], [-0.05, 0.0135], ...ribs(-0.048, -0.012, 0.0158, 0.0014, 7), [-0.01, 0.0158], [-0.01, 0]]);
     const seal = latheX([[-0.01, 0], [-0.01, 0.0168], [-0.004, 0.0172], [-0.004, 0.0152], [0, 0.0152], [0, 0]], 24);
-    c.black = merge([body]);
-    c.green = merge([seal]);
+    if (type === 'amp') {
+      const nut = latheX([[0, 0], [0, 0.0172], [-0.002, 0.0186], ...ribs(-0.003, -0.023, 0.0186, 0.0012, 10), [-0.024, 0.0176], [-0.024, 0]], 32);
+      const shell = latheX([[-0.024, 0], [-0.024, 0.0162], [-0.046, 0.0158], [-0.06, 0.0105], ...ribs(-0.061, -0.079, 0.0082, 0.0009, 6), [-0.08, 0.0072], [-0.08, 0]], 28);
+      const band = latheX([[-0.0245, 0], [-0.0245, 0.0166], [-0.0285, 0.0166], [-0.0285, 0]], 28);
+      c.black = merge([nut, shell]);
+      c.grey = merge([band]);
+    } else {
+      c.black = merge([body, body.clone().rotateZ(Math.PI)]);
+      c.green = merge([seal]);
+    }
   } else if (type === 'tee') {
     // yan hat bağlantısı: hat üzerinde kelepçeli gövde, dal (+Z) lambanın 0,6 m kablosuna gider
     const body = box(0.03, 0.02, 0.024);
@@ -445,16 +469,17 @@ const clipGeo = () => (clipG ??= markShared(new THREE.CylinderGeometry(1, 1, 0.0
 // ---------- Horpol kontrol modülü (yeni şema) ----------
 /** Modülün port düzeni: ön yüz (sokete bakan) ve arka yüz; z yanal. R: yuvarlak 7 pin, S: Superseal */
 /**
- * Kablolar 1,7 kat kalın çizildiği için modül de gerçeğinden ~1,35 kat büyük (orantı bozulmasın). Şemadaki gibi iki yüzde de
+ * Gerçek ölçü (kablolar artık gerçek çapta; önceki 1,35 kat büyütme kalktı, ölçüler doğrulanmadı). Şemadaki gibi iki yüzde de
  * soldan sağa 3 Superseal ve en sağda büyük yuvarlak soket. Üstten bakışta (ön yukarıda) sağ = dünya −z.
  */
+const MK = 0.74;
 export const MODULE = {
-  hx: 0.15,
-  hz: 0.25,
-  h: 0.085,
+  hx: 0.15 * MK,
+  hz: 0.25 * MK,
+  h: 0.085 * MK,
   /** Superseal portlarının z'si (soldan sağa) ve büyük soketin z'si (en sağ) */
-  small: [0.165, 0.085, 0.005] as const,
-  big: -0.13,
+  small: [0.165 * MK, 0.085 * MK, 0.005 * MK] as const,
+  big: -0.13 * MK,
   /** port ağzının yüzden çıkıntısı */
   lip: 0.014,
 };
@@ -471,17 +496,17 @@ export function moduleModel(mats: Mats) {
     g.add(m);
     return m;
   };
-  add(new RoundedBoxGeometry(hx * 2, h, hz * 2, 3, 0.018), mats.plastic);
-  add(new RoundedBoxGeometry(hx * 2 + 0.018, 0.03, hz * 2 + 0.018, 2, 0.012), mats.connWhite, 0, -h * 0.18);
+  add(new RoundedBoxGeometry(hx * 2, h, hz * 2, 3, 0.018 * MK), mats.plastic);
+  add(new RoundedBoxGeometry(hx * 2 + 0.018 * MK, 0.03 * MK, hz * 2 + 0.018 * MK, 2, 0.012 * MK), mats.connWhite, 0, -h * 0.18);
   for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) add(new RoundedBoxGeometry(0.066, h * 0.86, 0.066, 2, 0.016), mats.connWhite, sx * (hx - 0.016), -0.002, sz * (hz - 0.016));
+    for (const sz of [-1, 1]) add(new RoundedBoxGeometry(0.066 * MK, h * 0.86, 0.066 * MK, 2, 0.016 * MK), mats.connWhite, sx * (hx - 0.016 * MK), -0.002, sz * (hz - 0.016 * MK));
     // vida kulakları (yan uçların ortasında)
-    add(new THREE.CylinderGeometry(0.021, 0.021, 0.014, 16), mats.connWhite, 0, -h / 2 + 0.007, sx * (hz + 0.024));
+    add(new THREE.CylinderGeometry(0.021 * MK, 0.021 * MK, 0.014 * MK, 16), mats.connWhite, 0, -h / 2 + 0.007 * MK, sx * (hz + 0.024 * MK));
   }
-  add(new RoundedBoxGeometry(hx * 1.3, 0.008, hz * 1.3, 2, 0.004), mats.socket, 0, h / 2);
-  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.27, (0.27 * 528) / 720), mats.logoWhite);
+  add(new RoundedBoxGeometry(hx * 1.3, 0.008 * MK, hz * 1.3, 2, 0.004 * MK), mats.socket, 0, h / 2);
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.27 * MK, (0.27 * MK * 528) / 720), mats.logoWhite);
   logo.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
-  logo.position.y = h / 2 + 0.0045;
+  logo.position.y = h / 2 + 0.0045 * MK;
   g.add(logo);
   // port ağızları: Superseal dikdörtgen yuva, yuvarlak 7 pin yuva (fişler kablo yüksekliğinde, y = PORT_Y)
   const ports = [...MODULE.small.map((z) => ({ z, t: 'S' })), { z: MODULE.big, t: 'R' }];
@@ -489,12 +514,14 @@ export function moduleModel(mats: Mats) {
     for (const p of ports) {
       const x = face * (hx + MODULE.lip / 2);
       if (p.t === 'S') {
-        add(new THREE.BoxGeometry(MODULE.lip, 0.034, 0.042), mats.plastic, x, PORT_Y, p.z);
-        add(new THREE.BoxGeometry(MODULE.lip + 0.002, 0.022, 0.03), mats.socketGrey, x, PORT_Y, p.z);
+        // Superseal yuvası (fiş 21 × 16 mm): çevresinde 4 mm et
+        add(new THREE.BoxGeometry(MODULE.lip, 0.024, 0.029), mats.plastic, x, PORT_Y, p.z);
+        add(new THREE.BoxGeometry(MODULE.lip + 0.002, 0.017, 0.022), mats.socketGrey, x, PORT_Y, p.z);
       } else {
-        const r = add(new THREE.CylinderGeometry(0.034, 0.034, MODULE.lip, 24), mats.plastic, x, PORT_Y, p.z);
+        // yuvarlak 7 pin yuva (fiş Ø35)
+        const r = add(new THREE.CylinderGeometry(0.024, 0.024, MODULE.lip, 24), mats.plastic, x, PORT_Y, p.z);
         r.rotation.z = Math.PI / 2;
-        const ring = add(new THREE.CylinderGeometry(0.026, 0.026, MODULE.lip + 0.002, 24), mats.socketGrey, x, PORT_Y, p.z);
+        const ring = add(new THREE.CylinderGeometry(0.019, 0.019, MODULE.lip + 0.002, 24), mats.socketGrey, x, PORT_Y, p.z);
         ring.rotation.z = Math.PI / 2;
       }
     }
@@ -507,7 +534,7 @@ export function modulePort(face: 'front' | 'rear', z: number) {
   return V((face === 'front' ? -1 : 1) * (MODULE.hx + MODULE.lip), PORT_Y, z);
 }
 /** port ağızlarının modül merkezine göre yüksekliği (gövdenin alt yarısında: modül şasiye oturur, kablolar şasinin üstünde) */
-const PORT_Y = -0.012;
+const PORT_Y = -0.012 * MK;
 
 // ---------- ön soket (ISO 1185 / 3731) ----------
 /** Ön duvara vidalı soket: kare flanş ve 4 vida, gövde, yaylı kapak (üstten menteşeli, hafif aralık), arkada kablo rakoru. Yerel +Z dışa. */
