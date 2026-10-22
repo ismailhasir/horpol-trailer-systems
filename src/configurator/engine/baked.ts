@@ -69,9 +69,22 @@ export interface BakedMounts {
   /** ana demet: kirişin iç yanında korumalı güzergâh; profile [x, y] (x artan), modül ve arka dağıtım x'i */
   /** top: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y) ve yan hattın |z|'si (yalnız yeni şemalı dorseler) */
   harness: { trunkY: number; trunkZ: number; profile: number[][]; moduleX: number; rearJunctionX: number; top?: { y: number; sideZ: number; turnX?: number; profile?: number[][] }; notes: string };
+  /**
+   * arka lamba tamponu türevleri (tools/blender/bumpers.py VARIANTS; GLB <dorse>-bumper-<türev>.glb, lambaya göre delinmiş):
+   * faceX lambaların oturduğu web yüzü, plateX plaka çerçevesinin arka yüzü, armX lastik kolun uç sacındaki x'i, slots lamba
+   * merkezleri |z| (dıştan içe). Türev stop lambasından (data.ts BUMPER_BY_STOP)
+   */
+  bumper?: { default: string; kinds: Record<string, BumperVariant> };
   /** montajın bağlı olduğu sabit parça: 'chassis' (şasi GLB) | 'body' (sabit üst yapı: kapalı kasa, başlık, kule, korkuluk) */
   parents: Record<string, string>;
   notes: string;
+}
+
+export interface BumperVariant {
+  faceX: number;
+  plateX: number;
+  armX: number;
+  slots: number[];
 }
 
 /** Betiğin yazdığı JSON (tools/blender/bl_common.py → write_anchors) */

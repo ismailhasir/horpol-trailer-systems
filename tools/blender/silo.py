@@ -39,6 +39,7 @@ from bl_common import (  # noqa: E402
     decal_mesh, export_glb, galvanized_checker_tile, hose, join, logo_material, loft, material, np_image, pchip, planar_uv, poly_tube,
     prism_xy, prism_zy, rear_quad, run_bake, smart_uv, tank_metal_tile, tex_material, tiled_ao_finish, tiled_ao_setup, write_anchors,
 )
+from bumpers import BUMPERS, MM as BMM, T as BT, anchors_for, build_mudflap, export_variants, web_x  # noqa: E402
 
 scene = bpy.context.scene
 
@@ -170,7 +171,15 @@ def side_y_profile():
 
 # ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
 # Sabit parçalar: şasi (lamba barı, yan koruma rayı, çamurluk rayı, kirişler), arka kule ve yürüme yolu. Tank kabuğu lamba yeri değil.
-BAR_Z = 1.24  # box2 'lamp_bar' z ±1,24, y 0,50–0,74, arka yüz x = 0
+# Arka tampon (2026-10-22): Horpol sac tamponu (tools/blender/bumpers.py; türev stop lambasından, sitede seçilir) eski alüminyum
+# lamba barının yerinde; dikmelerden gelen kollar üst dudağa cıvatalı. Tozluk alt koruma demirinin arka yüzünde.
+BUMPER_X = XR  # tamponun arka dış yüzü
+BAR_Z = 1.2  # tamponun ucu
+
+
+def bumper_face(kind):
+    return round(BUMPER_X + web_x(kind), 4)
+
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y_GUARD = 1.025  # yan koruma üst rayı (0,99–1,06) ortası
 SIDE_Y_RAIL = 1.14  # çamurluk rayı (1,10–1,18) ortası
@@ -198,8 +207,8 @@ RAIL_PROFILE = [[SX0, 1.055], [SX1, 1.055], [FR0, 1.17], [-0.425, 1.17]]
 def mounts_dict():
     fb = [[FB_X, FB_Y, FB_Z0], [FB_X, FB_Y, FB_Z1]]
     return {
-        'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': BAR_Z, 'zInner': 0.30, 'faceX': XR},
-        'plate': {'x': XR, 'y': round(PLATE_Y + PLATE_H / 2 + 0.025, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
+        'rear': {'x': bumper_face('tek32'), 'y': LAMP_Y, 'zOuter': BAR_Z, 'zInner': 0.30, 'faceX': bumper_face('tek32')},
+        'plate': {'x': bumper_face('tek32'), 'y': round(PLATE_Y + PLATE_H / 2 + 0.025, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_y_profile(), 'z': SIDE_ZW, 'maxPerSide': SIDE_N, 'slots': SIDE_SLOTS,
                  'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': [], 'brackets': None,
@@ -208,17 +217,18 @@ def mounts_dict():
                  'rail': {'z': RAIL_Z, 'y': RAIL_PROFILE, 'rise': [-0.425, None], 'pass': 0.785, 'exit': [SX0 + 0.2, 1.058]}},
         'front': {'x': FB_X - 0.025, 'y': FB_Y, 'z': 1.17, 'bracket': fb},
         'armFront': {'x': ARM_FRONT_X, 'y': SIDE_Y_GUARD, 'z': SIDE_ZW - 0.002, 'wallZ': SIDE_ZW - 0.002, 'bracket': None},
-        'armRear': {'x': -0.07, 'y': LAMP_Y, 'z': BAR_Z, 'wallZ': BAR_Z, 'bracket': None},
+        'armRear': {'x': BUMPER_X - 0.04, 'y': LAMP_Y, 'z': BAR_Z, 'wallZ': BAR_Z, 'bracket': None, 'onBumper': True},
         'armRearAlt': {'x': FR1 - 0.06, 'y': SIDE_Y_RAIL, 'z': SIDE_ZW, 'wallZ': SIDE_ZW, 'bracket': None},
         # kablo arka kulenin içinden (x −0,70) yükselir: kule dar olduğu için dış köşeden gitmez
         'work': [{'x': RTW[1] + 0.005, 'y': WORK_Y, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'bracket': None, 'rise': [-0.70, WORK_Z]}
                  for s in (1, -1)],
         'beacon': [{'x': BEACON_X, 'y': RTW[3], 'z': s * BEACON_Z, 'bracket': None, 'rise': [BEACON_X + 0.06, BEACON_Z]} for s in (1, -1)],
         'harness': {'trunkY': TRUNK_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, TRUNK_Y], [XR, TRUNK_Y]], 'moduleX': MODULE_X,
-                    'rearJunctionX': REAR_JX, 'rearDrop': {'z': 0.73, 'innerX': -0.16},
+                    'rearJunctionX': REAR_JX, 'rearDrop': {'z': 0.73, 'innerX': round(BUMPER_X - 0.06, 3)},
                     'notes': 'Demet king pin konsolunun içinden ve kutu kirişlerin iç yüzünde (y 1,34) arkaya gider; traverslerin '
                              'uçlarından geçer. Arka 7×1 hatlar arka traversin ÖNÜNDE (x −0,50) lamba barı dikmesinin hizasına '
                              '(z ±0,73) iner, dikmenin ve bar kolunun içinden bara girer: arkadan bakınca travers ve dikme kabloyu örter.'},
+        'bumper': anchors_for(BUMPER_X),
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'chassis', 'armFront': 'chassis',
                     'armRear': 'chassis', 'armRearAlt': 'chassis', 'work': 'body', 'beacon': 'body', 'harness': 'chassis'},
         'notes': 'Tank kabuğu ince yüzey olduğu için lamba ve kol taşımaz. Burun kulesi orta düzlemde dar (z ±0,42): ön pozisyon orada '
@@ -272,7 +282,7 @@ def anchors_dict():
         'L': L,
         'W': W,
         'topY': DOME_TOP,
-        'rear': {'x': XR, 'lampY': LAMP_Y, 'lampZ': [0.96, 0.56], 'plateY': PLATE_Y, 'dropX': -0.2},
+        'rear': {'x': bumper_face('tek32'), 'lampY': LAMP_Y, 'lampZ': [0.96, 0.56], 'plateY': PLATE_Y, 'dropX': -0.2},
         'side': {'x0': SX0 + 0.05, 'x1': -0.55, 'z': W2 + 0.003, 'profile': side_y_profile()},
         'front': {'x': nose_point(FRONT_Y) - 0.03, 'y': FRONT_Y, 'z': FRONT_Z},
         'armFront': {'x': -7.25, 'y': 2.7, 'z': W2},
@@ -503,30 +513,43 @@ for xo in OUT:
     box(C, 'valve_actuator', (0.14, 0.09, 0.1), (xo, ym, 0.14), M['dark'], 0.01)
     cylinder(C, 'actuator_rod', 0.012, (xo, ym, 0.075), (xo, ym, 0.09), M['chrome'], 10, 0.0)
     cylinder(C, 'tee', 0.065, (xo - 0.12, DL_Y, 0), (xo + 0.12, DL_Y, 0), M['pipe'], 24, 0.004)
-dl = [(OUT[0] - 0.3, DL_Y, 0.0), (-0.75, DL_Y, 0.0), (-0.45, 0.42, 0.0), (-0.2, 0.40, -0.22), (0.02, 0.40, -0.22)]
+dl = [(OUT[0] - 0.3, DL_Y, 0.0), (-0.75, DL_Y, 0.0), (-0.45, 0.40, 0.0), (-0.2, 0.38, -0.22), (0.02, 0.38, -0.22)]  # uç tamponun altında
 poly_tube(C, 'discharge_line', dl, 0.057, M['pipe'], 3)
 cylinder(C, 'discharge_cap', 0.07, (OUT[0] - 0.28, DL_Y, 0), (OUT[0] - 0.35, DL_Y, 0), M['pipe'], 24, 0.006)
 for x in (-5.6, -4.45, -3.3, -1.8):
     box2(C, 'pipe_hanger', x - 0.02, x + 0.02, DL_Y + 0.05, (SUB_BOT if SUB_X0 < x < SUB_X1 else BOT) + 0.02, -0.035, 0.035, M['dark'], 0.002)
-cylinder(C, 'rear_coupling', 0.075, (-0.03, 0.40, -0.22), (0.035, 0.40, -0.22), M['pipe'], 28, 0.006)
-cylinder(C, 'rear_cap', 0.08, (0.035, 0.40, -0.22), (0.05, 0.40, -0.22), M['dark'], 28, 0.004)
+cylinder(C, 'rear_coupling', 0.075, (-0.03, 0.38, -0.22), (0.035, 0.38, -0.22), M['pipe'], 28, 0.006)
+cylinder(C, 'rear_cap', 0.08, (0.035, 0.38, -0.22), (0.05, 0.38, -0.22), M['dark'], 28, 0.004)
 
-# --- arka: lamba barı (alüminyum), alt koruma tamponu, paçalı levha, askılar ---
+# --- arka: dikmeler (lamba tamponu ve kolları ayrı GLB: aşağıda export_variants), alt koruma tamponu, tozluk ---
 for s in (-1, 1):
     box2(C, 'bar_post', -0.36, -0.30, 0.28, SUB_BOT + 0.02, s * 0.70, s * 0.76, M['alu'], 0.004)
-    box2(C, 'bar_arm', -0.30, -0.14, 0.58, 0.66, s * 0.70, s * 0.76, M['alu'], 0.004)
     box2(C, 'bar_arm_low', -0.30, -0.13, 0.32, 0.38, s * 0.70, s * 0.76, M['alu'], 0.004)
-box2(C, 'lamp_bar', -0.14, XR, 0.50, 0.74, -1.24, 1.24, M['alu'], 0.01)
-box2(C, 'lamp_bar_lip', -0.14, XR - 0.005, 0.49, 0.505, -1.22, 1.22, M['alu'], 0.003)
 box2(C, 'underrun', -0.13, -0.01, 0.30, 0.42, -1.18, 1.18, M['alu'], 0.012)
 for s in (-1, 1):
     box2(C, 'underrun_cap', -0.135, -0.005, 0.295, 0.425, s * 1.18, s * 1.2, M['rubber'], 0.005)
-box2(C, 'rear_flap', -0.07, -0.06, 0.12, 0.50, -1.2, 1.2, M['rubber'], 0.003)
-for s in (-1, 1):
-    box2(C, 'refl', -0.06, -0.057, 0.20, 0.27, s * 0.86, s * 1.12, M['red'], 0.0)
-
-chassis_logos = decal_mesh('ChassisLogos', [rear_quad(-0.0565, 0.20, 0.35, 0.10 * 720 / 528, 0.10)], LOGO_W)
+# eski paça levhası, reflektörleri ve logosu yerine tek parça tozluk (TRAILER SYSTEMS); boşaltma borusunun rakoruna delik
+MF = {'rubber': M['rubber'], 'zinc': material('MudflapZinc', '#b8bdc2', 0.3, 1.0), 'print': material('MudflapPrint', '#f2f3f5', 0.5, 0.0)}
+chassis_logos = build_mudflap(C, MF, -0.01, 0.33, 0.10, 1.15, holes=[(-0.22, 0.38, 0.085)])  # demirin (0,30–0,42) alt kenarına kenetli
 chassis = join(C, 'SiChassis')
+
+# --- arka lamba tamponu türevleri (ayrı GLB, site stop lambasına göre birini yükler): dikmelerden üst dudağa kollar ---
+MQ = {'sheet': material('BumperAlu', '#c6cbd1', 0.34, 0.9), 'zinc': material('BumperZinc', '#b8bdc2', 0.3, 1.0),
+      'rubber': material('BumperRubber', '#141517', 0.85, 0.0)}
+
+
+def bumper_extras(Q, kind):
+    """Dikmeden (x −0,30) üst dudağa yatay kol (lama), dudaktaki oval delikten iki M12 cıvata"""
+    b = BUMPERS[kind]
+    lip = BUMPER_X - b['d'] * BMM
+    ys = LAMP_Y + ((b['h'] - BT) / 2 - b['lip'] + 13.4) * BMM
+    for s in (-1, 1):
+        box2(Q, 'bar_arm', -0.30, lip, ys - 0.03, ys + 0.03, s * 0.70, s * 0.80, MQ['sheet'], 0.004)
+        for zz in (0.745, 0.78):
+            cylinder(Q, 'bolt_head', 0.0095, (lip + BT * BMM, ys, s * zz), (lip + BT * BMM + 0.008, ys, s * zz), MQ['zinc'], 6, 0.001)
+
+
+export_variants('silo', BUMPER_X, LAMP_Y, MQ, bumper_extras, RAW_DIR)
 
 # --- tekerlekler (tek model, 6 örnek) ---
 wheel = build_wheel(MW)

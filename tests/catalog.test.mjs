@@ -29,9 +29,10 @@ const rows = (lamps) => {
   return summaryRows(normalize(c), tr, 'tr');
 };
 
-test('sipariş özeti: standart dorsede plaka çerçevesi her zaman 1 adet', () => {
-  assert.ok(rows({}).some((r) => r.value === '1 × RTR 3366'));
-  assert.ok(rows({ plate: { qty: 0 } }).some((r) => r.value === '1 × RTR 3366'));
+test('sipariş özeti: plaka aydınlatması seçildiği gibi, çerçeve zorunlu değil (kullanıcı 2026-10-22)', () => {
+  assert.ok(!rows({}).some((r) => r.value.includes('RTR 3366')));
+  assert.ok(rows({ plate: { product: 'rtr3366', qty: 1 } }).some((r) => r.value === '1 × RTR 3366'));
+  assert.ok(!rows({ plate: { qty: 0 } }).some((r) => r.value.includes('RTR 3366') || r.value.includes('LTD 2834')));
 });
 
 test('sipariş özeti: LUNA seti bileşenleriyle', () => {

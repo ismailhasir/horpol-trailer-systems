@@ -12,11 +12,12 @@
 // Diğer dorseler eski şemada: yan hat arka lambanın Superseal'inden; çalışma / tepe için ayrı 2×1 besleme.
 // Montaj noktaları dorse betiğinin yazdığı `mounts` (R48 haritası) varsa ondan, yoksa eski bağlantı noktalarından.
 import * as THREE from 'three';
-import { CATEGORIES, layoutOf, productById, rulesFor, type CategoryId, type Config } from '../data';
+import { BUMPER_BY_STOP, CATEGORIES, layoutOf, productById, rulesFor, type CategoryId, type Config } from '../data';
+import type { BumperVariant } from './baked';
 import type { Mats } from './materials';
 import { profileAt, type Anchors } from './trailer';
 import { isShared, markShared } from './geo';
-import { lampInstance } from './lampfx';
+import { lampInstance, lampUrl } from './lampfx';
 import type { PlateLight } from './plateLight';
 import { ALL_CATS, CAT_BIT, drawHarness, MODULE, modulePort, moduleModel, socketModel, wireMat, type Conn, type ConnType, type Wire, type WireKind } from './harness';
 
@@ -77,7 +78,7 @@ interface MountsLike {
     };
   };
   front?: P3 & { bracket?: Bracket };
-  armRear?: P3 & { wallZ?: number; bracket?: Bracket };
+  armRear?: P3 & { wallZ?: number; bracket?: Bracket; onBumper?: boolean };
   armRearAlt?: P3 & { wallZ?: number; bracket?: Bracket };
   armFront?: P3 & { wallZ?: number; bracket?: Bracket };
   /** rise: kablonun dikey çıktığı [x, |z|, yanal geçiş y?] (dar kule/travers önü gibi; yoksa en yakın köşe) */
@@ -95,7 +96,35 @@ interface MountsLike {
     /** yeni şema: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y; değişkense profile [x, y]) ve yan hattın |z|'si */
     top?: { y: number; sideZ: number; turnX?: number; profile?: [number, number][] };
   };
+  bumper?: { default: string; kinds: Record<string, BumperVariant> };
 }
+
+/**
+ * Bu yapılandırmada takılı arka tampon türevi (dorsenin tamponu yoksa undefined): tip stop lambasından, türev lambaya göre
+ * delinmiş olanı (ör. tek32-lzd3194, hamburger-luna6); stop lambasının türevi yoksa (modeli olmayan ürün) düz tip
+ */
+function bumperKind(c: Config, M: MountsLike): string | undefined {
+  const B = M.bumper;
+  if (!B) return undefined;
+  const st = c.lamps.stop;
+  if (st.qty > 0) {
+    const k = BUMPER_BY_STOP[st.product] ?? B.default;
+    const v = `${k}-${st.product}${productById('stop', st.product).layouts ? st.qty : ''}`;
+    if (B.kinds[v]) return v;
+    if (B.kinds[k]) return k;
+  }
+  return B.default;
+}
+
+// Tampondaki çalışma lambası L braketi (3 mm sac): dik kolu webe iki M8 cıvatayla (somunları webin arkasında), yatay kolu lambanın
+// U braketinin altında. Lamba webden WORK_OFF kadar önde (gövde arkası dik kola dayanır).
+const WORK_OFF = 0.02;
+const WB = {
+  up: markShared(new THREE.BoxGeometry(0.004, 0.056, 0.05)),
+  foot: markShared(new THREE.BoxGeometry(0.036, 0.005, 0.05)),
+  nut: markShared(new THREE.CylinderGeometry(0.0075, 0.0075, 0.0065, 6).rotateZ(Math.PI / 2)),
+  washer: markShared(new THREE.CylinderGeometry(0.0085, 0.0085, 0.0016, 18).rotateZ(Math.PI / 2)),
+};
 
 // ---------- yer tutucu (model yüklenene kadar) ----------
 const PH_GEO = markShared(new THREE.BoxGeometry(1, 1, 1));
@@ -221,10 +250,22 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const toLamp = { d: CONN_FROM_LAMP, fromEnd: true };
   const conns: Conn[] = [];
 
+  // =========================== ARKA TAMPON ===========================
+  // Horpol sac tamponu (tipi stop lambasından): lambalar web yüzüne, kesikli tipte set lambaları kesiklere oturur
+  const bKind = bumperKind(c, M);
+  const BK = bKind ? M.bumper!.kinds[bKind] : undefined;
+  if (bKind) {
+    const bo = lampInstance(`${c.trailer}-bumper-${bKind}`);
+    if (bo) {
+      bo.traverse((o) => (o.userData.category = 'bumper'));
+      group.add(bo);
+    } else placeholders++;
+  }
+
   // =========================== ARKA LAMBALAR ===========================
   const stop = c.lamps.stop;
   const R = M.rear;
-  const rx = R?.faceX ?? R?.x ?? a.rear.x;
+  const rx = BK?.faceX ?? R?.faceX ?? R?.x ?? a.rear.x;
   const ly = R?.y ?? a.rear.lampY;
   // set (ör. LUNA): her yanda dıştan içe bileşenler sırayla
   const perSide = Math.floor(stop.qty / 2);
@@ -244,7 +285,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         if (s < 0) obj.scale.x = -1; // sağ lamba: ayna (LZD 3195 / 2857)
       });
       const w = lampWidth(sid, o);
-      const z = edge - w / 2;
+      const z = BK?.slots[k] ?? edge - w / 2;
       o.position.z = s * z;
       const mp = k === 0 ? o.getObjectByName('MOUNT_arm') : undefined;
       if (mp) {
@@ -260,7 +301,6 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const pl = c.lamps.plate;
   const P = M.plate;
   const plateCy = P?.plateY ?? a.rear.plateY; // plakanın merkez yüksekliği
-  const plateFace = a.rear.x + 0.006; // plakanın arka yüzü (trailer.ts ile aynı)
   const PLATE_HALF_W = 0.26;
   /** Her plaka lambası: konum, yönlendirme (lens plakaya bakar) ve kablonun girdiği nokta */
   type PlateSpot = { id: string; pos: THREE.Vector3; q: THREE.Quaternion; entry: THREE.Vector3 };
@@ -273,6 +313,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const frameId = rulesFor(c.trailer).plateFrame;
   const frameOn = frameId ?? (pl.qty > 0 && pl.product === 'rtr3366' ? pl.product : undefined);
   const sideId = pl.qty > 0 && pl.product !== frameOn ? pl.product : undefined;
+  // plakanın arka yüzü (trailer.ts ile aynı): tamponda webin önünde; çerçeve varsa aralayıcıyla daha önde (çerçeve yuvadan yüksek)
+  const plateFace = BK ? (frameOn ? BK.plateX : BK.faceX + 0.006) : a.rear.x + 0.006;
+  if (BK && !frameOn) platePos = V(plateFace, plateCy, 0);
   if (frameOn) {
     // RTR 3366 (HOR 160): LED aydınlatmalı plaka çerçevesi, plakanın yerine taşıyıcıya vidalanır; plaka çerçevenin yuvasına
     // oturur, saçağın altındaki 3 modül plakaya aşağı ışık verir. Yerel: Z dışa (dünya +X), Y yukarı, X = dünya −Z.
@@ -280,6 +323,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     const base = V(plateFace - 0.001, plateCy - RTR_SEAT.y, 0);
     plateSpots.push({ id: frameOn, pos: base, q: basis(V(0, 0, -1), V(0, 1, 0), V(1, 0, 0)), entry: V(base.x + 0.002, base.y - 0.115, 0) });
     plateLight = { top: [-0.171, 0, 0.171] };
+    // çerçeve webden uzaksa (yuvadan yüksek çerçeve, eğik kenarlara binmesin): iki aralayıcı
+    if (BK && BK.plateX - BK.faceX > 0.01) for (const z of [-0.18, 0.18]) brackets.push([[BK.faceX, plateCy, z], [BK.plateX - 0.002, plateCy, z]]);
   }
   if (sideId) {
     // LTD 2834 ve LTD 229: plakanın İKİ YANINDA (çizim HOR 47: lamba ekseni plaka kenarından 40–80 mm), TABANI taşıyıcının
@@ -292,7 +337,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       const s = z > 0 ? 1 : -1;
       const Yw = V(1, 0, 0);
       const Zw = V(0, 0, -s);
-      const base = V(plateFace - 0.002, plateCy, z);
+      // tamponda taban web yüzüne oturur (stop lambaları gibi); saplamaları webin arkasında pul + somunla (bağlantı takımı)
+      const base = V(BK ? BK.faceX : plateFace - 0.002, plateCy, z);
       plateSpots.push({ id: sideId, pos: base, q: basis(Yw.clone().cross(Zw), Yw, Zw), entry: V(base.x - 0.02, base.y, z) });
     }
     // ışık penceresi lambanın derinlik ortasından ~31 mm plakaya doğru
@@ -306,6 +352,15 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       const mp = o.getObjectByName('MOUNT_plate');
       o.updateMatrixWorld(true);
       platePos = mp ? mp.getWorldPosition(V(0, 0, 0)) : V(sp.pos.x + RTR_SEAT.z, plateCy, 0);
+    } else if (BK && lampUrl(`mount-${sp.id}`)) {
+      // bağlantı takımı (tools/blender/bumpers.py build_kit): lambanın yerelinde, aynı dönüşümle
+      const kit = lampInstance(`mount-${sp.id}`);
+      if (kit) {
+        kit.quaternion.copy(sp.q);
+        kit.position.copy(sp.pos);
+        kit.traverse((q) => (q.userData.category = 'bracket'));
+        group.add(kit);
+      } else placeholders++;
     }
   }
 
@@ -404,7 +459,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   const ar = c.lamps.arm;
   // lambada kol takma noktası yoksa (LUNA, CUBE …) dorse kuralına göre taşıyıcı plakanın dış kenarı (kasa köşesi değil)
   const onCarrier = rulesFor(c.trailer).armOnCarrier && !Object.keys(armMount).length && M.armRearAlt;
-  const AR: P3 & { wallZ?: number; bracket?: Bracket } = onCarrier ? M.armRearAlt! : (M.armRear ?? a.armRear);
+  // tamponda (taşıyıcıda ya da dorse betiği arka kolu tampona koyduysa: onBumper): uç sacının ortası (türevin derinliğine göre)
+  const AR0: P3 & { wallZ?: number; bracket?: Bracket; onBumper?: boolean } = onCarrier ? M.armRearAlt! : (M.armRear ?? a.armRear);
+  const AR = BK && (onCarrier || AR0.onBumper) ? { ...AR0, x: BK.armX } : AR0;
   const AF: P3 & { wallZ?: number; bracket?: Bracket } = M.armFront ?? a.armFront;
   const armSpots = ar.qty >= 4 ? [AR, AF] : ar.qty >= 2 ? [AR] : [];
   for (const sp of armSpots) {
@@ -430,7 +487,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       const s = sp.z >= 0 ? 1 : -1;
       const inner = Math.min(...rearLamps.filter((r) => r.s === s).map((r) => r.z - r.hw), R?.zOuter ?? W2);
       const plateOuter = Math.max(0, ...plateSpots.map((p) => Math.abs(p.pos.z) + (p.id === frameOn ? RTR_HALF_W : 0.035)));
-      return { ...sp, z: s * (inner + plateOuter) / 2 };
+      return { ...sp, x: BK ? BK.faceX + WORK_OFF : sp.x, z: s * (inner + plateOuter) / 2 };
     });
   for (const sp of workSpots) {
     const d0 = sp.dir ?? [1, -0.25, 0];
@@ -440,6 +497,22 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       o.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(d, V(0, 0, 0), V(0, 1, 0)));
     });
     if (sp.bracket) brackets.push(sp.bracket);
+    if (BK && sp.between) {
+      const fx = BK.faceX;
+      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
+        const o = m(geo, mat);
+        o.position.set(x, y, z);
+        o.userData.category = 'bracket';
+        group.add(o);
+      };
+      add(WB.up, mats.darkMetal, fx + 0.002, sp.y + 0.022, sp.z);
+      add(WB.foot, mats.darkMetal, fx + 0.004 + 0.018, sp.y - 0.0025, sp.z);
+      for (const dz of [-0.015, 0.015]) {
+        add(WB.nut, mats.socketGrey, fx + 0.004 + 0.00325, sp.y + 0.03, sp.z + dz); // cıvata başı (önde)
+        add(WB.washer, mats.socketGrey, fx - 0.003 - 0.0008, sp.y + 0.03, sp.z + dz);
+        add(WB.nut, mats.socketGrey, fx - 0.003 - 0.0016 - 0.00325, sp.y + 0.03, sp.z + dz);
+      }
+    }
   }
   const bc = c.lamps.beacon;
   const beaconSpots = (M.beacon ?? [{ x: Math.min(-0.3, a.extra.x - 0.2), y: a.topY, z: 0.9 }, { x: Math.min(-0.3, a.extra.x - 0.2), y: a.topY, z: -0.9 }]).slice(0, bc.qty);
@@ -949,15 +1022,19 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
   return { group, harness, lampsByCat, placeholders, plate: { pos: platePos, light: plateLight } };
 }
 
-/** Hangi lamba modelleri gerekiyor (Engine kurmadan önce yükler) */
-export function lampIds(c: Config): string[] {
+/** Hangi lamba (ve tampon) modelleri gerekiyor (Engine kurmadan önce yükler) */
+export function lampIds(c: Config, a?: Anchors): string[] {
   const ids = new Set<string>();
+  const bk = a ? bumperKind(c, (a.mounts as MountsLike) ?? {}) : undefined;
+  if (bk) ids.add(`${c.trailer}-bumper-${bk}`);
   for (const cat of CATEGORIES) {
     const ch = c.lamps[cat.id];
     if (ch.qty > 0) for (const id of productById(cat.id, ch.product).set ?? [productById(cat.id, ch.product).id]) ids.add(id);
   }
   const frame = rulesFor(c.trailer).plateFrame;
   if (frame) ids.add(frame);
+  // tamponda plaka lambalarının bağlantı takımı (varsa)
+  if (bk && c.lamps.plate.qty > 0) ids.add(`mount-${c.lamps.plate.product}`);
   return [...ids];
 }
 

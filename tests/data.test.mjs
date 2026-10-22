@@ -89,7 +89,7 @@ test('lowbed: sınırlar standart dorseyle aynı, yalnız tepe lambası takılab
   assert.equal(normalize(withLamps({ arm: { qty: 4 } }, lb)).lamps.arm.qty, 2);
   assert.equal(normalize(withLamps({ stop: { product: 'lzd3194', qty: 2 }, arm: { product: 'ld2994', qty: 2 } }, lb)).lamps.arm.product, 'ldcc2698');
   assert.equal(normalize(withLamps({ side: { product: 'ld500' }, front: { product: 'ld2773' } }, lb)).lamps.front.product, 'ld499');
-  assert.ok(!productsFor('lowbed', 'plate').some((p) => p.id === 'rtr3366'));
+  assert.ok(productsFor('lowbed', 'plate').some((p) => p.id === 'rtr3366'));
 });
 
 test('LUNA seti: toplam yalnız 0, 6 ya da 8', () => {
@@ -115,11 +115,12 @@ test('yan marker çift sayıda ve dorse tavanında', () => {
   }
 });
 
-test('plaka: sabit çerçeve seçenek değildir, plaka lambaları çift', () => {
-  assert.ok(!productsFor('standart', 'plate').some((p) => p.id === 'rtr3366'));
-  assert.equal(normalize(withLamps({ plate: { product: 'ltd2834', qty: 1 } })).lamps.plate.qty, 2);
-  // başka dorseden çerçeve seçili gelirse ek plaka lambası yok
-  assert.deepEqual(normalize(withLamps({ plate: { product: 'rtr3366', qty: 1 } })).lamps.plate, { product: 'ltd2834', qty: 0 });
+test('plaka: üç aydınlatma tek tek seçilir, aynı anda biri (kullanıcı 2026-10-22); lambalar çift, çerçeve tek', () => {
+  for (const t of ['standart', 'lowbed']) {
+    assert.deepEqual(productsFor(t, 'plate').map((p) => p.id), ['ltd2834', 'ltd669', 'rtr3366'], t);
+    assert.deepEqual(normalize(withLamps({ plate: { product: 'rtr3366', qty: 2 } }, { trailer: t })).lamps.plate, { product: 'rtr3366', qty: 1 });
+    assert.equal(normalize(withLamps({ plate: { product: 'ltd2834', qty: 1 } }, { trailer: t })).lamps.plate.qty, 2);
+  }
 });
 
 test('dorseye uymayan uzunluk ilk uygun uzunluğa döner', () => {

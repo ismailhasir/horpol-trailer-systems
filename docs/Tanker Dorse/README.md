@@ -171,3 +171,7 @@ Yukarıdaki tabloyu geçersiz kılan değişiklikler (sayılar `tools/blender/ta
 - **Tepe lambaları:** arka üst kuşakta çalışma lambalarının dış yanında (x −0,14; y 1,12; z ±0,86). Çalışma ve tepe kabloları arka traversin önünde (x −0,33) yükselir.
 - **Yan hat kablosu:** tekerleklerin içinden geçen 90° dallar kaldırıldı. Arka lambadan arka çerçevenin dış ucunda (x −0,14; z 1,06) rafın yüksekliğine çıkar, rafın içinde (y 1,215; z 1,20) tek düz hat olarak öne gider; markerlara ve ön kola kısa düz uç. Ön pozisyon kablosu rafın ön kolunun (x −7,27) altından kirişe girer, kiriş içinden öne.
 - **Hava hatları:** önden EBS'ye giden kırmızı/sarı hava hatları modelden kaldırıldı (tesisat görünümünde demetle karışıyordu). Model yeniden üretildi.
+
+## Arka tampon (2026-10-22)
+
+Kutu tampon (damla sac üstlü), paça levhası ve logosu yerine Horpol sac tamponu (`tools/blender/bumpers.py`; türev stop lambasından), arka yüzü x 0, web ortası 0,56. Arka dikmeler 0,735'te biter, altlarındaki ayak sacından üst dudağa askı lamaları. ADR levhası tamponun üstüne (0,74) alındı. Tozluk tamponun alt dudağına asılı (TRAILER SYSTEMS). Arka lastik kol tamponun uç sacında.

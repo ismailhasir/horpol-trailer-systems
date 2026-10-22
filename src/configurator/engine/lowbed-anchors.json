@@ -4,7 +4,7 @@
   "W": 2.55,
   "topY": 3.46,
   "rear": {
-    "x": 0.0,
+    "x": 0.0511,
     "lampY": 0.45,
     "lampZ": [1.02, 0.58],
     "plateY": 0.47,
@@ -115,11 +115,11 @@
   ],
   "mounts": {
     "rear": {
-      "x": 0.0,
+      "x": 0.0511,
       "y": 0.45,
-      "zOuter": 1.25,
-      "zInner": 0.36,
-      "faceX": 0.0
+      "zOuter": 1.2,
+      "zInner": 0.3,
+      "faceX": 0.0511
     },
     "plate": {
       "x": -0.005,
@@ -178,30 +178,65 @@
       "bracket": null
     },
     "armRearAlt": {
-      "x": -0.05,
+      "x": 0.05,
       "y": 0.45,
-      "z": 1.25,
-      "wallZ": 1.25,
+      "z": 1.2,
+      "wallZ": 1.2,
       "bracket": null
     },
     "work": [
       {
-        "x": 0.016,
-        "y": 0.45,
+        "x": 0.0511,
+        "y": 0.373,
         "z": 0.555,
         "dir": [1, 0, 0],
         "bracket": null,
         "between": true
       },
       {
-        "x": 0.016,
-        "y": 0.45,
+        "x": 0.0511,
+        "y": 0.373,
         "z": -0.555,
         "dir": [1, 0, 0],
         "bracket": null,
         "between": true
       }
     ],
+    "bumper": {
+      "default": "tek32",
+      "kinds": {
+        "tek32": {
+          "faceX": 0.0511,
+          "plateX": 0.0752,
+          "armX": 0.0475,
+          "slots": []
+        },
+        "tek32-lzd3194": {
+          "faceX": 0.0511,
+          "plateX": 0.0752,
+          "armX": 0.0475,
+          "slots": [0.997]
+        },
+        "tek32-lzd2854": {
+          "faceX": 0.0511,
+          "plateX": 0.0752,
+          "armX": 0.0475,
+          "slots": [0.9747]
+        },
+        "hamburger-luna6": {
+          "faceX": 0.0686,
+          "plateX": 0.0887,
+          "armX": 0.0634,
+          "slots": [1.0928, 0.9277, 0.7626]
+        },
+        "hamburger-luna8": {
+          "faceX": 0.0686,
+          "plateX": 0.0887,
+          "armX": 0.0634,
+          "slots": [1.0928, 0.9277, 0.7626, 0.5975]
+        }
+      }
+    },
     "beacon": [
       {
         "x": -13.15,

@@ -22,9 +22,11 @@ const GROUP: Record<LampFn, FnToggle> = {
   beacon: 'beacon',
 };
 
-const urls = import.meta.glob('../../assets/models/lamp-*.glb', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+// lambalar (lamp-<id>.glb → <id>) ve seçime göre değişen parçalar (aynı adla): <dorse>-bumper-<türev>.glb tamponlar,
+// mount-<id>.glb lamba bağlantı takımları (pul, somun, rakor)
+const urls = import.meta.glob(['../../assets/models/lamp-*.glb', '../../assets/models/*-bumper-*.glb', '../../assets/models/mount-*.glb'], { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 const URL_BY_ID = new Map<string, string>();
-for (const [k, v] of Object.entries(urls)) URL_BY_ID.set(k.replace(/^.*lamp-/, '').replace(/\.glb$/, ''), v);
+for (const [k, v] of Object.entries(urls)) URL_BY_ID.set(k.replace(/^.*\//, '').replace(/^lamp-/, '').replace(/\.glb$/, ''), v);
 
 export function lampUrl(id: string): string | undefined {
   return URL_BY_ID.get(id);

@@ -283,7 +283,9 @@ export class Engine {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.09;
-    this.controls.minDistance = 2.5;
+    // yakın inceleme (revize md. 13): tampon arkasındaki montaj görülebilsin; tekerlek imlecin gösterdiği yere yakınlaştırır
+    this.controls.minDistance = 0.6;
+    this.controls.zoomToCursor = true;
     this.controls.maxDistance = 38;
     this.controls.maxPolarAngle = Math.PI * 0.49;
     this.controls.screenSpacePanning = true;
@@ -431,7 +433,7 @@ export class Engine {
     this.cfg = c;
     // lamba modelleri ilk kullanımda indirilir; o ana kadar yer tutucu görünür, gelince ekipman yeniden kurulur
     // yalnız modeli VAR olup henüz yüklenmemiş lambalar için (modeli olmayan ürünler yer tutucuyla kalır; döngü yok)
-    const missing = lampIds(c).filter((id) => lampUrl(id) && !lampReady(id) && !lampFailed(id));
+    const missing = lampIds(c, this.trailer!.anchors).filter((id) => lampUrl(id) && !lampReady(id) && !lampFailed(id));
     if (this.equip.placeholders > 0 && missing.length) {
       const token = ++this.lampRetry;
       Promise.all(missing.map(loadLamp)).then(() => {

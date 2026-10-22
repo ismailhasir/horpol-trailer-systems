@@ -223,3 +223,5 @@ Rampalar hareketli, lamba yeri değil. Başlık ve arka uyarı direkleri kaynakl
 - **Ön pozisyon:** boynun ön ALT köşeleri (x −13,19; y 1,303), öne bakar.
 - **Tepe lambaları:** başlığın üst köşelerinde kaynaklı taban sacı (x −13,15; y 2,01; z ±1,195). Alçak yükleyicilerde yaygın yer; rampalar hareketli olduğu için arkada sabit yüksek yer yok. Kablo modülün ön yüzündeki Superseal'den öne, başlığın arkasından yükselir.
 - **Tesisat yeni şemada** (standart dorseyle aynı): `harness.top.profile` ile tesisat görünümünde hatlar boyun, pah ve platform boyunca şasinin üstünden gider. Modül x −1,05 (−1,0 traversinin üstü), yan hat dönüşü x −0,305.
+- **Arka tampon (2026-10-22):** alçak lamba ve plaka tutucuları yerine Horpol sac tamponu (türev stop lambasından; bkz. Standart Dorse README). Arka travers lamba yüksekliğinde olduğundan tampon traversin arkasında (arka yüz x 0,09), üst dudağı traversin yüzüne askı lamalarıyla cıvatalı. Rampa silindirlerinin alt kulakları tamponun üstüne (y 0,62–0,70) alındı. Tozluk tamponun alt dudağına asılı (alt koruma demiri yok), alt kenarı yerden 0,10 m.
+- **Plaka:** RTR 3366 zorunluluğu kalktı; üç plaka aydınlatması tek tek seçilir.

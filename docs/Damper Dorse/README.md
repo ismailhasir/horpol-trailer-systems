@@ -177,3 +177,7 @@ Kasa ve kapak devrilir: her lamba, kol ve braket **yalnız şasiye** bağlanır.
 - **Tesisat çerçevesi:** `outline()` sol üst köşeyi atlıyordu (üstte eğik çizgi, ön duvarda kesik köşe); düzeltildi. Ara kesitler üstü açık çizilir.
 - **Ön merdiven:** iki ayak da 2,94 m'ye uzanır ve üstte tutamakla birleşir.
 - **Arka kapak:** kabuğun arka ağzı (dış ve iç yüz arası) kapatıldı; kapak iç çevreden dışa taşacak kadar büyütüldü ve sol üst köşesindeki kesik (aynı `[1:-1]` hatası) giderildi.
+
+## Arka tampon (2026-10-22)
+
+Lamba levhaları ve plaka tutucusu yerine Horpol sac tamponu (`tools/blender/bumpers.py`; türev stop lambasından), arka yüzü x 0, web ortası 1,04 (plaka da tamponda, 1,04). Arka traversten gelen kollar tamponun üstünde (y 1,205–1,225) raf olur: çalışma ve tepe lambaları burada; tampon kollara askı lamalarıyla bağlı. Tozluk katlanır alt koruma demirinin alt kenarına kenetli (TRAILER SYSTEMS), reflektörler demirin üst yarısında. Arka lastik kol tamponun uç sacında.

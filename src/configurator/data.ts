@@ -219,11 +219,18 @@ export function lockedArm(c: Pick<Config, 'trailer' | 'lamps'>): string | undefi
   return st && st.qty > 0 ? rulesFor(c.trailer).armForStop?.[st.product] : undefined;
 }
 export const TRAILER_RULES: Partial<Record<TrailerId, TrailerRules>> = {
-  // armForStop / armMax: kullanıcı 2026-10-21 (LZD 3194'ün kol adaptörü LDCC 2698 ile; lastik kol yalnız arka çift)
-  standart: { hide: ['beacon'], frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
+  // armForStop / armMax: kullanıcı 2026-10-21 (LZD 3194'ün kol adaptörü LDCC 2698 ile; lastik kol yalnız arka çift).
+  // RTR 3366 artık zorunlu değil (kullanıcı 2026-10-22): üç plaka aydınlatması (LTD 2834, LTD 669, RTR 3366) tek tek seçilir, aynı
+  // anda yalnız biri (kategoride tek ürün)
+  standart: { hide: ['beacon'], frontFromSide: true, sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
   // lowbed (kullanıcı 2026-10-22): sınırlar standart dorseyle aynı, yalnız tepe lambası takılabilir
-  lowbed: { frontFromSide: true, plateFrame: 'rtr3366', sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
+  lowbed: { frontFromSide: true, sitePlate: true, armOnCarrier: true, armMax: 2, armForStop: { lzd3194: 'ldcc2698' } },
 };
+/**
+ * Arka tampon tipi stop lambasından (kullanıcı 2026-10-22): Horpol sac tamponları lambaya göre delinir. Yuvarlak LUNA seti
+ * Tek-240-30cm-Hamburger (yan başına 4 Ø115 kesik), diğerleri Tek-240-32cm. Dorse betiği tamponu varsa (mounts.bumper) geçerli.
+ */
+export const BUMPER_BY_STOP: Record<string, string> = { luna: 'hamburger' };
 export const rulesFor = (t: TrailerId): TrailerRules => TRAILER_RULES[t] ?? {};
 /** Konfigüratör listesinde bu dorse için görünen kategoriler */
 export const categoriesFor = (t: TrailerId) => CATEGORIES.filter((c) => !rulesFor(t).hide?.includes(c.id));

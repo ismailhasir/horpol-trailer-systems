@@ -37,6 +37,7 @@ from bl_common import (  # noqa: E402
     planar_uv, poly_tube, preview_renders, prism_xy, prism_zy, rear_quad, run_bake, running_gear, smart_uv, tex_material,
     write_anchors,
 )
+from bumpers import BUMPERS, MM as BMM, T as BT, anchors_for, build_mudflap, export_variants, web_x  # noqa: E402
 
 scene = bpy.context.scene
 
@@ -146,7 +147,14 @@ VALVES = [max(min(b - 0.3, XT2 - 0.35), XT0 + 0.3) for a, b in COMP]  # dip vana
 
 # ================= lamba montaj haritası (UN R48; yalnız JSON'a yazılır, modeli değiştirmez) =================
 # Sabit parçalar: şasi (tampon, arka çerçeve, hortum rafı, kirişler) ve devrilme korkuluğu. Tank kabuğu lamba yeri değil.
-BUMPER_Z = 1.20  # box2 'bumper' z ±1,22 (+ lastik uç); y 0,45–0,67, arka yüz x = 0
+# Arka tampon (2026-10-22): Horpol sac tamponu (tools/blender/bumpers.py; türev stop lambasından, sitede seçilir) eski kutu
+# tamponun yerinde; arka dikmeler üst dudağa askı lamalarıyla bağlı, tozluk tamponun alt dudağına asılı.
+BUMPER_X = XR  # tamponun arka dış yüzü
+BUMPER_Z = 1.20  # tamponun ucu
+
+
+def bumper_face(kind):
+    return round(BUMPER_X + web_x(kind), 4)
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y, SIDE_Y_END = 1.27, 1.30  # hortum rafı dış dudağı (1,18–1,36); eğik arka uçta biraz yukarı
 SIDE_ZW = 1.273
@@ -180,8 +188,8 @@ def trunk_profile():
 
 def mounts_dict():
     return {
-        'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': BUMPER_Z, 'zInner': 0.30, 'faceX': XR},
-        'plate': {'x': XR, 'y': round(PLATE_Y + PLATE_H / 2 + 0.03, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
+        'rear': {'x': bumper_face('tek32'), 'y': LAMP_Y, 'zOuter': BUMPER_Z, 'zInner': 0.30, 'faceX': bumper_face('tek32')},
+        'plate': {'x': bumper_face('tek32'), 'y': round(PLATE_Y + PLATE_H / 2 + 0.03, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
         'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': [[-L, SIDE_Y], [TR_X1 - 0.35, SIDE_Y], [SIDE_X1, SIDE_Y_END], [XR, SIDE_Y_END]],
                  'z': SIDE_ZW, 'maxPerSide': SIDE_N, 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0},
@@ -191,7 +199,8 @@ def mounts_dict():
                  'rail': {'z': LINE_Z, 'y': [[TR_X0, LINE_Y], [XR, LINE_Y]], 'rise': [-0.14, 1.06], 'exit': [TR_X0 + 0.2, 1.12]}},
         'front': {'x': FRONT_X, 'y': SOCKET_Y, 'z': FRONT_Z, 'bracket': None},
         'armFront': {'x': ARM_FRONT_X, 'y': SIDE_Y, 'z': SIDE_ZW, 'wallZ': SIDE_ZW, 'bracket': None},
-        'armRear': {'x': -0.06, 'y': LAMP_Y, 'z': BUMPER_Z + 0.02, 'wallZ': BUMPER_Z + 0.02, 'bracket': None},
+        'armRear': {'x': BUMPER_X - 0.04, 'y': LAMP_Y, 'z': BUMPER_Z, 'wallZ': BUMPER_Z, 'bracket': None, 'onBumper': True},
+        'bumper': anchors_for(BUMPER_X),
         'armRearAlt': {'x': -0.14, 'y': 1.08, 'z': 1.0, 'wallZ': 1.0, 'bracket': None},
         # çalışma/tepe kablosu arka traversin (−0,30…−0,20) önünde yükselir, üst kuşağın üstünden lambaya
         'work': [{'x': -0.08, 'y': 1.18, 'z': s * WORK_Z, 'dir': [1, -0.35, 0], 'rise': [-0.33, WORK_Z],
@@ -243,7 +252,7 @@ def anchors_dict():
         'L': L,
         'W': W,
         'topY': RAIL_TOP,
-        'rear': {'x': XR, 'lampY': LAMP_Y, 'lampZ': [0.98, 0.6], 'plateY': PLATE_Y, 'dropX': -0.16},
+        'rear': {'x': bumper_face('tek32'), 'lampY': LAMP_Y, 'lampZ': [0.98, 0.6], 'plateY': PLATE_Y, 'dropX': -0.16},
         'side': {'x0': -7.2, 'x1': -1.3, 'z': W2 + 0.003, 'profile': [[TR_X0, 1.27], [XR, 1.27]]},
         'front': {'x': FRONT_X - 0.005, 'y': FRONT_Y, 'z': FRONT_Z},
         'armFront': {'x': -7.3, 'y': 1.27, 'z': W2},
@@ -480,17 +489,13 @@ for cx, cy_, cz in CHAMBERS:
 # --- arka çerçeve: travers, dikmeler, üst kuşak, ADR levhası; tampon (damla sac üstlü), paça levhası; kutular ---
 box2(C, 'rear_cross', -0.30, -0.20, 0.88, 1.04, -1.0, 1.0, P, 0.006)
 for s in (-1, 1):
-    box2(C, 'rear_post', -0.20, -0.08, 0.67, 1.12, s * 0.75, s * 0.81, P, 0.005)
+    box2(C, 'rear_post', -0.20, -0.08, 0.735, 1.12, s * 0.75, s * 0.81, P, 0.005)  # altı tampon askısının ayağında
 box2(C, 'rear_top', -0.20, -0.08, 1.04, 1.12, -1.0, 1.0, P, 0.005)
-box2(C, 'adr_panel', -0.09, -0.075, 0.70, 1.035, -0.32, 0.32, M['white'], 0.004)
-box2(C, 'adr_plate', -0.075, -0.068, 0.72, 1.015, -0.2, 0.2, M['orange'], 0.004)
+box2(C, 'adr_panel', -0.09, -0.075, 0.74, 1.035, -0.32, 0.32, M['white'], 0.004)  # tamponun (üstü 0,722) üstünde
+box2(C, 'adr_plate', -0.075, -0.068, 0.76, 1.015, -0.2, 0.2, M['orange'], 0.004)
 box2(C, 'adr_line', -0.068, -0.066, 0.86, 0.875, -0.19, 0.19, M['black'], 0.0)
 prism_zy(C, 'adr_diamond', [(0.26, 0.865), (0.31, 0.915), (0.36, 0.865), (0.31, 0.815)], -0.075, -0.07, M['red'], 0.0)
-box2(C, 'bumper', -0.12, XR, 0.45, 0.67, -1.22, 1.22, P, 0.012)
-box2(C, 'bumper_lip', -0.12, XR - 0.005, 0.44, 0.455, -1.2, 1.2, P, 0.003)
-for s in (-1, 1):
-    box2(C, 'bumper_cap', -0.125, 0.005, 0.445, 0.675, s * 1.22, s * 1.245, M['rubber'], 0.006)
-box2(C, 'rear_flap', -0.05, -0.04, 0.14, 0.45, -1.19, 1.19, M['rubber'], 0.003)
+# (eski kutu tampon, damla sac üstü, paça levhası ve logosu kaldırıldı: lamba tamponu ve tozluk ayrı GLB, aşağıda export_variants)
 # arka sol (+z): dökülme kiti kutusu (gri) ve yangın tüpü kutusu (kırmızı); tesisat tarağının altında
 box2(C, 'spill_box', -1.08, -0.66, 0.32, 0.78, 0.86, 1.2, M['grey'], 0.02)
 box2(C, 'spill_lid', -1.06, -0.68, 0.34, 0.76, 1.2, 1.21, M['grey'], 0.01)
@@ -499,10 +504,30 @@ box2(C, 'fire_box', -0.62, -0.32, 0.36, 0.78, 0.88, 1.18, M['fire'], 0.02)
 box2(C, 'fire_latch', -0.5, -0.44, 0.66, 0.70, 1.18, 1.195, M['dark'], 0.003)
 for x in (-0.9, -0.45):
     box2(C, 'box_hanger', x - 0.02, x + 0.02, 0.775, 0.805, 0.55, 1.15, P, 0.003)
-box2(T, 'bumper_top', -0.12, XR, 0.67, 0.676, -1.22, 1.22, MD['checker'], 0.0)
 
-chassis_logos = decal_mesh('ChassisLogos', [rear_quad(-0.0385, 0.30, -0.6, 0.13 * 720 / 528, 0.13)], LOGO_W)
 chassis = join(C, 'TkChassis')
+
+# --- arka lamba tamponu türevleri (ayrı GLB, site stop lambasına göre birini yükler): askılar, tozluk ---
+MQ = {'sheet': material('BumperPaint', ANTHRACITE, 0.44, 0.05, 0.35), 'ktl': material('BumperDark', '#1b1d20', 0.5, 0.4),
+      'zinc': material('BumperZinc', '#b8bdc2', 0.3, 1.0), 'rubber': material('BumperRubber', '#141517', 0.85, 0.0),
+      'print': material('MudflapPrint', '#f2f3f5', 0.5, 0.0)}
+
+
+def bumper_extras(Q, kind):
+    """Arka dikmelerin altındaki ayak sacından üst dudağa askı lamaları (oval delikten iki M12), alt dudakta tozluk"""
+    b = BUMPERS[kind]
+    lip = BUMPER_X - b['d'] * BMM
+    dy = ((b['h'] - BT) / 2 - b['lip'] + 13.4) * BMM
+    for s in (-1, 1):
+        z = s * 0.78
+        box2(Q, 'post_foot', min(lip - 0.008, -0.12), lip, 0.723, 0.735, z - 0.03, z + 0.03, MQ['ktl'], 0.002)
+        box2(Q, 'hanger', lip - 0.008, lip, LAMP_Y + dy - 0.035, 0.723, z - 0.03, z + 0.03, MQ['ktl'], 0.002)
+        for dz in (-0.015, 0.015):
+            cylinder(Q, 'bolt_head', 0.0095, (lip + BT * BMM, LAMP_Y + dy, z + dz), (lip + BT * BMM + 0.008, LAMP_Y + dy, z + dz), MQ['zinc'], 6, 0.001)
+    Q.objs.append(build_mudflap(Q, MQ, lip - 0.0145, LAMP_Y - dy + 0.014, 0.14, 1.15))
+
+
+export_variants('tanker', BUMPER_X, LAMP_Y, MQ, bumper_extras, RAW_DIR)
 tiled = join(T, 'TkChassisTiled')
 planar_uv(tiled, {'AluChecker': (0.3, 0.3)})
 
@@ -683,7 +708,7 @@ smart_uv(wheel, 0.004)
 smart_uv(body, 0.004)
 smart_uv(TK_obj, 0.003, angle=32.0)
 size = 1024 if FAST else 2048
-decals = [chassis_logos, tank_logos, rear_logo, decor]
+decals = [tank_logos, rear_logo, decor]
 targets = bake_ao([(chassis, size, 'tk_chassis_ao'), (wheel, 512 if FAST else 1024, 'tk_wheel_ao'), (TK_obj, size, 'tk_tank_ao'), (body, size // 4, 'tk_body_ao')],
                   P, samples=16 if FAST else 96, distance=0.6)
 upper = [TK_obj, body]
@@ -693,7 +718,7 @@ for ob, img in targets:
 bake_surface([(chassis, size, 'tk_chassis'), (wheel, 512 if FAST else 1024, 'tk_wheel'), (TK_obj, size, 'tk_tank'), (body, size // 4, 'tk_body')],
              PROFILES, samples=8 if FAST else 16)
 
-export_glb(os.path.join(RAW_DIR, 'tanker-chassis.glb'), [chassis, chassis_logos, tiled] + wheels)
+export_glb(os.path.join(RAW_DIR, 'tanker-chassis.glb'), [chassis, tiled] + wheels)
 export_glb(os.path.join(RAW_DIR, 'tanker-body.glb'), [TK_obj, body, decor, tank_logos, rear_logo])
 tri = lambda ob: sum(len(p.vertices) - 2 for p in ob.data.polygons)
 print(f'TRIS chassis={tri(chassis)} wheel={tri(wheel)} tank={tri(TK_obj)} body={tri(body)} tiled={tri(tiled)}')

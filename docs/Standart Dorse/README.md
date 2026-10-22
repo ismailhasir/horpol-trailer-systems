@@ -210,3 +210,14 @@ kapılar lamba yeri değildir.
 - **Stop lambaları:** ~~taşıyıcının dış ucundan 9 cm boşluk~~ geri alındı (kullanıcı, 2026-10-20 akşam): lambalar yine taşıyıcının dış ucuna dayalı (zOuter 1,19).
 - **Çalışma ve tepe lambası kabloları:** kapı bölgesinden değil, arka köşe dikmesinin içinden yukarı çıkar, başlık boyunca lambaya gider (`equipment.ts → auxTo`).
 - Tepe lambasının zemine yansıması kaldırıldı (tüm tiplerde).
+
+## Arka tampon (2026-10-22, revize md. 1–4, 11, 13)
+
+Eski lamba taşıyıcı kutusu kaldırıldı; yerine Horpol sac tamponu (`tools/blender/bumpers.py`, çizimler: SolidWorks `Tampon Çizimleri`):
+- **Türev lambaya göre** (`bumpers.py` VARIANTS, `data.ts` BUMPER_BY_STOP): LZD 3194 / LZD 2854 → Tek-240-32cm, o lambanın saplama ve fiş delikleriyle; LUNA 6'lı / 8'li → Tek-240-30cm-Hamburger, yan başına 3 / 4 Ø115 kesik (boş kesik kalmaz); stop yok ya da modeli olmayan stop (CUBE) → düz Tek-32. Her türev ayrı GLB (`standart-bumper-<türev>.glb`, gzip 17–40 KB), yalnız seçilen indirilir.
+- **Montaj:** delikler lamba modelinin web düzlemindeki kesitinden otomatik; saplamalarda pul + somun, fiş geçişlerinde lastik rakor, LUNA'da kesik çevresindeki 3 vidada somun. Uçlarda 5 mm kapak sacı: lastik kol tabanı buna cıvatalı (içte kaynaklı somunlar). Askılar üst dudaktaki oval delikten iki M12 ile, ayakları arka traversin altına kaynaklı.
+- **Ortalama:** web ortası LAMP_Y (0,86): stop, plaka ve çalışma lambası kafası tampona dikeyde ortalı. Çalışma lambası webe iki M8'le cıvatalı L brakette (site çizer). Plaka lambaları da web yüzünde; LTD 2834'ün saplamaları arkada pul + somunla (`mount-ltd2834.glb`, bağlantı takımı).
+- **Plaka:** RTR 3366 artık zorunlu değil (kullanıcı 2026-10-22); LTD 2834, LTD 669, RTR 3366 tek tek seçilir, aynı anda biri. RTR 3366 (195 mm) yuvadan yüksek olduğu için iki aralayıcıyla webden uzak.
+- **Tozluk (md. 11):** logolu levha kaldırıldı; alt koruma demirinin yalnız alt kenarına kenetli tek parça kauçuk, üzerinde TRAILER SYSTEMS (geometri yazı, Arial Bold).
+- **Yakın inceleme (md. 13):** kamera 0,6 m'ye kadar yaklaşır, tekerlek imlecin gösterdiği yere yakınlaştırır.
+- Varsayımlar (doğrulanmadı): sac kalınlığı 3 mm, renk eski taşıyıcıyla aynı beyaz, tampon AO'suz (gölgeyi sahne verir).
