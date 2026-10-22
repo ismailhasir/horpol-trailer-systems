@@ -229,7 +229,8 @@
       "rearJunctionX": -0.185,
       "top": {
         "y": 1.225,
-        "sideZ": 1.15
+        "sideZ": 1.15,
+        "turnX": -0.28
       },
       "notes": "Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner. Tesisat görünümünde (top) aynı hatlar şasinin üstünden gösterilir."
     },

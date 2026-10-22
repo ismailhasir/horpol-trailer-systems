@@ -105,6 +105,10 @@ BEACON_Z = 1.0
 TRUNK_Z = BZ - 0.035  # ana demet: kiriş gövdesinin iç yanı, üst başlığın altında
 MODULE_X = -2.2  # Horpol modülü: hava tanklarının önünde, kirişlerin arasında
 REAR_JX = BEAM_X1 - 0.025  # arka dağıtım: arka traversin önü, iniş lamba taşıyıcının içinden
+CROSS_XS = [XF + 0.32 + 0.36 * i for i in range(100) if XF + 0.32 + 0.36 * i < -0.32]  # traverslerin ön yüzü (C profil 45 mm)
+# tesisat görünümünde yan hatların yana döndüğü x: son traversle arka dağıtım arasındaki boşluğun ortası (kesişmede yan hat
+# 7×1'in altından geçer, traverse değmez)
+SIDE_TURN_X = round((CROSS_XS[-1] + 0.045 + REAR_JX) / 2, 3)
 
 
 def mounts_dict():
@@ -127,7 +131,7 @@ def mounts_dict():
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]], 'moduleX': MODULE_X,
                     'rearJunctionX': REAR_JX,
                     # tesisat görünümü: yatay hatlar kiriş ve traverslerin ÜSTÜNDEN (kasa gizli), yan hat dış rayın iç yanında
-                    'top': {'y': CH_TOP, 'sideZ': round(RAIL_Z - 0.115, 3)},
+                    'top': {'y': CH_TOP, 'sideZ': round(RAIL_Z - 0.115, 3), 'turnX': SIDE_TURN_X},
                     'notes': 'Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst '
                              'başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner. Tesisat görünümünde '
                              '(top) aynı hatlar şasinin üstünden gösterilir.'},
@@ -270,12 +274,7 @@ for s in (-1, 1):
         x += 0.72
 
 # --- traversler (C profil, kiriş gövdesinden geçer) ---
-cross_xs = []
-x = XF + 0.32
-while x < -0.32:
-    cross_xs.append(x)
-    x += 0.36
-for x in cross_xs:
+for x in CROSS_XS:
     h = 0.063 if x < XN1 + 0.05 else 0.08
     y0 = CH_TOP - h
     t = 0.004

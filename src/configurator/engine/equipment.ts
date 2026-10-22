@@ -89,7 +89,7 @@ interface MountsLike {
     /** arka 7×1 hattın lamba barına indiği yer (|z|) ve barın içinde yanal gittiği x: arkadan bakınca dikme kabloyu örter */
     rearDrop?: { z: number; innerX: number };
     /** yeni şema: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y) ve yan hattın |z|'si */
-    top?: { y: number; sideZ: number };
+    top?: { y: number; sideZ: number; turnX?: number };
   };
 }
 
@@ -118,8 +118,8 @@ function placeholder(cat: CategoryId, mats: Mats) {
 // ---------- tesisat ----------
 /** lambaya giden dalın konnektörü lambadan bu kadar önce (m) */
 const CONN_FROM_LAMP = 0.3;
-/** kesişen kabloda üstten geçen kablonun kavis yüksekliği (m): iki kablonun çizim yarıçapları toplamından (~0,04) belirgin büyük */
-const HOP = 0.065;
+/** kesişmede alttan geçen kablonun çukur derinliği (m): iki kablonun çizim yarıçapları toplamı (~0,04) + boşluk */
+const DIP = 0.055;
 
 /** Eski şema (harness.top olmayan dorseler) Horpol modülü: siyah gövde, açık renk çerçeve ve kulaklar, üstte logo; portlar yanlarda. */
 function controlModule(mats: Mats) {
@@ -491,27 +491,27 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     //   ön yüz büyük soket: ana besleme; arka yüz büyük soket: 7×1 arka hat
     //   arka yüz Superseal: sol (+z) yan hat · orta çalışma lambaları · sağ (−z) yan hat
     // Arkaya giden şeritler (z): sol yan hat 0,165 · çalışma 0,085 · sağ yan hat 0,005 · 7×1 −0,13 (modülün hemen arkasındaki
-    // Y ayırıcıdan sonra iki kol: −0,095 ve −0,165). Kesişen yerlerde yanal koşan kablo alttakinin üzerinden kısa bir kavisle
-    // geçer (hop): sağ yan hat 7×1 kollarının, 7×1'in sol kolu çalışma hattının üstünden.
+    // Y ayırıcıdan sonra iki kol: −0,095 ve −0,165). Sağ yan hat 7×1 kollarını iki travers arasındaki boşlukta (top.turnX)
+    // altlarından kısa bir çukurla geçer: yukarıdan bakınca çukur kırmızı hatların arkasında kalır, kırmızılar düz görünür.
     const [zS1, zS2, zS3] = MODULE.small;
     const zR = MODULE.big;
     const rearLanes = rearLamps.length ? [zR - 0.035, zR + 0.035] : [];
     /**
-     * Önden gelip x'te yana dönen koşu (zA → zB); crossings'teki z'lerde alttaki kablonun üstünden geçer (yakın kesişmeler tek
-     * kavis). Kesişme dönüş noktasına yakınsa kablo dönmeden önce yükselir, yana yüksekten döner.
+     * Önden gelip x'te yana dönen koşu (zA → zB); crossings'teki z'lerde üstteki kablonun altından geçer (yakın kesişmeler tek
+     * çukur). Kesişme dönüş noktasına yakınsa kablo dönmeden hemen önce (son traversin arkasında) alçalır, yana alçaktan döner.
      */
     const lateral = (x: number, y: number, zA: number, zB: number, crossings: number[] = []) => {
       const d = Math.sign(zB - zA);
       const pts = [V(x, y, zA)];
-      // gizli güzergâhta kablolar şasinin içinde, kesişme görünmez: kavis yalnız tesisat görünümünde
+      // gizli güzergâhta kablolar şasinin içinde, kesişme görünmez: çukur yalnız tesisat görünümünde
       const cs = (show ? crossings : []).filter((q) => (q - zA) * d > 0 && (zB - q) * d > 0.2).sort((p, q) => (p - q) * d);
       for (let i = 0; i < cs.length; ) {
         let j = i;
         while (j + 1 < cs.length && (cs[j + 1] - cs[j]) * d < 0.25) j++;
-        // düz tepe alttaki kablonun iki yanından taşar (köşe yuvarlaması tepeyi alçaltmasın), iniş yokuşu yumuşak
-        if ((cs[i] - zA) * d > 0.2) pts.push(V(x, y, cs[i] - d * 0.2), V(x, y + HOP, cs[i] - d * 0.075));
-        else pts.splice(0, 1, V(x - 0.22, y, zA), V(x, y + HOP, zA));
-        pts.push(V(x, y + HOP, cs[j] + d * 0.075), V(x, y, cs[j] + d * 0.2));
+        // düz dip üstteki kablonun iki yanından taşar (köşe yuvarlaması dibi yükseltmesin), çıkış yokuşu yumuşak
+        if ((cs[i] - zA) * d > 0.2) pts.push(V(x, y, cs[i] - d * 0.2), V(x, y - DIP, cs[i] - d * 0.075));
+        else pts.splice(0, 1, V(x - 0.08, y, zA), V(x, y - DIP, zA));
+        pts.push(V(x, y - DIP, cs[j] + d * 0.075), V(x, y, cs[j] + d * 0.2));
         i = j + 1;
       }
       pts.push(V(x, y, zB));
@@ -540,8 +540,8 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     const ssOut = (r: (typeof rearLamps)[number]) => V(rx - 0.035, ly - 0.03, r.s * (r.z + r.hw * 0.6));
     const ssIn = (r: (typeof rearLamps)[number]) => V(rx - 0.035, ly - 0.03, r.s * (r.z - r.hw * 0.6));
     const needSide = sideXs.length > 0 || fr.qty > 0 || ar.qty >= 4;
-    /** yan hatların yana döndüğü x: en arkadaki markerın arkası (7×1 Y ayırıcısının önünde) */
-    const xb = sideXs.length ? Math.min(Math.max(...sideXs) + 0.12, xDrop - 0.2) : xDrop - 0.25;
+    /** yan hatların yana döndüğü x: dorse betiğinin verdiği travers boşluğu; yoksa en arkadaki markerın arkası */
+    const xb = TOP!.turnX ?? (sideXs.length ? Math.min(Math.max(...sideXs) + 0.12, xDrop - 0.2) : xDrop - 0.25);
 
     // --- 7×1 arka hat: modül → (şerit −0,13) → Y ayırıcı → her yanda dıştaki lambaya (içtekiler hattaki T'den) ---
     const R0 = port('rear', zR);
