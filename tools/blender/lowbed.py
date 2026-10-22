@@ -108,12 +108,13 @@ PLATE_HOLDER_X = -0.005  # plaka tutucunun arka yüzü (y 0,405–0,56)
 PLATE_W, PLATE_H = 0.52, 0.11
 SIDE_Y_DECK = 0.74  # platform yan kirişinde (0,676–0,875) kazık ceplerinin (≥ 0,785) altı
 SIDE_Y_NECK = 1.39  # boyun yan kirişinin ortası (1,265–1,507)
-SIDE_X0, SIDE_X1, SIDE_N = -11.0, -0.6, 9  # ilk marker boyunda (önden 2,19 m), son arkadan 0,6 m; yan başına en çok 9 (1,3 m)
-# Yan markerlar iki sabit seviyede (kullanıcı 2026-10-22): platformda 0,74, boyunda 1,39. Tekerlek kemerlerinin (yay ± marker yarı
-# boyu) ve kaz boynu eğiminin üstüne marker konmaz; eşit aralıklı yer bu bölgelere düşerse site en yakın kenara kaydırır (avoid).
+SIDE_X0, SIDE_X1, SIDE_N = XF + 0.8, -0.6, 10  # ilk marker boyunda (önden 0,8 m), son arkadan 0,6 m; yan başına en çok 10 (kullanıcı 2026-10-22: 20)
+# Yan markerlar iki sabit seviyede (kullanıcı 2026-10-22): platformda 0,74, boyunda 1,39. Kaz boynunda marker yok; iki düz kesim
+# (segments) ayrı ayrı eşit aralıklı, adet kesimlere boylarıyla orantılı dağılır. Platformda tekerlek kemerlerine (yay ± marker yarı
+# boyu) düşen marker en yakın kenara kayar (avoid).
 MARKER_HL = 0.055  # LD 2774 yarı boyu
-# kaz boynunda (pahın başladığı XN_T'den boyun arka duvarına, XG) marker yok (kullanıcı 2026-10-22)
-SIDE_NECK_X1 = round(XN_T - MARKER_HL - 0.005, 3)  # boyun seviyesinin son x'i: marker pahın başlangıcından önce biter
+# kaz boynunda (boyun altının eğimle inmeye başladığı XN_B'den boyun arka duvarına, XG) marker yok (kullanıcı 2026-10-22)
+SIDE_NECK_X1 = round(XN_B - MARKER_HL - 0.01, 3)  # boyun seviyesinin son x'i: marker alt kenarın kırılmasından önce biter
 SIDE_DECK_X0 = round(XG + 0.06, 3)  # platform seviyesinin ilk x'i: marker boyun arka duvarının arkasında başlar
 # ön pozisyon: boynun ön ALT köşeleri, öne bakar (standart dorse gibi; kullanıcı 2026-10-22). LD 2773 en alt noktası tutucu
 # merkezinin 37,6 mm altı: yan kirişin altını (NECK_BOT) geçmez; tutucu boyun ön kirişinin ön yüzüne oturur
@@ -156,8 +157,9 @@ def mounts_dict():
         'rear': {'x': XR, 'y': LAMP_Y, 'zOuter': HOLDER_Z1, 'zInner': HOLDER_Z0, 'faceX': XR},
         'plate': {'x': PLATE_HOLDER_X, 'y': round(PLATE_Y + PLATE_H / 2 + 0.02, 3), 'z': [-0.17, 0.17], 'plateY': PLATE_Y,
                   'plateW': PLATE_W, 'plateH': PLATE_H},
-        'side': {'x0': SIDE_X0, 'x1': SIDE_X1, 'y': side_marker_profile(), 'z': W2 + 0.001, 'maxPerSide': SIDE_N,
-                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': side_avoid(), 'brackets': None},
+        'side': {'x0': round(SIDE_X0, 3), 'x1': SIDE_X1, 'y': side_marker_profile(), 'z': W2 + 0.001, 'maxPerSide': SIDE_N,
+                 'rule': {'firstFromFront': 3.0, 'lastFromRear': 1.0, 'maxGap': 3.0}, 'avoid': side_avoid(), 'brackets': None,
+                 'segments': [[round(SIDE_X0, 3), SIDE_NECK_X1], [SIDE_DECK_X0, SIDE_X1]]},
         'front': {'x': XF, 'y': round(FRONT_LAMP_Y, 3), 'z': W2 - 0.06, 'bracket': None},
         'armFront': {'x': XF + 0.04, 'y': ARM_FRONT_Y, 'z': W2, 'wallZ': W2, 'bracket': None},
         'armRear': {'x': ARM_REAR_X, 'y': ARM_REAR_Y, 'z': W2, 'wallZ': W2, 'bracket': None},

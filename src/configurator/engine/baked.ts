@@ -52,6 +52,8 @@ export interface BakedMounts {
     rule: { firstFromFront: number; lastFromRear: number; maxGap: number };
     avoid: number[][];
     brackets: { x0: number; x1: number; from: number[]; to: number[] } | null;
+    /** ayrı düz kesimler [x0, x1]: markerlar kesimlere boylarıyla orantılı dağılır, her kesimde eşit aralıklı */
+    segments?: number[][];
   };
   /** ön pozisyon (beyaz), öne (−x) bakar; x montaj yüzü */
   front: P3 & { bracket: BakedBracket };

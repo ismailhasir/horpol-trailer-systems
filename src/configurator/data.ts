@@ -190,7 +190,7 @@ export const CATEGORIES: CategoryDef[] = [
 ];
 
 /** Dorse başına yan marker tavanı (iki yan toplamı): yan rayda çakışmasız yuva sayısı (~1,5 m'de bir). */
-export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 20, lowbed: 18, silo: 10, tanker: 10, damper: 10 };
+export const SIDE_MAX: Partial<Record<TrailerId, number>> = { standart: 20, lowbed: 20, silo: 10, tanker: 10, damper: 10 };
 
 /**
  * Dorseye özel seçim kuralları (vault Revizeler/<Dorse>.md). hide: listede gösterilmeyen, adedi 0 tutulan kategoriler.
@@ -241,7 +241,7 @@ export const TRAILER_L: Partial<Record<TrailerId, number>> = { standart: 13.7, l
  * Site markerları montaj haritasındaki yan rayın (x0 … x1) boyuna eşit aralıkla dizer; açıklık SIDE_SPAN (tools/check-lighting.mjs).
  * Döner: her yanda en az kaç adet (alt sınır DEĞİL; arayüzde uyarı yok, kullanıcı isteği 2026-10-21: tools/check-lighting.mjs).
  */
-const SIDE_SPAN: Partial<Record<TrailerId, number>> = { standart: 12.4, lowbed: 10.4, silo: 5.0, tanker: 6.16, damper: 5.24 };
+const SIDE_SPAN: Partial<Record<TrailerId, number>> = { standart: 12.4, lowbed: 11.79, silo: 5.0, tanker: 6.16, damper: 5.24 };
 export function sideMinPerSide(t: TrailerId): number {
   const L = TRAILER_L[t] ?? 13.6;
   if (L <= 6) return 1;

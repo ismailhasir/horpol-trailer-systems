@@ -59,6 +59,8 @@ interface MountsLike {
     brackets?: { x0: number; x1: number; from: [number, number]; to: [number, number] } | null;
     /** marker merkezinin giremeyeceği x aralıkları (ör. tekerlek kemeri): eşit aralıklı yer buraya düşerse en yakın kenara kayar */
     avoid?: [number, number][];
+    /** ayrı düz kesimler [x0, x1] (önden arkaya): markerlar kesimlere boylarıyla orantılı dağılır, her kesimde eşit aralıklı */
+    segments?: [number, number][];
     /** sabit marker yuvaları [x, y], arkadan öne (ör. lastik ortaları); verilirse eşit aralık yerine bunlar kullanılır */
     slots?: [number, number][];
     /** yan hat rayın/rafın içinde tek düz hat: z (iç yüz), y profili, arkada yükselme [x, z|null], önde kirişe giriş [x, y] */
@@ -337,7 +339,22 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       }
       return x;
     };
-    for (let i = 0; i < per; i++) sideXs.push(snap(per === 1 ? (sx0 + sx1) / 2 : sx0 + ((sx1 - sx0) * i) / (per - 1)));
+    const even = (a: number, b: number, n: number) => Array.from({ length: n }, (_, i) => (n === 1 ? (a + b) / 2 : a + ((b - a) * i) / (n - 1)));
+    const segs = S?.segments;
+    if (segs?.length && per > 1) {
+      // ayrı düz kesimler (ör. lowbed boyun ve platform): adet boylarıyla orantılı (her kesime en az 1), her kesimde eşit aralık
+      const len = segs.map(([p, q]) => q - p);
+      const tot = len.reduce((u, v) => u + v, 0);
+      const cnt = len.map((l) => Math.max(1, Math.floor((per * l) / tot)));
+      while (cnt.reduce((u, v) => u + v, 0) < per) {
+        const k = len.map((l, i) => (per * l) / tot - cnt[i]).reduce((b, v, i, r) => (v > r[b] ? i : b), 0);
+        cnt[k]++;
+      }
+      while (cnt.reduce((u, v) => u + v, 0) > per) cnt[cnt.indexOf(Math.max(...cnt))]--;
+      segs.forEach(([p, q], i) => sideXs.push(...even(p, q, cnt[i]).map(snap)));
+    } else {
+      sideXs.push(...even(sx0, sx1, per).map(snap));
+    }
   }
   const markerY = (x: number) => slotY.get(x) ?? sideY(x);
   for (const x of sideXs) {

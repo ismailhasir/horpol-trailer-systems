@@ -61,8 +61,19 @@ function sidePositions(S, n) {
     }
     return x;
   };
-  if (n === 1) return [snap((S.x0 + S.x1) / 2)];
-  return Array.from({ length: n }, (_, i) => snap(S.x0 + ((S.x1 - S.x0) * i) / (n - 1)));
+  const even = (a, b, k) => Array.from({ length: k }, (_, i) => (k === 1 ? (a + b) / 2 : a + ((b - a) * i) / (k - 1)));
+  const segs = S.segments;
+  if (!segs?.length || n === 1) return even(S.x0, S.x1, n).map(snap);
+  // ayrı düz kesimler: sitedeki gibi (equipment.ts) boyla orantılı, her kesime en az 1, kesimde eşit aralık
+  const len = segs.map(([p, q]) => q - p);
+  const tot = len.reduce((u, v) => u + v, 0);
+  const cnt = len.map((l) => Math.max(1, Math.floor((n * l) / tot)));
+  while (cnt.reduce((u, v) => u + v, 0) < n) {
+    const k = len.map((l, i) => (n * l) / tot - cnt[i]).reduce((b, v, i, r) => (v > r[b] ? i : b), 0);
+    cnt[k]++;
+  }
+  while (cnt.reduce((u, v) => u + v, 0) > n) cnt[cnt.indexOf(Math.max(...cnt))]--;
+  return segs.flatMap(([p, q], i) => even(p, q, cnt[i]).map(snap));
 }
 function evalSide(S, L, n) {
   const xs = sidePositions(S, n);
@@ -156,7 +167,9 @@ for (const t of TYPES) {
     row(t, 'Yan marker: en az adet (yan başına, eşit dağıtım)', nMin ?? 'yok', `kuramsal en az ${theo}; tavan ${S.maxPerSide}`, nMin !== null);
     row(t, 'Yan marker: yasak bölge çakışması (n = 1…tavan)', clashAny ? 'var' : 'yok', 'yok', !clashAny);
     if (SIDE_MAX[t] !== undefined) row(t, 'Yan marker tavanı = data.ts SIDE_MAX / 2', `${S.maxPerSide} / ${SIDE_MAX[t] / 2}`, 'eşit', S.maxPerSide === SIDE_MAX[t] / 2);
-    row(t, 'Yan marker yuva aralığı (tavanda)', f((S.x1 - S.x0) / (S.maxPerSide - 1), 2), '≥ 1.20 (çakışmasız)', (S.x1 - S.x0) / (S.maxPerSide - 1) >= 1.2);
+    const xsMax = sidePositions(S, S.maxPerSide);
+    const minGap = Math.min(...xsMax.slice(1).map((x, i) => x - xsMax[i]));
+    row(t, 'Yan marker en dar aralık (tavanda)', f(minGap, 2), '≥ 1.00 (çakışmasız)', minGap >= 1.0);
   }
 
   // ---------- çalışma / tepe ----------
