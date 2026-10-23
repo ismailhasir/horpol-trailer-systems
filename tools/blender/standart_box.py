@@ -147,7 +147,7 @@ def mounts_dict():
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]], 'moduleX': MODULE_X,
                     'rearJunctionX': REAR_JX,
                     # tesisat görünümü: yatay hatlar kiriş ve traverslerin ÜSTÜNDEN (kasa gizli), yan hat dış rayın iç yanında
-                    'top': {'y': CH_TOP, 'sideZ': round(RAIL_Z - 0.115, 3), 'turnX': SIDE_TURN_X},
+                    'top': {'y': CH_TOP, 'sideZ': round(RAIL_Z - SIDE_BRANCH, 3), 'turnX': SIDE_TURN_X},
                     'notes': 'Ana hat ve yan hatlar traverslerin gövdesinden (y 1,18) geçer; yan hat kiriş gövdesinin iç yanında, üst '
                              'başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner. Tesisat görünümünde '
                              '(top) aynı hatlar şasinin üstünden gösterilir.'},
@@ -160,6 +160,10 @@ def mounts_dict():
                  '1,5 m). Çalışma lambaları lamba taşıyıcıda stop ile plaka arasında, tepe lambaları başlığın üstünde (130 mm derinlik, Ø150 için '
                  'adaptör levhası); tepe lambası toplam yüksekliği ~4,15 m yapar (4,0 m sınırı ülkeye göre kontrol edilmeli).',
     }
+
+
+# tesisat görünümünde yan hat yan markerlardan bu kadar içte (kullanıcı 2026-10-23: kenara fazla yakındı; marker dalı ~0,6 m)
+SIDE_BRANCH = 0.6
 
 
 def anchors_dict():

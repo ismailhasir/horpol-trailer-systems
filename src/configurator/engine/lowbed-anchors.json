@@ -291,7 +291,7 @@
       "rearJunctionX": -0.16,
       "top": {
         "y": 0.83,
-        "sideZ": 1.16,
+        "sideZ": 0.675,
         "turnX": -0.305,
         "profile": [
           [-13.19, 1.462],

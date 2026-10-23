@@ -182,7 +182,7 @@ def mounts_dict():
         'bumper': anchors_for(BUMPER_X),
         'beacon': [{'x': BEACON_X, 'y': HEAD_TOP + BEACON_PLATE, 'z': s * BEACON_Z, 'bracket': None} for s in (1, -1)],
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': hp, 'moduleX': MODULE_X, 'rearJunctionX': REAR_JX,
-                    'top': {'y': FR_TOP, 'sideZ': round(W2 - 0.115, 3), 'turnX': SIDE_TURN_X, 'profile': top_profile()},
+                    'top': {'y': FR_TOP, 'sideZ': round(W2 - SIDE_BRANCH, 3), 'turnX': SIDE_TURN_X, 'profile': top_profile()},
                     'notes': 'Boyunda traverslerin gövdesinden (y 1,40), kaz boynunda kiriş alt eğrisinin ~0,1 m üstünden iner, '
                              'platformda traverslerin gövdesinden (y 0,80) geçer; yan hat kiriş gövdesinin iç yanında. Tesisat '
                              'görünümünde yatay hatlar şasinin üstünde (top.profile: boyun, pah, platform).'},
@@ -195,6 +195,10 @@ def mounts_dict():
                  'tutucusunda stop ile plaka arasında. Tepe lambaları başlığın üst köşelerindeki taban saclarında; kabloları başlığın '
                  'arkasından köşe dikmesini izler (önden görünmez).',
     }
+
+
+# tesisat görünümünde yan hat yan markerlardan bu kadar içte (kullanıcı 2026-10-23: kenara fazla yakındı; marker dalı ~0,6 m)
+SIDE_BRANCH = 0.6
 
 
 def anchors_dict():
