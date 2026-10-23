@@ -310,7 +310,7 @@ Betik `tools/blender/lamps_cad2.py` (sonu). STEP → STL: `tools/blender/cad/lzd
 
 | Ürün | Ölçü (mm) | İşlevler (EMIT) | Kaynak |
 |---|---|---|---|
-| LZD 2246 (HOR 86, universal) | 257 × 27 × 20, 2 × Ø4,5 (230) | position+stop (6 kırmızı kap), turn (6 turuncu kap) | STEP: lens kabuğu + lastik conta; kaplar fotoğraftan |
+| LZD 2246 (HOR 86, universal) | 257 × 27 × 20, 2 × Ø4,5 (230) | turn (dış uçta 6 turuncu kap), position+stop (iç uçta 6 kırmızı kap; kullanıcı 2026-10-23) | STEP: lens kabuğu + lastik conta; kaplar fotoğraftan |
 | LZD 3141 LIZARD (HOR 145AD, universal) | 252 × 27 × 21 | position (22 üçgen kılavuz), stop (uçlarda 2 + 2 altıgen), turn (ortada 8 altıgen; föyde dinamik, sitede sabit) | STEP: lens, uç kapakları, arka kapak, taban; iç fotoğraftan |
 | LRD 2681 (HOR 111) | 101 × 127 × 50,5, M8 | work (12 LED halka), work+reverse (ortadaki 3 büyük LED) | STEP'i yok: **aynı gövdenin LRD 2679 STEP'i** (gövde, ön çerçeve, C braket, cıvata, pul, somun, ped); orta beyaz blok ve halka 2681 fotoğraflarından |
 

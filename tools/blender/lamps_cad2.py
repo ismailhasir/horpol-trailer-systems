@@ -548,9 +548,9 @@ def build_lzd3223_cad(L):
 
 # =====================================================================
 # REAR STRIPS (kullanıcı 2026-10-23: yalnız standart dorse, kasanın arka üst köşeleri). İkisi de "universal" (sol / sağ aynı;
-# sağda lens ekseni çevresinde 180° döndürülür: kırmızı uç iki yanda dışta). Kaynaklar: üretici STEP'leri (ek paket 2026-10-22),
+# sağda lens ekseni çevresinde 180° döndürülür: −X ucu iki yanda dışta). Kaynaklar: üretici STEP'leri (ek paket 2026-10-22),
 # ürün paketleri (Downloads/LZD-2246.zip, LZD-3141.zip: föy, çizim, fotoğraflar).
-# Yerel: X uzunluk (önden bakınca sağ +X; kırmızı uç −X), Y yukarı, Z lens yönü, montaj yüzü Z = 0.
+# Yerel: X uzunluk (önden bakınca sağ +X; dış uç −X), Y yukarı, Z lens yönü, montaj yüzü Z = 0.
 # =====================================================================
 # LZD 2246 (HOR 86): 257 × 27 × 20, 2 × Ø4,5 delik (230), 12 LED: 6 kırmızı (pozisyon + fren), 6 turuncu (sinyal); 4 × 0,5 kablo
 # 1 m, arka ortadan. STEP'te: lens gövde (p000, içi dolu kabuk: CAD x ±126, derinlik y 0 … 18), lastik conta (p001, montaj yüzü
@@ -579,10 +579,10 @@ def build_lzd2246_cad(L):
         frame(L.inner, 'screw_pocket', _m(circle(5.2, 24, x, 0.0)), _m(circle(4.4, 24, x, 0.0)), _z(2.0), _z(9.0), mat('HousingGloss'), 0.0)
         cyl(L.inner, 'screw_head', 0.0036, (_z(x), 0.0, _z(2.0)), (_z(x), 0.0, _z(4.2)), mat('Stainless'), 20, bevel=0.0007)
         box(L.inner, 'screw_slot', _z(x - 0.4), _z(x + 0.4), -0.0025, 0.0025, _z(4.2), _z(4.4), mat('HousingGloss'))
-    # ===== 3) 12 fasetli krom kap: −X'te 6 kırmızı (pozisyon + fren), +X'te 6 turuncu (sinyal) =====
+    # ===== 3) 12 fasetli krom kap: −X'te (dış uç) 6 turuncu (sinyal), +X'te (iç uç) 6 kırmızı (pozisyon + fren); kullanıcı 2026-10-23 =====
     for k in range(12):
         x = (k - 5.5) * 16.2
-        fn, col = ('position+stop', 'red') if k < 6 else ('turn', 'amber')
+        fn, col = ('turn', 'amber') if k < 6 else ('position+stop', 'red')
         tint = '#c3c7cc'
         gains = (0.42, 0.3, 0.2)
         _cup_bands(L.E(fn), _z(x), 0.0, _z(16.2), 0.0065, 0.0021, _z(16.2 - ZF - 0.3), gains, fn, col, tint, 0.28, seg=10)
