@@ -119,8 +119,14 @@ export const CATEGORIES: CategoryDef[] = [
       // LZD 2452); sağda aynaları LZD 2449 / LZD 2453. Seçilebilir toplam: 0, 6, 8
       { id: 'luna', code: 'LZD 2448 + LZD 2452', codeR: 'LZD 2449 + LZD 2453', set: ['lzd2448', 'lzd2452'], setCodes: ['LZD 2448', 'LZD 2452'], max: 8,
         layouts: { 3: ['lzd2448', 'lzd2448', 'lzd2452'], 4: ['lzd2448', 'lzd2448', 'lzd2448', 'lzd2452'] } },
-      { id: 'lzd2875', code: 'LZD 2875/GRAPHITE', max: 4 },
-      { id: 'lzd2876', code: 'LZD 2876', max: 4 },
+      // CUBE seti (kullanıcı 2026-10-23, LUNA gibi): LZD 2875/GRAPHITE (pozisyon, fren, sinyal) föye göre yalnız üçlü set olarak
+      // onaylı; sis ve geri vites LZD 2876'da. Her yanda dıştan 2–3 × LZD 2875 + içte LZD 2876 (kullanıcı: LUNA gibi 6 ya da 8);
+      // ikisi de "universal" (sağ eşi yok). Seçilebilir toplam: 0, 6, 8
+      { id: 'cube', code: 'LZD 2875/GRAPHITE + LZD 2876', set: ['lzd2875', 'lzd2876'], setCodes: ['LZD 2875/GRAPHITE', 'LZD 2876'], max: 8,
+        layouts: { 3: ['lzd2875', 'lzd2875', 'lzd2876'], 4: ['lzd2875', 'lzd2875', 'lzd2875', 'lzd2876'] } },
+      // STRADA (HOR 124): sağ eşi LZD 2821 (STEP "LZD 2820, 2821"). HORUS LZD 3223 (HOR 153A): sağ eşinin kodu doğrulanmadı
+      { id: 'lzd2820', code: 'LZD 2820', codeR: 'LZD 2821', max: 2 },
+      { id: 'lzd3223', code: 'LZD 3223', max: 2 },
     ],
   },
   {

@@ -710,7 +710,7 @@ def build_lzd3194(L):
 # ---------------------------------------------------------------------
 def _load_modules():
     here = os.path.dirname(os.path.abspath(__file__))
-    for mod in ('lamps_rear', 'lamps_small', 'lamps_aux', 'lamps_cad'):  # lamps_cad: üretici CAD verisi varsa el modelinin yerine geçer
+    for mod in ('lamps_rear', 'lamps_small', 'lamps_aux', 'lamps_cad', 'lamps_cad2'):  # lamps_cad(2): üretici CAD verisi varsa el modelinin yerine geçer
         p = os.path.join(here, mod + '.py')
         if os.path.exists(p):
             try:

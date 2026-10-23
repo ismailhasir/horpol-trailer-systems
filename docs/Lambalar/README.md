@@ -273,3 +273,28 @@ LTD 2834 ile aynı yerleşimde. Yerel sözleşme ikisinde ortak: taban y = 0, +Y
 - LTD 2834'ün kablo çıkışı yaklaşık.
 - RTR 3366 simgesi boş çerçeveyi gösterir (ışık saçağın altında, üstten görünmez).
 - Plaka yuvası ölçüsü 520 × 110 TR plakasına göre; 520 × 114 AB plakası doğrulanmadı.
+
+## 10. İkinci STEP paketi: CUBE, STRADA, HORUS (2026-10-23)
+
+Kaynak: `Downloads/Product-3D-Step-Files/3d-model-ek-urunler/Modele 3D - Dideban (2026-10-22)/` ve ürün paketleri (`Downloads/LZD-2820.zip`, `LZD-2875GRAPHITE.zip`, `LZD-2876.zip`, `LZD-3223.zip`). Betik: `tools/blender/lamps_cad2.py` (`lamps.py` bunu `lamps_cad.py`'den sonra yükler).
+
+```bash
+# STEP → STL (her ürün için; çıktı tools/blender/cad/<id>, .gitignore'da)
+STEP_IN=".../LZD 2875_GRAPHITE.STEP" STEP_OUT=tools/blender/cad/lzd2875 "C:/Program Files/FreeCAD 1.1/bin/freecadcmd.exe" tools/cad/step_to_stl.py
+# model + simgeler, paketleme (her zaman önekle)
+blender -b -P tools/blender/lamps.py -- --only lzd2875,lzd2876,lzd2820,lzd3223 --icons
+npm run models:pack -- lamp-lzd2875 lamp-lzd2876 lamp-lzd2820 lamp-lzd3223
+```
+
+STEP'lerin dördünde de yalnız dış zarf var (gövde, düz lens kabuğu, çerçeve / aralayıcı, saplamalar). İç optik önden çekilmiş ürün fotoğraflarından ölçüldü (ölçek: lens ya da çerçeve genişliği).
+
+| Ürün | Ölçü (mm) | İşlevler (EMIT) | Not |
+|---|---|---|---|
+| LZD 2875/GRAPHITE CUBE (HOR 164AY, universal) | 115 × 138 × 27,9 (çerçeve), rakor Ø15,4 | position (8 neon çubuk), stop (2 kristal "gülümseme"), turn (5 şerit × 6 LED) | koyu füme lens; föy: yalnız üçlü set onaylı |
+| LZD 2876 CUBE (HOR 164, universal) | aynı gövde | reverse (8 kristal çubuk), fog (5 kristal şerit) | hafif füme lens |
+| LZD 2820 STRADA (sağ: LZD 2821, ayna) | 240 × 141 × 49,6; 2 saplama ±76 | position (neon yol çizgileri), turn (çubuk), reverse (2 pencere, 3'er krom kap), stop / fog (yan retro paneller, ")" 8 LED), plate (iç yan yüzde şerit) | 7 × 0,5 kablo: sitede AMP çifti |
+| LZD 3223 HORUS (HOR 153A) | 200 × 140 × 51; 2 × M6 ±76 | position (18 uzun altıgen modül), turn / reverse (6'şar kaburgalı altıgen), stop / fog (6'şar kristal altıgen); katmanlı retro üçgen | STEP'in içindeki ürün LZD 3215 (aynı gövde ve lens; 3215'te ek plaka ışığı) |
+
+- **CUBE seti** (kullanıcı 2026-10-23, LUNA gibi): sitede tek ürün `cube`, her yanda dıştan 2–3 × LZD 2875 + içte LZD 2876 (toplam yalnız 0 / 6 / 8). Föy LZD 2875'i yalnız üçlü set olarak onaylıyor: 6'lı dizilimde yanda iki LZD 2875 kalır (kullanıcıya bildirildi). Tampon `tek32-cube6` / `tek32-cube8`, çerçeveler 4 mm arayla (çizim HOR-164AY-3-razem: 110–116 mm adım). Montaj: ön çerçevenin üst / alt ortasından iki vida (Ø4,5), arkada aralayıcı.
+- **Doğrulanmadı:** CUBE'un CAD'de "yukarı" yönü (lamba simetrik); STRADA'da hangi yan panelin fren, hangisinin sis olduğu (LZD 2854 düzeniyle dış uç fren varsayıldı); HORUS sağ eşinin kodu; iç elemanların derinlikleri (fotoğraf önden); LED sayıları föydeki toplamla birebir değil.
+- **Not:** LZD 3223 föyde **12 V**. Dorselerde genelde 24 V sistem kullanılır; kullanıcıya bildirildi.

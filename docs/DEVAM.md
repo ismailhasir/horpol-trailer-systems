@@ -2,7 +2,16 @@
 
 Bu dosya, başka bir bilgisayardaki Claude Code oturumunun kaldığımız yerden devam etmesi içindir. Önce `CLAUDE.md`'yi oku.
 
-## Güncel (2026-10-21 gece)
+## Güncel (2026-10-22 akşam)
+- `main` = `452b3b4` (GitHub'da; kilometre taşı incelemesi birleşti). Çalışma dalı `visual-quality-reworks`, son commit `b4dc4d3` (yerelde).
+- Tamponlar `tools/blender/bumpers.py`: Tek 32 / Hamburger aileleri, 5 lamba delikli varyant. Her dorse için `<tip>-bumper-<varyant>.glb` üretilir.
+  Site varyantı stoptan seçer (`BUMPER_BY_STOP`). Tüm dorselerde "TRAILER SYSTEMS" tozluk.
+- Gerçek boyutlu tesisat (`harness.ts` `WIRE_SCALE = 1`). Kablolar lamba bağlantı noktalarına takılı (`equipment.ts` `LAMP_PORTS`).
+  LZD 3194: AMP soket somunda, 4 Superseal çıkışı (pos1 lastik kol, pos2 plaka, rev çalışma, flash kör tapa).
+- Sıradaki: kullanıcı kablolamayı test edecek. Beğenmezse kablo ve konnektör STEP'leri istenecek. 8 ürün STEP bekliyor.
+- Lamba paketlerken her zaman önek ver: `npm run models:pack -- lamp-<id>` (öneksiz çalıştırma eski GLB'leri geri yazar).
+
+## Önceki (2026-10-21 gece)
 - `main` = `04d93bd` (lamba CAD modelleri, LUNA seti, standart dorse kuralları; GitHub'da).
 - Dal **`project-milestone-check`** (yerelde, push / merge yok, 14 commit): yayın öncesi inceleme. Hata düzeltmeleri, ölü kod temizliği,
   tek teklif formu (`src/components/QuoteFields.tsx`), tesisat renkleri tek kaynak (`src/configurator/colors.ts`),

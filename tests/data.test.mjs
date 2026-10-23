@@ -9,6 +9,7 @@ import {
   TRAILER_LIST,
   categoriesFor,
   fromQuery,
+  layoutOf,
   lockedArm,
   maxQty,
   normalize,
@@ -103,8 +104,22 @@ test('LUNA seti: toplam yalnız 0, 6 ya da 8', () => {
   assert.equal(q(12), 8);
 });
 
+test('CUBE seti: LUNA gibi toplam yalnız 0, 6 ya da 8; içte LZD 2876 (kullanıcı 2026-10-23)', () => {
+  const cube = productById('stop', 'cube');
+  assert.deepEqual(qtyOptions(cube), [0, 6, 8]);
+  assert.deepEqual(layoutOf(cube, 3), ['lzd2875', 'lzd2875', 'lzd2876']);
+  assert.deepEqual(layoutOf(cube, 4), ['lzd2875', 'lzd2875', 'lzd2875', 'lzd2876']);
+  const q = (n) => normalize(withLamps({ stop: { product: 'cube', qty: n } })).lamps.stop.qty;
+  assert.equal(q(2), 6);
+  assert.equal(q(6), 6);
+  assert.equal(q(8), 8);
+  assert.equal(q(12), 8);
+});
+
 test('büyük kombine stoplar tek çift', () => {
   assert.equal(normalize(withLamps({ stop: { product: 'lzd2854', qty: 6 } })).lamps.stop.qty, 2);
+  assert.equal(normalize(withLamps({ stop: { product: 'lzd2820', qty: 6 } })).lamps.stop.qty, 2);
+  assert.equal(normalize(withLamps({ stop: { product: 'lzd3223', qty: 4 } })).lamps.stop.qty, 2);
 });
 
 test('yan marker çift sayıda ve dorse tavanında', () => {

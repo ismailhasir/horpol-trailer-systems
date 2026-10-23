@@ -447,10 +447,11 @@ for x in (TB[0] + 0.14, TB[1] - 0.14):
 box2(C, 'bumper', -0.11, -0.005, 0.475, 0.585, -1.2, 1.2, M['white'], 0.014)
 for s in (-1, 1):
     box2(C, 'bumper_cap', -0.115, 0.0, 0.47, 0.59, s * 1.2, s * 1.222, M['rubber'], 0.006)
-    beam(C, 'underrun_strut', (-0.66, DEEP_BOT + 0.02, s * BZ), (-0.07, 0.57, s * BZ), 0.08, 0.05, M['white'], 0.006)
-# logolu levha kaldırıldı (kullanıcı 2026-10-22); koruma demirinin arka yüzünde tek parça tozluk, üzerinde TRAILER SYSTEMS (revize md. 11)
+# şasiden demire inen eğik destekler kaldırıldı (kullanıcı 2026-10-23); demiri lamba tamponunun dikmeleri taşır (bumper_extras)
+# logolu levha kaldırıldı (kullanıcı 2026-10-22); tek parça tozluk, üzerinde TRAILER SYSTEMS (revize md. 11). Demirin ön (dorseye
+# bakan) yüzüne arkadan monte (kullanıcı 2026-10-23): demirin arka yüzü temiz kalır, yalnız cıvata başları görünür
 MF = {'rubber': M['rubber'], 'zinc': M['galv'], 'print': material('MudflapPrint', '#f2f3f5', 0.5, 0.0)}
-mudflap_text = build_mudflap(C, MF, -0.005, 0.505, 0.20, 1.15)  # demirin (0,475–0,585) alt kenarına kenetli
+mudflap_text = build_mudflap(C, MF, -0.11, 0.505, 0.20, 1.15, behind=-0.005)  # demirin (0,475–0,585) alt kenarına kenetli
 
 # --- şasiye ait çıkartmalar: yan koruma ve arka levha logoları ---
 lq = []

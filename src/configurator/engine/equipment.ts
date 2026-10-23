@@ -141,6 +141,11 @@ const LAMP_PORTS: Record<string, { amp?: Port; ss?: Partial<Record<SsOut, Port>>
   lzd2854: { tail: { p: [0, -0.01, -0.036], d: [0, -0.2, -1] }, pin7: true },
   lzd2448: { tail: { p: [0, -0.04, -0.0237], d: [0, -0.33, -0.94] } },
   lzd2452: { tail: { p: [0, -0.04, -0.0237], d: [0, -0.33, -0.94] } },
+  // CUBE, STRADA, HORUS (tools/blender/lamps_cad2.py): arka ortadaki rakordan kısa kablo
+  lzd2875: { tail: { p: [0, -0.01, -0.036], d: [0, -0.2, -1] } },
+  lzd2876: { tail: { p: [0, -0.01, -0.036], d: [0, -0.2, -1] } },
+  lzd2820: { tail: { p: [0, -0.01, -0.03], d: [0, -0.3, -0.95] }, pin7: true },
+  lzd3223: { tail: { p: [0, -0.01, -0.03], d: [0, -0.3, -0.95] }, pin7: true },
   ltd2834: { tail: { p: [0, -0.03, -0.026], d: [0, -0.96, -0.27] } },
   ld2774: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
   ld2773: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
@@ -221,7 +226,7 @@ function controlModule(mats: Mats) {
 
 // Işıma (hale, zemin ışığı) Engine'deki bloom ile yanan parçanın kendi biçiminden gelir (2026-10-20); sprite efektleri kaldırıldı.
 /** Arka lambaların genişliği (lamba yerel X), dizilim için: modelden ölçülür, yoksa ürüne göre tahmin */
-const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2854: 0.449, lzd2448: 0.168, lzd2452: 0.168 };
+const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2854: 0.449, lzd2448: 0.168, lzd2452: 0.168, lzd2875: 0.1156, lzd2876: 0.1156, lzd2820: 0.2396, lzd3223: 0.2 };
 
 export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuild {
   const group = new THREE.Group();
@@ -518,20 +523,14 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       // arka kol: lambada takma noktası (MOUNT_arm) varsa kol plakası lambanın ucundaki adaptöre DÖNDÜRMEDEN oturur (kolun
       // kendi biçimi yukarı eğik; LZD 3194 STEP'indeki LDCC 2698 montajıyla aynı); yoksa montaj haritasındaki yerine (duvara dik)
       const lm = sp === AR ? armMount[s] : undefined;
-      const o = mount('arm', ar.product, lm ? lm.clone() : V(sp.x, sp.y, s * wz), (o) => {
+      // tamponun uç sacında: kolun orijini taban plakasının ortası (LDCC 2698 ve LD 2994: plaka 35 × 105, M5 delikler ±39 mm;
+      // CAD'den ölçüldü 2026-10-23). Plaka sacın derinlik ortasına (BK.armX) ve web ortasına oturur; delikler uç saçtaki cıvata ve
+      // somunlarla çakışır (tools/blender/bumpers.py ARM_HOLE_Y). Kolun tamamını ortalamak plakayı arkaya kaydırıyordu (kafa arkaya
+      // uzanır). Plaka sacın dış yüzüne (0,5 mm örten uç) yaslanır
+      const wall = !lm && sp === AR && BK && AR !== AR0 ? wz + 0.0005 : wz;
+      mount('arm', ar.product, lm ? lm.clone() : V(sp.x, sp.y, s * wall), (o) => {
         if (s < 0) o.scale.z = -1;
       });
-      // tamponun uç sacında: kolun tamamı sacın ortasına (derinlik ve yükseklikte; modelin orijini taban plakasının altında, kol
-      // yukarı uzandığı için ortalanmazsa kolun başı tamponun üst kenarından taşar)
-      if (!lm && sp === AR && BK && AR !== AR0 && !o.userData.placeholder) {
-        o.updateMatrixWorld(true);
-        const bb = new THREE.Box3().setFromObject(o, true);
-        if (!bb.isEmpty()) {
-          const c = bb.getCenter(V(0, 0, 0));
-          o.position.x += sp.x - c.x;
-          o.position.y += sp.y - c.y;
-        }
-      }
     }
     if (sp.bracket) brackets.push(sp.bracket);
   }

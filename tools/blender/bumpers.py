@@ -176,6 +176,14 @@ def depth(kind):
     return BUMPERS[kind]['d'] * MM
 
 
+def arm_x(kind):
+    """Lastik kol taban plakasının merkezi (yerel x, m): uç sacın kol yüksekliğindeki DOLU kısmının ortası. Uç sac kesiti birebir
+    kapatır; ortada lambaların oturduğu girinti (web) olduğu için dolu kısım ön dudaklarla web arası (kullanıcı 2026-10-23: toplam
+    derinliğin ortası plakayı girintinin üstüne, arkaya taşırıyordu)"""
+    s = BUMPERS[kind]
+    return -(s['recess'] + s['d']) / 2 * MM
+
+
 # ---------------- tampon türevleri (lambaya göre delinmiş) ----------------
 # Gerçek tampon takılan lambaya göre delinir: her türev kendi lambalarının saplama ve fiş delikleri, pul / somun / rakorlarıyla
 # ayrı GLB'dir (site seçime göre birini yükler). Lambalar dıştan içe; LUNA 6'lı sette her yanda 3 kesik (boş kesik kalmaz).
@@ -183,11 +191,20 @@ VARIANTS = {
     'tek32': ('tek32', [], None),  # stop yok ya da modeli olmayan stop (CUBE): yalnız sac ve bağlantılar
     'tek32-lzd3194': ('tek32', ['lzd3194'], None),
     'tek32-lzd2854': ('tek32', ['lzd2854'], None),
+    'tek32-lzd2820': ('tek32', ['lzd2820'], None),
+    'tek32-lzd3223': ('tek32', ['lzd3223'], None),
+    # CUBE seti (kullanıcı 2026-10-23, LUNA gibi 6 ya da 8): her yanda dıştan 2–3 × LZD 2875 (föy: yalnız üçlü set onaylı) + içte
+    # LZD 2876
+    'tek32-cube6': ('tek32', ['lzd2875', 'lzd2875', 'lzd2876'], None),
+    'tek32-cube8': ('tek32', ['lzd2875', 'lzd2875', 'lzd2875', 'lzd2876'], None),
     'hamburger-luna6': ('hamburger', ['lzd2448', 'lzd2448', 'lzd2452'], 3),
     'hamburger-luna8': ('hamburger', ['lzd2448', 'lzd2448', 'lzd2448', 'lzd2452'], 4),
 }
 CAP_T = 5.0  # uç sacı (lastik kol tabanı buna cıvatalanır), mm
+ARM_HOLE_Y = 0.039  # lastik kol taban plakasının M5 deliklerinin yarı aralığı (m; plaka merkezinden)
 REAR_GAP = 0.025  # yan yana dikdörtgen lambalar arası (site equipment.ts ile aynı)
+# türeve özel aralık: CUBE üçlüsü çizimde (HOR-164AY-3-razem) 110–116 mm adımla, çerçeveler neredeyse bitişik
+GAPS = {'tek32-cube6': 0.004, 'tek32-cube8': 0.004}
 RAW = os.path.abspath('tools/blender/out')
 _widths = {}
 
@@ -249,7 +266,7 @@ def variant_slots(variant):
     for pid in lamps:
         w = lamp_width(pid)
         out.append(round(edge - w / 2, 4))
-        edge -= w + REAR_GAP
+        edge -= w + GAPS.get(variant, REAR_GAP)
     return out
 
 
@@ -356,8 +373,13 @@ def build_set(variant, mats, parts):
     for sz in (1, -1):
         z0, z1 = sorted((sz * (half + 0.0005), sz * (half - CAP_T * MM)))  # sacın ucunu 0,5 mm örter (aynı düzlemde titreme olmasın)
         prism_xy(parts, 'end_cap', cap, z0, z1, mats['sheet'], 0.0)
-        for yy in (-0.035, 0.035):
-            _nut(parts, -depth(kind) / 2, yy, sz * (half - CAP_T * MM), 0.008, mats['zinc'], axis='z', sign=-sz)
+        # lastik kol (LDCC 2698 ve LD 2994 aynı taban: plaka 35 × 105, M5 delikler ±39 mm; kolların CAD'inden ölçüldü
+        # 2026-10-23) uç sacın ortasına: iki M5 cıvatanın ucu ve içteki somunları
+        xc = arm_x(kind)
+        # LZD 3194'te kol lambanın ucundaki adaptöre takılır (MOUNT_arm): uç saçta kol bağlantısı yok
+        for yy in (() if 'lzd3194' in lamps else (-ARM_HOLE_Y, ARM_HOLE_Y)):
+            cylinder(parts, 'arm_bolt', 0.0024, (xc, yy, sz * (half + 0.0005)), (xc, yy, sz * (half - CAP_T * MM - 0.009)), mats['zinc'], 12, 0.0)
+            _nut(parts, xc, yy, sz * (half - CAP_T * MM), 0.005, mats['zinc'], axis='z', sign=-sz)
     # lamba bağlantıları (sacın dorse tarafında)
     for k, zc, yc, d in hw:
         if k == 'stud':
@@ -392,7 +414,7 @@ def anchors_for(x0):
     kinds = {}
     for v, (k, _, _) in VARIANTS.items():
         f = x0 + web_x(k)
-        kinds[v] = {'faceX': round(f, 4), 'plateX': round(f + plate_standoff(k), 4), 'armX': round(x0 - depth(k) / 2, 4), 'slots': variant_slots(v)}
+        kinds[v] = {'faceX': round(f, 4), 'plateX': round(f + plate_standoff(k), 4), 'armX': round(x0 + arm_x(k), 4), 'slots': variant_slots(v)}
     return {'default': 'tek32', 'kinds': kinds}
 
 
@@ -412,12 +434,16 @@ def export_variants(trailer, x0, y0, mats, extras, raw_dir):
         bpy.data.objects.remove(q, do_unlink=True)
 
 
-def build_mudflap(parts, mats, x, y_top, y_bot, half_w, text='TRAILER SYSTEMS', font='C:/Windows/Fonts/arialbd.ttf', holes=(), clamp=0.03):
+def build_mudflap(parts, mats, x, y_top, y_bot, half_w, text='TRAILER SYSTEMS', font='C:/Windows/Fonts/arialbd.ttf', holes=(), clamp=0.03,
+                  behind=None):
     """Tek parça tozluk (5 mm kauçuk) koruma demirinin arka yüzüne (x) galvaniz lamayla cıvatalı; arkaya bakan yüzünde beyaz yazı
     (baskı kabartması, geometri: her yakınlıkta keskin). mats: rubber, zinc, print. holes: geçiş delikleri [(z, y, r)] (ör. boşaltma
     borusu). clamp: üstte demire kenetlenen bant (y_top − clamp … y_top; tozluk demirin yalnız alt kenarını örter, kullanıcı
-    2026-10-22). Döner: yazı nesnesi (AO atlasına girmez)"""
-    flap = box2(None, 'mudflap', x, x + 0.005, y_bot, y_top, -half_w, half_w, mats['rubber'], 0.0)
+    2026-10-22). behind: verilirse tozluk demirin ÖN (dorseye bakan) yüzüne (x) arkadan monte edilir; lama ve somunlar önde
+    kalır, demirin arka yüzünde (x = behind) yalnız bombeli cıvata başları görünür (kullanıcı 2026-10-23). Döner: yazı nesnesi (AO
+    atlasına girmez)"""
+    x0 = x - 0.005 if behind is not None else x
+    flap = box2(None, 'mudflap', x0, x0 + 0.005, y_bot, y_top, -half_w, half_w, mats['rubber'], 0.0)
     if holes:
         cut = Parts()
         for zc, yc, r in holes:
@@ -433,11 +459,19 @@ def build_mudflap(parts, mats, x, y_top, y_bot, half_w, text='TRAILER SYSTEMS', 
         bpy.data.objects.remove(cutter, do_unlink=True)
         flap.data.set_sharp_from_angle(angle=math.radians(30))
     parts.objs.append(flap)
-    box2(parts, 'mudflap_strip', x + 0.005, x + 0.009, y_top - clamp + 0.003, y_top - 0.003, -(half_w - 0.01), half_w - 0.01, mats['zinc'], 0.001)
+    # lama ve somunlar tozluğun demire bakmayan yüzünde (arkadan montajda önde)
+    k = -1 if behind is not None else 1
+    xs = x0 if behind is not None else x0 + 0.005
+    box2(parts, 'mudflap_strip', min(xs, xs + k * 0.004), max(xs, xs + k * 0.004), y_top - clamp + 0.003, y_top - 0.003,
+         -(half_w - 0.01), half_w - 0.01, mats['zinc'], 0.001)
     n = 8
+    yb = y_top - clamp / 2
     for i in range(n):
         z = -(half_w - 0.08) + 2 * (half_w - 0.08) * i / (n - 1)
-        cylinder(parts, 'mudflap_bolt', 0.0095, (x + 0.009, y_top - clamp / 2, z), (x + 0.016, y_top - clamp / 2, z), mats['zinc'], 6, 0.0006)
+        cylinder(parts, 'mudflap_bolt', 0.0095, (xs + k * 0.004, yb, z), (xs + k * 0.011, yb, z), mats['zinc'], 6, 0.0006)
+        if behind is not None:
+            # demirin arka yüzünde bombeli (gömme omuzlu) cıvata başı
+            cylinder(parts, 'mudflap_bolt_head', 0.0085, (behind, yb, z), (behind + 0.003, yb, z), mats['zinc'], 20, 0.0012)
     cu = bpy.data.curves.new('mudflap_text', 'FONT')
     cu.body = text
     if os.path.exists(font):
@@ -454,7 +488,7 @@ def build_mudflap(parts, mats, x, y_top, y_bot, half_w, text='TRAILER SYSTEMS', 
     if ob.dimensions.x > fit:
         cu.size *= fit / ob.dimensions.x
     # yazı düzlemi arkaya (+x) bakar: yerel X → Blender +y (three −z, arkadan bakana sağ), yerel Y → yukarı
-    ob.matrix_world = Matrix(((0, 0, 1, x + 0.0055), (1, 0, 0, 0), (0, 1, 0, (y_top - clamp + y_bot) / 2), (0, 0, 0, 1)))
+    ob.matrix_world = Matrix(((0, 0, 1, x0 + 0.0055), (1, 0, 0, 0), (0, 1, 0, (y_top - clamp + y_bot) / 2), (0, 0, 0, 1)))
     select_only([ob])
     bpy.ops.object.convert(target='MESH')
     ob = bpy.context.view_layer.objects.active

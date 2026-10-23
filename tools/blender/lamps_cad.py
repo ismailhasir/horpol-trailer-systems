@@ -705,6 +705,10 @@ def build_ld2994_cad(L):
         _simplify(b, 1.0)
         _mesh_obj('neon_' + key, _xf(b, LD_M), [_emat('outline', key, off[key], 'cad')], L.E('outline'), 40, decimate=None if FAST else 2500)
     raw.free()
+    # montaj: taban plakasının iki M5 deliğinde (±39 mm, plakadan Ø5,1 kanal, dış yüz z ~13; STEP'te vida yok) yuvarlak başlı
+    # vidalar (LDCC 2698'in STEP vidalarıyla aynı yerde; tampon uç sacındaki somunlara girer)
+    for y in (-0.039, 0.039):
+        cyl(L.body, 'screw_head', 0.0042, (0.0, y, 0.0126), (0.0, y, 0.0148), mat('Zinc'), 20, bevel=0.0008)
 
 
 # =====================================================================
@@ -840,8 +844,10 @@ def build_ltd229_cad(L):
     box(L.inner, 'pcb', (wx0 + 0.6) / 1000, (wx1 - 0.6) / 1000, (wy0 + 0.6) / 1000, (wy1 - 0.6) / 1000, (zback - 1.2) / 1000, zback / 1000, mat('Pcb'))
 
 
-# LTD 2834 (HOR 127) CAD: x genişlik, taban z −52 (civatalar −z), +z yukarı (Π neon tepede), difüzör −y (y merkezi −3,66)
-LTD2834_M = Matrix(((1, 0, 0, 0), (0, 1, 0, 0.00366), (0, 0, 1, 0.052), (0, 0, 0, 1)))
+# LTD 2834 (HOR 127) CAD: x genişlik, +z yukarı (Π neon tepede), difüzör −y (y merkezi −3,66). Gövdenin alt yüzü z −37,6; altındaki
+# 14 mm (z −52'ye kadar) iki M5 saplama. Yerel y = 0 gövdenin alt yüzü (tampona oturan yüz; önceden saplamaların ucuydu ve lamba
+# webden 14 mm havada kalıyordu, kullanıcı 2026-10-23)
+LTD2834_M = Matrix(((1, 0, 0, 0), (0, 1, 0, 0.00366), (0, 0, 1, 0.0376), (0, 0, 0, 1)))
 
 
 @product('ltd2834', 'LTD 2834', 'plate', 'Plaka lambası + kırmızı neon pozisyon (HOR 127), 12 LED — üretici CAD')
