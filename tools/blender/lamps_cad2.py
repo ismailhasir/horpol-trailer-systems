@@ -4,6 +4,10 @@
 #
 # Dört üründe de STEP yalnız dış zarf: gövde, lens (iç desensiz düz kabuk), saplamalar / çerçeveler. İç optik (ışık kılavuzları,
 # LED optikleri, reflektörler) YOK: ürün paketlerindeki önden çekilmiş fotoğraflardan ölçüldü (lens kenarı ölçek, ±1 mm).
+# Işık şiddeti (LZD 3194 ile aynı ilke, kullanıcı 2026-10-23: "ışık şeritleri birbirine karışıyor"): sitede ışıma = işlev çarpanı
+# (lampfx.ts FN_I: pozisyon 1,45, fren 2,7, sinyal / sis 2,6, geri vites 3,0) × malzeme oranı (.g); bloom eşiği 1,05. Büyük yüzeyler
+# (kılavuz gövdeleri, kristal yüzeyin LED'den uzak hücreleri, yansıtıcılar) eşiğin altında kalır: biçimleri okunur, birbirine
+# karışmaz; haleyi yalnız LED noktaları ve LED'in hemen önündeki hücreler verir.
 # Yerel eksen (site sözleşmesi, LZD 3194 ile aynı): X genişlik (dış uç −X: sol lambada sinyal tarafı), Y yukarı, Z lens yönü,
 # arka montaj yüzü Z = 0. Blender'da (x, −z, y).
 import os
@@ -15,6 +19,15 @@ def _m(pts):
 
 def _z(v):
     return v / 1000
+
+
+def _mirror_red(p, base_hex='#a8111a'):
+    """Retro reflektör renkli ayna gibi yansıtır: metalik kırmızı, kaplamasız (kaplama gökyüzünü beyaz yansıtıp kırmızıyla
+    karışınca yüzey pembe okunuyordu, kullanıcı 2026-10-23)"""
+    p.inputs['Base Color'].default_value = srgb(base_hex)
+    p.inputs['Metallic'].default_value = 0.75
+    p.inputs['Roughness'].default_value = 0.35
+    p.inputs['Coat Weight'].default_value = 0.0
 
 
 def _crystal(fn, color, gain, base_hex):
@@ -29,6 +42,9 @@ def _crystal(fn, color, gain, base_hex):
             nt.nodes.remove(n)
         p = nt.nodes['Principled BSDF']
         p.inputs['Base Color'].default_value = srgb(base_hex)
+        rr, gg = int(base_hex[1:3], 16), int(base_hex[3:5], 16)
+        if rr > 1.6 * gg:
+            _mirror_red(p, base_hex)  # kırmızı kristal (HORUS fren / sis): renkli ayna
         p.inputs['Emission Color'].default_value = (*GLOW[color], 1.0)
         p.inputs['Emission Strength'].default_value = 0.0
         m.use_backface_culling = False
@@ -47,26 +63,57 @@ def _retro_plain(color):
         nt = m.node_tree
         for n in [n for n in nt.nodes if n.type in ('NORMAL_MAP', 'TEX_IMAGE')]:
             nt.nodes.remove(n)
-        # fotoğraflarda koyu kırmızı (kütüphanedeki açık retro kırmızısı stüdyo ışığında pembe okunuyordu)
-        nt.nodes['Principled BSDF'].inputs['Base Color'].default_value = srgb({'red': '#b8121a'}.get(color, '#f6f7f9'))
+        # fotoğraflarda koyu kırmızı (kütüphanedeki açık retro kırmızısı renksiz lensin ardında pembe okunuyordu)
+        p = nt.nodes['Principled BSDF']
+        if color == 'red':
+            _mirror_red(p)
         m.use_backface_culling = False
         MATS[key] = m
     return MATS[key]
 
 
-def _ribbed(fn, color, off_hex, gain):
-    """Dikey kaburgalı (silindirik mercek sütunları) LED optiği: sönükken off_hex, yanınca gain oranında ışır"""
-    key = f'E.{fn}.{color}.g{int(round(gain * 100))}.rib'
+def _retro_dark(fn, color, gain):
+    """Arkasında LED olan retro (STRADA yan panelleri): dokusuz retro (hücreler geometri), koyu kırmızı (renksiz lensin ardında),
+    yanınca gain oranında ışır. Kendi adıyla kurulur: _retro_cad / _glow ile aynı ad (E.<işlev>.<renk>.g<yüzde>) önbellekte başka
+    ürünün malzemesini döndürüyordu (CUBE'un gri fren gövdesi STRADA retrosuna geçti)"""
+    key = f'E.{fn}.{color}.g{int(round(gain * 100))}.d'
     if key not in MATS:
-        m = mat(f'E.{fn}.{color}').copy()
+        m = mat(f'Retro.{color}').copy()
         m.name = key
-        p = m.node_tree.nodes['Principled BSDF']
-        p.inputs['Base Color'].default_value = srgb(off_hex)
-        p.inputs['Roughness'].default_value = 0.2
-        p.inputs['Coat Weight'].default_value = 0.5
-        _normal(m, p, tex('rib'), 0.8)
+        nt = m.node_tree
+        for n in [n for n in nt.nodes if n.type in ('NORMAL_MAP', 'TEX_IMAGE')]:
+            nt.nodes.remove(n)
+        p = nt.nodes['Principled BSDF']
+        _mirror_red(p)
+        p.inputs['Emission Color'].default_value = (*GLOW[color], 1.0)
+        p.inputs['Emission Strength'].default_value = 0.0
+        m.use_backface_culling = False
         m['fn'] = fn
         m['gain'] = gain
+        MATS[key] = m
+    return MATS[key]
+
+
+def _gl(fn, color, off_hex, gain):
+    """_glow'un bu dosyaya özel adlısı (E.<işlev>.<renk>.g<yüzde>.c2): ad çakışmasında önbellek başka ürünün malzemesini vermesin"""
+    m = _emat(fn, color, off_hex, f'g{int(round(gain * 100))}.c2')
+    m['gain'] = gain
+    return m
+
+
+def _lens_rib(color):
+    """Dikey kaburgalı şeffaf optik (HORUS altıgenleri; fotoğraf: kaburgaların ardında krom kap ve LED). Lens.<renk>.cad.rib"""
+    key = f'Lens.{color}.cad.rib'
+    if key not in MATS:
+        m = mat(f'Lens.{color}').copy()
+        m.name = key
+        for n in m.node_tree.nodes:
+            if n.type == 'TEX_IMAGE':
+                n.image = tex('rib')
+            if n.type == 'NORMAL_MAP':
+                n.inputs['Strength'].default_value = 0.9
+        p = m.node_tree.nodes['Principled BSDF']
+        p.inputs['Alpha'].default_value = {'clear': 0.22, 'amber': 0.5}.get(color, 0.4)
         MATS[key] = m
     return MATS[key]
 
@@ -195,12 +242,15 @@ def _cube(L, var):
         poly = rrect(w, h, min(w, h) / 2, 4, cx, cy)
         _slot(L.inner, poly, ZF, 18.9)
         if g2875:
-            prism(L.E('position'), f'neon{i}', _m(offset(poly, 0.15)), _z(ZF), _z(19.3), _emat('position', 'red', '#cdbfbc', 'cube'), 0.0008)
+            # neon kılavuz: 1,45 × 0,85 (eşiğin hemen üstü): yumuşak hale, iç ve dış çubuk ayrı okunur
+            prism(L.E('position'), f'neon{i}', _m(offset(poly, 0.15)), _z(ZF), _z(19.3), _gl('position', 'red', '#cdbfbc', 0.85), 0.0008)
         else:
-            prism(L.E('reverse'), f'rev_bar{i}', _m(poly), _z(ZF), _z(17.8), _emat('reverse', 'white', '#d2d4d8', 'cube'), 0.0)
+            # gövde eşiğin altında (3,0 × 0,15), kristalde yalnız LED'in önündeki hücreler parlak (fotoğraf 4-1: çubuk boyunca LED
+            # noktaları, aralarında sönük beyaz)
+            prism(L.E('reverse'), f'rev_bar{i}', _m(poly), _z(ZF), _z(17.8), _gl('reverse', 'white', '#d2d4d8', 0.15), 0.0)
             ax = [(cx - w / 2 + 1.0, cy), (cx + w / 2 - 1.0, cy)] if w > h else [(cx, cy - h / 2 + 1.0), (cx, cy + h / 2 - 1.0)]
             _banded(L.E('reverse'), f'rev_xtal{i}', poly, [], 19.2, 1.7, 0.7, _polyline_pts(ax, 5.0),
-                    lambda g: _crystal('reverse', 'white', g, '#e4e6ea'), ((0.0, 1.6, 0.95), (1.6, 1e9, 0.62)))
+                    lambda g: _crystal('reverse', 'white', g, '#e4e6ea'), ((0.0, 1.5, 0.8), (1.5, 2.8, 0.3), (2.8, 1e9, 0.16)))
 
     # ===== 4) orta şeritler: 2875 sinyal (buzlu kılavuz + 6 LED noktası), 2876 sis (kristal blok, 5 LED) =====
     led_core = _emat('turn', 'amber', '#b2aca3', 'cubeled')
@@ -208,15 +258,15 @@ def _cube(L, var):
         poly = rrect(39.0, 6.0, 1.4, 4, 0.0, cy)
         _slot(L.inner, poly, ZF, 18.6)
         if g2875:
-            prism(L.E('turn'), f'turn{i}', _m(poly), _z(ZF), _z(18.6), _glow('turn', 'amber', '#a9a39b', 0.8), 0.0005)
+            prism(L.E('turn'), f'turn{i}', _m(poly), _z(ZF), _z(18.6), _gl('turn', 'amber', '#a9a39b', 0.5), 0.0005)
             for k in range(6):
                 x = -16.25 + 6.5 * k
                 cyl(L.E('turn'), 'turn_led', 0.0013, (_z(x), _z(cy), _z(18.55)), (_z(x), _z(cy), _z(18.75)), led_core, 12)
         else:
-            prism(L.E('fog'), f'fog{i}', _m(poly), _z(ZF), _z(17.6), _emat('fog', 'red', '#8e898b', 'cube'), 0.0)
+            prism(L.E('fog'), f'fog{i}', _m(poly), _z(ZF), _z(17.6), _gl('fog', 'red', '#8e898b', 0.15), 0.0)
             leds = [(-16.0 + 8.0 * k, cy) for k in range(5)]
             _banded(L.E('fog'), f'fog_xtal{i}', poly, [], 19.0, 1.5, 0.6, leds, lambda g: _crystal('fog', 'red', g, '#c9c3c5'),
-                    ((0.0, 2.2, 0.95), (2.2, 4.0, 0.7), (4.0, 1e9, 0.45)))
+                    ((0.0, 1.8, 0.85), (1.8, 3.5, 0.38), (3.5, 1e9, 0.18)))
 
     # ===== 5) 2875: üst ve alt "gülümseme" fren şeritleri (kristal; LED'ler 4 mm arayla) =====
     if g2875:
@@ -224,9 +274,9 @@ def _cube(L, var):
             pl = [(x, sy * y) for x, y in CUBE_SMILE]
             band = _s_ccw(_band(pl, 5.0))
             _slot(L.inner, band, ZF, 18.4)
-            prism(L.E('stop'), nm, _m(band), _z(ZF), _z(17.8), _emat('stop', 'red', '#9d9799', 'cube'), 0.0)
+            prism(L.E('stop'), nm, _m(band), _z(ZF), _z(17.8), _gl('stop', 'red', '#9d9799', 0.2), 0.0)
             _banded(L.E('stop'), nm + '_xtal', band, [], 19.0, 1.5, 0.6, _polyline_pts(pl, 4.0),
-                    lambda g: _crystal('stop', 'red', g, '#cfc9cb'), ((0.0, 1.8, 0.95), (1.8, 3.2, 0.7), (3.2, 1e9, 0.45)))
+                    lambda g: _crystal('stop', 'red', g, '#cfc9cb'), ((0.0, 1.6, 0.85), (1.6, 3.0, 0.4), (3.0, 1e9, 0.2)))
 
     # ===== 6) montaj: ön çerçevenin üst ve alt ortasındaki vidalar (Ø4,5 delik; aralayıcı ve tamponun webinden geçer) =====
     for sy in (1, -1):
@@ -297,7 +347,8 @@ def build_lzd2820_cad(L):
     _s_hex_retro(L.inner, 'tri_retro', _m(TRI), [_m(h) for h in holes], _z(44.6), 0.0021, 0.0008, _retro_plain('red'))
 
     # ===== 5) neon yol çizgileri (pozisyon): koyu yuvada süt beyazı kılavuz, retronun 1 mm önünde =====
-    neon_m = _emat('position', 'red', '#d98f8a', 'strada')
+    # sönükken kırmızı ışık borusu (fotoğraf 2-1; renksiz lensin ardında soluk pembe okunmasın)
+    neon_m = _emat('position', 'red', '#b8302c', 'strada')
     for i, pl in enumerate(NEON):
         band = _s_ccw(_band(pl, 7.6))
         _slot(L.inner, band, ZP, 45.0)
@@ -308,7 +359,11 @@ def build_lzd2820_cad(L):
 
     # ===== 6) sinyal çubuğu =====
     _slot(L.inner, BAR, ZP, 45.0)
-    prism(L.E('turn'), 'turn_bar', _m(BAR), _z(ZP), _z(45.6), _emat('turn', 'amber', '#eda24c', 'strada'), 0.0008)
+    # kılavuz 2,6 × 0,55 (turuncu kalır, beyaza doymaz) + önünde 13 LED noktası (fotoğraf 2-1: çubuk boyunca LED izleri)
+    prism(L.E('turn'), 'turn_bar', _m(BAR), _z(ZP), _z(45.6), _gl('turn', 'amber', '#e8963a', 0.55), 0.0008)
+    for k in range(13):
+        x = -66.0 + 11.0 * k
+        cyl(L.E('turn'), 'turn_led', 0.0011, (_z(x), _z(-0.8), _z(45.55)), (_z(x), _z(-0.8), _z(45.75)), _emat('turn', 'amber', '#f1b766', 'strled'), 12)
 
     # ===== 7) geri vites pencereleri: krom yuva, 3 krom kap + LED (LZD 3194 geri vites yaklaşımı) =====
     for sx in (1, -1):
@@ -320,18 +375,19 @@ def build_lzd2820_cad(L):
             _cup_bands(L.E('reverse'), _z(lx), _z(ly), _z(44.0), 0.0088, 0.0036, _z(44.0 - ZP - 1.5), (0.33, 0.26, 0.19), 'reverse', 'white')
             box(L.E('reverse'), 'rev_led', _z(lx - 2.6), _z(lx + 2.6), _z(ly - 2.6), _z(ly + 2.6), _z(ZP + 1.6), _z(ZP + 3.0), E('reverse', 'white'))
 
-    # ===== 8) yan paneller: kırmızı retro, ardında ")" dizili 8 LED (dış uç fren, iç uç sis) =====
+    # ===== 8) yan paneller: kırmızı retro, ardında ")" dizili 8 LED (iç uç FREN, dış uç SİS; kullanıcı 2026-10-23) =====
     ys = [38.0, 27.0, 16.0, 5.0, -6.0, -17.0, -28.0, -39.0]
-    for sx, fn in ((1, 'stop'), (-1, 'fog')):
+    for sx, fn in ((1, 'fog'), (-1, 'stop')):  # sx 1: dış (−X) panel
         poly = PANEL if sx > 0 else _s_ccw(mx(PANEL))
         leds = [(sx * (-100.5 + 5.5 * (1 - (y / 42.0) ** 2)), y) for y in ys]
         frame(L.inner, 'panel_frame', _m(poly), _m(offset(poly, 1.0)), _z(ZP), _z(44.8), mat('HousingGloss'), 0.0)
         prism(L.inner, 'panel_base', _m(offset(poly, 0.8)), _z(ZP), _z(43.8), mat('ReflectorRed'), 0.0)
-        _banded(L.E(fn), f'panel_{fn}', offset(poly, 1.0), [], 44.6, 2.1, 0.8, leds, lambda g, fn=fn: _retro_cad(fn, 'red', g),
-                ((0.0, 3.2, 0.95), (3.2, 6.2, 0.64), (6.2, 9.5, 0.42), (9.5, 1e9, 0.27)))
+        # yalnız LED'lerin önündeki hücreler parlak (fotoğraf 5 / 6: LED dizisi seçik, panelin geri kalanı koyu kırmızı)
+        _banded(L.E(fn), f'panel_{fn}', offset(poly, 1.0), [], 44.6, 2.1, 0.8, leds, lambda g, fn=fn: _retro_dark(fn, 'red', g),
+                ((0.0, 2.4, 0.95), (2.4, 4.5, 0.45), (4.5, 7.0, 0.2), (7.0, 1e9, 0.07)))
 
     # ===== 9) plaka şeridi: iç (+X) yan yüzde, lensin yan duvarının ardında =====
-    box(L.E('plate'), 'plate_strip', _z(113.2), _z(115.0), _z(-48.0), _z(40.0), _z(31.0), _z(46.0), _glow('plate', 'white', '#e6e8ec', 0.8))
+    box(L.E('plate'), 'plate_strip', _z(113.2), _z(115.0), _z(-48.0), _z(40.0), _z(31.0), _z(46.0), _gl('plate', 'white', '#e6e8ec', 0.8))
 
     # ===== 10) ön vidalar (panelde) ve kablo =====
     for x, y in ((-109.5, 58.4), (-63.0, 8.8), (63.0, 8.8), (109.5, 58.4)):
@@ -370,7 +426,11 @@ def build_lzd3223_cad(L):
     ext = _assembly_exterior(parts)
     _plate_parts(L, parts, ext, {'p002': ([mat('Housing')], L.body, 9000), 'p000': ([mat('Zinc')], L.body, 300),
                                  'p001': ([mat('Zinc')], L.body, 300)}, 'horus')
-    _cad_lens(L, cad, HORUS_M, 'p004', [_lmat('clear')], 'horus_lens', 7000)
+    # lens tek parça: üçgen bölgede retro prizmalar lense kalıplı (CAD'de var). Renksiz çizilince prizmalar beyaz benek gibi
+    # parlıyordu; bölge kırmızı lens (gerçekte kırmızı malzeme)
+    tri_lens = _round_poly([(0.0, 66.0), (-75.5, -62.0), (75.5, -62.0)], 4.0)
+    _cad_lens(L, cad, HORUS_M, 'p004', [_lmat('clear'), _lmat('red')], 'horus_lens', 9000,
+              region_of=lambda x, y, z: 1 if _inside(tri_lens, x, y) else 0)
 
     # ===== 2) iç panel (lensin iç yüzü Z 48) ve 4 vida =====
     ZP = 31.0
@@ -396,7 +456,7 @@ def build_lzd3223_cad(L):
             frame(L.inner, 'ridge_line_' + nm, _m(offset(T, a)), _m(offset(T, b)), _z(45.4), _z(45.7), mat('Reflector'), 0.0)
 
     # ===== 4) üst köşeler: uzun altıgen neon pozisyon modülleri =====
-    pos_m = _glow('position', 'red', '#b2242b', 0.9)
+    pos_m = _gl('position', 'red', '#b2242b', 0.9)
     for sx in (1, -1):
         for i, (x, y) in enumerate(HORUS_POS):
             poly = _ehex(sx * x, y, 13.6, 5.9, 2.0)
@@ -413,16 +473,22 @@ def build_lzd3223_cad(L):
                 frame(L.inner, 'hex_wall', _m(hexp), _m(offset(hexp, 0.8)), _z(ZP), _z(43.8), mat('HousingGloss'), 0.0)
                 inner = offset(hexp, 0.8)
                 if ri < 2:
-                    # turuncu / beyaz: krom yuva, LED, dikey kaburgalı optik (fotoğraf: kaburgaların ardında LED)
-                    prism(L.E(fn_a), 'hex_back', _m(inner), _z(ZP), _z(ZP + 0.6), _refl_tint(fn_a, col_a, 0.25, tint_a, 0.35), 0.0)
-                    box(L.E(fn_a), 'hex_led', _z(cx - 1.6), _z(cx + 1.6), _z(cy - 1.6), _z(cy + 1.6), _z(ZP + 0.6), _z(ZP + 1.4), E(fn_a, col_a))
-                    ob = prism(L.E(fn_a), 'hex_optic', _m(offset(hexp, 0.9)), _z(43.0), _z(44.2), _ribbed(fn_a, col_a, off_a, 0.75), 0.0003)
-                    set_uv_planar(ob, 0.004)
+                    # turuncu / beyaz (fotoğraf 3-1, ayrıntı): şeffaf dikey kaburgalı optik, ardında altı fasetli krom kap, dipte LED.
+                    # Kap eşiğin altında ışır (yapısı okunur), haleyi LED verir
+                    gains = (0.32, 0.24, 0.16) if col_a == 'white' else (0.38, 0.28, 0.19)
+                    prism(L.E(fn_a), 'hex_floor', _m(inner), _z(ZP), _z(ZP + 0.5), _refl_tint(fn_a, col_a, 0.12, tint_a, 0.4), 0.0)
+                    _cup_bands(L.E(fn_a), _z(cx), _z(cy), _z(42.8), 0.0064, 0.0024, _z(42.8 - ZP - 0.6), gains, fn_a, col_a, tint_a, 0.3, seg=6)
+                    box(L.E(fn_a), 'hex_led', _z(cx - 1.4), _z(cx + 1.4), _z(cy - 1.4), _z(cy + 1.4), _z(ZP + 0.5), _z(ZP + 1.3), E(fn_a, col_a))
+                    cyl(L.E(fn_a), 'optic_core', 0.0018, (_z(cx), _z(cy), _z(ZP + 1.3)), (_z(cx), _z(cy), _z(ZP + 1.9)),
+                        _emat(fn_a, col_a, off_a, 'core3223'), 16)
+                    ob = prism(L.lens, 'hex_optic', _m(offset(hexp, 0.9)), _z(43.2), _z(44.2), _lens_rib('amber' if col_a == 'amber' else 'clear'), 0.0003)
+                    set_uv_planar(ob, 0.024)
                 else:
-                    # kırmızı: piramit desenli kristal optik, ortasındaki LED'den dışa sönen
-                    prism(L.inner, 'hex_base', _m(inner), _z(ZP), _z(43.2), _emat(fn_r, 'red', '#4a1416', 'horus'), 0.0)
-                    _banded(L.E(fn_r), 'hex_xtal', inner, [], 44.0, 2.5, 0.9, [(cx, cy)], lambda g, fn_r=fn_r: _crystal(fn_r, 'red', g, '#6a2023'),
-                            ((0.0, 2.8, 0.95), (2.8, 5.0, 0.7), (5.0, 1e9, 0.5)))
+                    # kırmızı: piramit desenli kristal optik (iri hücre: fotoğrafta tek tek seçilen piramitler), ortadaki LED'den
+                    # dışa sönen; taban eşiğin altında
+                    prism(L.E(fn_r), 'hex_base', _m(inner), _z(ZP), _z(43.2), _gl(fn_r, 'red', '#4a1416', 0.12), 0.0)
+                    _banded(L.E(fn_r), 'hex_xtal', inner, [], 44.0, 3.2, 1.1, [(cx, cy)], lambda g, fn_r=fn_r: _crystal(fn_r, 'red', g, '#6a2023'),
+                            ((0.0, 3.0, 0.8), (3.0, 5.2, 0.38), (5.2, 1e9, 0.18)))
 
     # kablo: arka ortadaki rakordan (6 × 0,5, 2 m; sitede tesisat sürer)
     tube(L.body, 'cable', [(0.0, 0.0, -0.002), (0.0, 0.0, -0.016), (0.0, -0.010, -0.028)], 0.0034, mat('Cable'), 3, smooth=True)
