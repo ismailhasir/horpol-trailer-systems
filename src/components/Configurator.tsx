@@ -120,7 +120,7 @@ function LampIcon({ id, lit, size = 'thumb' }: { id: string | string[]; lit: boo
   );
 }
 
-const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e', work: '#a5b4fc', beacon: '#f59e0b' };
+const CAT_DOT: Record<CategoryId, string> = { stop: '#d4221c', strip: '#ef5a3c', side: '#f29a0c', plate: '#c9d2de', front: '#e9eef6', arm: '#22c55e', work: '#a5b4fc', beacon: '#f59e0b' };
 /** kategori → kameranın döndüğü görünüm düğmesi (Engine.focusCategory ile aynı yön; diğerleri özel poz) */
 const CAT_VIEW: Partial<Record<CategoryId, View>> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front' };
 const FN_LIST: FnToggle[] = ['position', 'stop', 'turn', 'reverse', 'fog', 'work', 'beacon'];

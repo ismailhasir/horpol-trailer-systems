@@ -118,6 +118,45 @@ def _lens_rib(color):
     return MATS[key]
 
 
+def _lmat_flat(color):
+    """Lens.<renk>.cad.flat: optik dokusuz düz şeffaf pencere"""
+    key = f'Lens.{color}.cad.flat'
+    if key not in MATS:
+        m = mat(f'Lens.{color}').copy()
+        m.name = key
+        nt = m.node_tree
+        for n in [n for n in nt.nodes if n.type in ('NORMAL_MAP', 'TEX_IMAGE')]:
+            nt.nodes.remove(n)
+        MATS[key] = m
+    return MATS[key]
+
+
+def _frame_poly(group, name, outer, hole, z0, z1, material):
+    """Delikli düz levha (dış ve iç çokgen nokta sayısı farklı olabilir): ön ve arka yüz üçgenlenir (CDT), kenarlar duvar"""
+    bm = bmesh.new()
+    for z in (z0, z1):
+        vo = [bm.verts.new(bl((x / 1000, y / 1000, z))) for x, y in outer]
+        vi = [bm.verts.new(bl((x / 1000, y / 1000, z))) for x, y in hole]
+        cut = delaunay_2d_cdt([Vector(p) for p in outer + hole], [(i, (i + 1) % len(outer)) for i in range(len(outer))] +
+                              [(len(outer) + i, len(outer) + (i + 1) % len(hole)) for i in range(len(hole))], [], 2, 1e-6, True)
+        vs = vo + vi
+        for f in cut[2]:
+            c = sum((Vector(cut[0][k]) for k in f), Vector((0, 0))) / len(f)
+            if _inside(outer, c.x, c.y) and not _inside(hole, c.x, c.y):
+                try:
+                    bm.faces.new([vs[cut[3][k][0]] for k in f])
+                except ValueError:
+                    pass
+    n = len(outer) + len(hole)
+    bm.verts.ensure_lookup_table()
+    for ring, off in ((outer, 0), (hole, len(outer))):
+        for i in range(len(ring)):
+            j = (i + 1) % len(ring)
+            bm.faces.new([bm.verts[off + i], bm.verts[off + j], bm.verts[n + off + j], bm.verts[n + off + i]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return _obj(name, bm, material, group, 0.0)
+
+
 def _lmat_alpha(color, alpha, tag):
     """Lens.<renk>.cad.<etiket>: aynı renkte daha açık / koyu füme (site üçüncü alanı 'cad' okur: lens az parlar)"""
     key = f'Lens.{color}.cad.{tag}'
@@ -504,3 +543,169 @@ def build_lzd3223_cad(L):
 
     # kablo: arka ortadaki rakordan (6 × 0,5, 2 m; sitede tesisat sürer)
     tube(L.body, 'cable', [(0.0, 0.0, -0.002), (0.0, 0.0, -0.016), (0.0, -0.010, -0.028)], 0.0034, mat('Cable'), 3, smooth=True)
+
+
+
+# =====================================================================
+# REAR STRIPS (kullanıcı 2026-10-23: yalnız standart dorse, kasanın arka üst köşeleri). İkisi de "universal" (sol / sağ aynı;
+# sağda lens ekseni çevresinde 180° döndürülür: kırmızı uç iki yanda dışta). Kaynaklar: üretici STEP'leri (ek paket 2026-10-22),
+# ürün paketleri (Downloads/LZD-2246.zip, LZD-3141.zip: föy, çizim, fotoğraflar).
+# Yerel: X uzunluk (önden bakınca sağ +X; kırmızı uç −X), Y yukarı, Z lens yönü, montaj yüzü Z = 0.
+# =====================================================================
+# LZD 2246 (HOR 86): 257 × 27 × 20, 2 × Ø4,5 delik (230), 12 LED: 6 kırmızı (pozisyon + fren), 6 turuncu (sinyal); 4 × 0,5 kablo
+# 1 m, arka ortadan. STEP'te: lens gövde (p000, içi dolu kabuk: CAD x ±126, derinlik y 0 … 18), lastik conta (p001, montaj yüzü
+# y −2). İç (kaplar, LED'ler) ürün fotoğraflarından: 12 fasetli krom kap Ø13, 16,2 mm aralık; uçlarda vida cepleri.
+# CAD ekseni (mm): x uzunluk, lens +y, yukarı +z. Yerel: X = −x, Y = z, Z = y + 2.
+LZD2246_M = Matrix(((-1, 0, 0, 0), (0, -1, 0, -0.002), (0, 0, 1, 0), (0, 0, 0, 1)))
+
+
+@product('lzd2246', 'LZD 2246', 'strip', 'Arka şerit lamba (HOR 86), 12 LED: pozisyon, fren, sinyal — üretici CAD + fotoğraflar')
+def build_lzd2246_cad(L):
+    cad = os.path.join(CAD_ROOT, 'lzd2246')
+    if not os.path.exists(os.path.join(cad, 'p001.stl')):
+        print('CAD YOK (LZD 2246 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    # ===== 1) CAD: lastik conta (montaj yüzü), lens kabuğu (hafif füme) =====
+    parts = _cad_parts(cad, LZD2246_M, ['p001'], angle=0.5)
+    ext = _assembly_exterior(parts)
+    _plate_parts(L, parts, ext, {'p001': ([mat('Rubber')], L.body, 1500)}, 'lzd2246')
+    _cad_lens(L, cad, LZD2246_M, 'p000', [_lmat_alpha('smoke', 0.3, 'l30')], 'lzd2246_lens', 5000)
+
+    # ===== 2) iç: siyah taban (lensin iç yüzü Z 18,5; boşluğun tabanı Z 8,5), uçlarda vida cepleri =====
+    ZF = 8.6
+    prism(L.inner, 'strip_floor', _m(rrect(196.0, 17.6, 3.0)), _z(7.8), _z(ZF), mat('HousingGloss'), 0.0)
+    for sx in (1, -1):
+        x = sx * 115.0
+        frame(L.inner, 'screw_pocket', _m(circle(5.2, 24, x, 0.0)), _m(circle(4.4, 24, x, 0.0)), _z(2.0), _z(9.0), mat('HousingGloss'), 0.0)
+        cyl(L.inner, 'screw_head', 0.0036, (_z(x), 0.0, _z(2.0)), (_z(x), 0.0, _z(4.2)), mat('Stainless'), 20, bevel=0.0007)
+        box(L.inner, 'screw_slot', _z(x - 0.4), _z(x + 0.4), -0.0025, 0.0025, _z(4.2), _z(4.4), mat('HousingGloss'))
+    # ===== 3) 12 fasetli krom kap: −X'te 6 kırmızı (pozisyon + fren), +X'te 6 turuncu (sinyal) =====
+    for k in range(12):
+        x = (k - 5.5) * 16.2
+        fn, col = ('position+stop', 'red') if k < 6 else ('turn', 'amber')
+        tint = '#c3c7cc'
+        gains = (0.42, 0.3, 0.2)
+        _cup_bands(L.E(fn), _z(x), 0.0, _z(16.2), 0.0065, 0.0021, _z(16.2 - ZF - 0.3), gains, fn, col, tint, 0.28, seg=10)
+        box(L.E(fn), 'led', _z(x - 1.1), _z(x + 1.1), -0.0011, 0.0011, _z(ZF + 0.2), _z(ZF + 0.9), E(fn, col))
+        cyl(L.E(fn), 'optic_core', 0.0015, (_z(x), 0.0, _z(ZF + 0.9)), (_z(x), 0.0, _z(ZF + 1.4)),
+            _emat(fn, col, '#e7d9c2' if col == 'red' else '#f2c27a', 'core2246'), 16)
+    # kablo: arka ortadan (sitede tesisat sürer)
+    tube(L.body, 'cable', [(0.0, 0.0, -0.012), (0.0, 0.0, -0.024), (0.0, -0.010, -0.034)], 0.0028, mat('Cable'), 3, smooth=True)
+
+
+# LZD 3141 LIZARD (HOR 145AD): 252 × 27 × 21, 34 LED: pozisyon (22 üçgen ışık kılavuzu), fren (uçlarda 2 + 2 altıgen), dinamik
+# sinyal (ortada 8 altıgen; sitede sabit yanar). STEP'te: renksiz lens (p000), uçlarda dolgu kapakları (p001, p003), siyah arka
+# kapak + kablo rakoru (p002), mikro kauçuk taban (p004, montaj yüzü y −2,8). İç ürün fotoğraflarından (lzd-3141_3, _4_white,
+# www-3): 12 altıgen bal peteği optik (köşe yarıçapı 6,9, 16,6 mm aralık), her aralıkta üstte ve altta birer üçgen.
+# CAD ekseni (mm): x uzunluk, lens +y, yukarı +z. Yerel: X = −x, Y = z, Z = y + 2,8.
+LZD3141_M = Matrix(((-1, 0, 0, 0), (0, -1, 0, -0.0028), (0, 0, 1, 0), (0, 0, 0, 1)))
+
+
+@product('lzd3141', 'LZD 3141', 'strip', 'LIZARD arka şerit lamba (HOR 145AD), 34 LED: pozisyon, fren, dinamik sinyal — üretici CAD + fotoğraflar')
+def build_lzd3141_cad(L):
+    cad = os.path.join(CAD_ROOT, 'lzd3141')
+    if not os.path.exists(os.path.join(cad, 'p004.stl')):
+        print('CAD YOK (LZD 3141 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    # ===== 1) CAD: uç kapakları, arka kapak, taban (siyah); lens (renksiz) =====
+    parts = _cad_parts(cad, LZD3141_M, ['p001', 'p002', 'p003', 'p004'], angle=0.5)
+    ext = _assembly_exterior(parts)
+    _plate_parts(L, parts, ext, {'p001': ([mat('Housing')], L.body, 1000), 'p003': ([mat('Housing')], L.body, 1000),
+                                 'p002': ([mat('Housing')], L.body, 3000), 'p004': ([mat('Rubber')], L.body, 400)}, 'lzd3141')
+    _cad_lens(L, cad, LZD3141_M, 'p000', [_lmat('clear')], 'lzd3141_lens', 7000)
+
+    # ===== 2) iç: koyu füme panel (lensin iç yüzü Z 19,3) =====
+    ZP = 8.6
+    win = [(-105.0, 0.0), (-98.5, -11.0), (98.5, -11.0), (105.0, 0.0), (98.5, 11.0), (-98.5, 11.0)]
+    prism(L.inner, 'lizard_panel', _m(win), _z(ZP - 0.8), _z(ZP), mat('HousingGloss'), 0.0)
+    # ===== 3) 12 altıgen bal peteği optik: uçlarda 2'şer kırmızı (fren), ortada 8 turuncu (sinyal) =====
+    A = 6.9
+    for k in range(12):
+        x = (k - 5.5) * 16.6
+        red = k < 2 or k > 9
+        fn, col, base = ('stop', 'red', '#a8121a') if red else ('turn', 'amber', '#e3932a')
+        hexp = _hexf(x, 0.0, A)
+        frame(L.inner, 'hex_wall', _m(offset(hexp, -0.7)), _m(hexp), _z(ZP), _z(17.6), mat('HousingGloss'), 0.0)
+        prism(L.E(fn), 'hex_base', _m(hexp), _z(ZP), _z(15.6), _gl(fn, col, '#3a1a12' if not red else '#3d0d10', 0.12), 0.0)
+        box(L.E(fn), 'hex_led', _z(x - 1.2), _z(x + 1.2), -0.0012, 0.0012, _z(15.6), _z(16.3), E(fn, col))
+        _banded(L.E(fn), 'hex_xtal', offset(hexp, 0.3), [], 17.4, 1.6, 0.6, [(x, 0.0)],
+                lambda g, fn=fn, col=col, base=base: _crystal(fn, col, g, base), ((0.0, 2.4, 0.85), (2.4, 4.4, 0.4), (4.4, 1e9, 0.2)))
+    # ===== 4) pozisyon: her aralıkta üstte (tepesi aşağı) ve altta (tepesi yukarı) kırmızı üçgen ışık kılavuzu =====
+    tri_m = _gl('position', 'red', '#6e1a1e', 0.85)
+    for k in range(11):
+        x = (k - 5.0) * 16.6
+        for sy in (1, -1):
+            tri = _s_ccw([(x - 3.4, sy * 10.0), (x + 3.4, sy * 10.0), (x, sy * 4.6)])
+            _slot(L.inner, tri, ZP, 17.2, 0.6)
+            prism(L.E('position'), 'pos_tri', _m(tri), _z(ZP), _z(17.8), tri_m, 0.0003)
+    # kablo: arka kapaktaki rakordan (sitede tesisat sürer)
+    tube(L.body, 'cable', [(0.0, 0.0, -0.014), (0.0, 0.0, -0.026), (0.0, -0.010, -0.036)], 0.0028, mat('Cable'), 3, smooth=True)
+
+
+# =====================================================================
+# LRD 2681 — geri vites işlevli çalışma lambası (HOR 111; föy: 15 LED, AR 1,1 / 1,3 W, WL 12 W, 3 × 0,75 mm² kablo).
+# STEP'i yok; aynı HOR 111 gövdesinin STEP'i var: "LRD 2679" (Downloads/Product-3D-Step-Files; içindeki ön çerçevenin adı
+# "Outer_Lens_Black (usunięte przesłona na środku)": 2679'da orta perde çıkarılmış). Gövde, ön çerçeve, braket, cıvata, pul,
+# somun ve braket pedi CAD'den; 2681'in ortadaki beyaz bloğu (3 büyük LED, geri vites) ve 12 LED'lik halka ürün fotoğraflarından
+# (Downloads/LRD-2681.zip: lrd-2681-1-1 sönük, _3-1 çalışma, _3-2 hepsi). Lens CAD'de prizmalı (700 bin köşe): sitede düz lens +
+# yastık optik dokusu (aynı görüntü, bütçe içinde).
+# CAD ekseni (mm): lens +x (ön yüz −1,2; çerçeve 0,5), genişlik y, yukarı +z; mafsal ekseni x −36; braket pedinin altı z −76,5.
+# Yerel (eski geçici modelle aynı sözleşme, sitedeki L braket değişmez): taban (ped altı) Y = 0, saplama −Y, lens +Z.
+# X = y, Y = z + 76,5, Z = x + 36.
+# =====================================================================
+LRD2681_M = Matrix(((0, 1, 0, 0), (-1, 0, 0, -0.036), (0, 0, 1, 0.0765), (0, 0, 0, 1)))
+
+
+@product('lrd2681', 'LRD 2681', 'work', 'Geri vites işlevli çalışma lambası HOR 111, 15 LED — üretici CAD (LRD 2679 gövdesi) + fotoğraflar')
+def build_lrd2681_cad(L):
+    cad = os.path.join(CAD_ROOT, 'lrd2679')
+    if not os.path.exists(os.path.join(cad, 'p010.stl')):
+        print('CAD YOK, geçici model:', cad)
+        return build_lrd2681(L)
+    Hc = 76.5
+    # ===== 1) CAD: gövde, ön çerçeve, C braket, mafsal ve taban cıvataları, pul / somun, braket pedi =====
+    names = [f'p{i:03d}' for i in range(11) if i != 1]
+    parts = _cad_parts(cad, LRD2681_M, names, angle=0.5)
+    _drop_small(parts['p000'], lambda mn, mx, n: n < 60)
+    ext = _assembly_exterior(parts)
+    zinc = mat('Zinc')
+    spec = {'p000': ([mat('Housing')], L.body, 12000), 'p002': ([mat('Housing')], L.body, 5000), 'p003': ([mat('Stainless')], L.body, 1500),
+            'p010': ([mat('Seal')], L.body, 400)}
+    for i in range(4, 10):
+        spec[f'p{i:03d}'] = ([zinc], L.body, 500)
+    _plate_parts(L, parts, ext, spec, 'lrd2681')
+
+    # ===== 2) iç: reflektör taban (Z 23,3), 12 LED'lik halka (çalışma) =====
+    W = rrect(80, 80, 13, 6, 0, Hc)
+    prism(L.inner, 'refl', _m(offset(W, 0.5)), _z(22.1), _z(23.3), mat('Reflector'))
+    ring = [(x, 29.5) for x in (-27, -9, 9, 27)] + [(x, -29.5) for x in (-27, -9, 9, 27)] + \
+           [(sx * 31.0, sy * 13.5) for sx in (1, -1) for sy in (1, -1)]
+    for x, y in ring:
+        mini_led(L, L.E('work'), _z(x), _z(Hc + y), _z(26.6), 0.0015, E('work', 'white'), 0.0050, 0.0032, 8)
+    # ===== 3) orta beyaz blok (2681'e özgü): 3 krom kap, büyük LED'ler çalışma + geri vites =====
+    blk = rrect(56.0, 30.0, 5.0, 4, 0.0, Hc + 4.0)
+    # blok: yan duvar + kap delikli üst plaka (dolu blok kapların üstünü örtüyordu)
+    frame(L.inner, 'center_block', _m(blk), _m(offset(blk, 1.2)), _z(23.3), _z(28.0), mat('Reflector'), 0.0)
+    with Xf(L, None, (0.0, 0.0, _z(28.0))):
+        profile_solid(L.inner, 'block_top', _m(blk), [_m(circle(7.6, 28, x, Hc + 4.0)) for x in (-17.0, 0.0, 17.0)], 0.0012,
+                      mat('Reflector'), 0.0, 1)
+    for x in (-17.0, 0.0, 17.0):
+        cx, cy = _z(x), _z(Hc + 4.0)
+        _cup_bands(L.E('work+reverse'), cx, cy, _z(28.7), 0.0076, 0.0027, _z(28.7 - 23.6), (0.36, 0.27, 0.18), 'work+reverse', 'white',
+                   '#c3c8ce', 0.25, seg=24)
+        box(L.E('work+reverse'), 'chip', cx - 0.0016, cx + 0.0016, cy - 0.0016, cy + 0.0016, _z(23.6), _z(24.3), E('work+reverse', 'white'))
+        cyl(L.E('work+reverse'), 'optic_core', 0.0022, (cx, cy, _z(24.3)), (cx, cy, _z(25.0)), _emat('work+reverse', 'white', '#e9e1c4', 'core2681'), 16)
+    # blok üstündeki ve altındaki baskı plakaları (fotoğraf: E işareti ve güç değerleri)
+    prism(L.inner, 'mark_plate', _m(rrect(34.0, 7.0, 1.5, 3, 0.0, Hc + 24.0)), _z(23.3), _z(26.0), mat('Reflector'), 0.0004, 1)
+    prism(L.inner, 'text_plate', _m(rrect(40.0, 8.0, 1.5, 3, 0.0, Hc - 17.0)), _z(23.3), _z(26.0), mat('Reflector'), 0.0004, 1)
+    for w_, yy in ((26.0, Hc + 24.0), (30.0, Hc - 16.0), (20.0, Hc - 18.6)):
+        box(L.inner, 'print', _z(-w_ / 2), _z(w_ / 2), _z(yy - 0.5), _z(yy + 0.5), _z(26.0), _z(26.2), mat('HousingGloss'))
+    # ===== 4) lens: düz, yastık optik dokulu (CAD lensinin ön yüzü Z 34,8, iç yüzü ~31) =====
+    # orta bloğun önü düz şeffaf pencere (fotoğraf 1-1: kaplar net görünür), çevresi yastık optikli
+    win = rrect(58.0, 32.0, 6.0, 4, 0.0, Hc + 4.0)
+    lw = _s_ccw(offset(W, -1.0))
+    ob = _frame_poly(L.lens, 'lens', lw, _s_ccw(win), _z(31.0), _z(34.8), _lmat('clear'))
+    set_uv_planar(ob, 0.010)
+    prism(L.lens, 'lens_window', _m(win), _z(33.6), _z(34.6), _lmat_flat('clear'), 0.0)
+    # kablo: gövdenin arka ortasındaki rakordan aşağı (sitede tesisat sürer; bağlantı noktası equipment.ts LAMP_PORTS)
+    cable(L, [(0, _z(Hc - 10.0), -0.0140), (0, _z(Hc - 14.0), -0.0300), (0, 0.040, -0.058)], 0.0030)

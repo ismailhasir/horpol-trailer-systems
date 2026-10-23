@@ -856,13 +856,14 @@ ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan i
     'front': ('front',),
     'plate': ('plate', 'position'),
     'arm': ('outline',),
-    'work': ('work',),
+    'work': ('work', 'reverse'),
     'beacon': ('beacon',),
+    'strip': ('position', 'turn', 'stop'),
 }
 # yanık simgede ürüne özel şiddet çarpanı (tepe lambası: ışık kaplardan yansır, turuncu kılavuz çubuklarından zayıf kalıyordu)
 ICON_BOOST = {'ldo2660': 1.8}
 ICON_LIT_P = {}  # kategorinin imzası ürüne uymuyorsa ürüne özel (stop kategorisi artık bütün işlevleri yakar)
-ICON_DIR_VEC = {'arm': (0.55, 0.25, 0.8), 'beacon': (0.45, 0.45, 1.0), 'plate': (-0.35, 0.55, 1.0)}
+ICON_DIR_VEC = {'arm': (0.55, 0.25, 0.8), 'beacon': (0.45, 0.45, 1.0), 'plate': (-0.35, 0.55, 1.0), 'strip': (-0.35, 0.3, 1.0)}
 
 
 PLATE_TEXT = 'horpol-trailer-systems'  # src/config/site.ts plateText ile aynı (şimdilik yer tutucu)

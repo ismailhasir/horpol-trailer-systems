@@ -12,8 +12,8 @@ import { markShared } from './geo';
 import type { Mats } from './materials';
 
 // ---------- devreler (kategori bitleri) ----------
-export const CAT_BIT: Record<CategoryId, number> = { stop: 1, side: 2, plate: 4, front: 8, arm: 16, work: 32, beacon: 64 };
-export const ALL_CATS = 127;
+export const CAT_BIT: Record<CategoryId, number> = { stop: 1, side: 2, plate: 4, front: 8, arm: 16, work: 32, beacon: 64, strip: 128 };
+export const ALL_CATS = 255;
 /** Kabloya tıklanınca açılacak kategori: devrenin asıl kategorisi (en küçük bit: 7×1 → stop, yan hat → yan marker).
  *  Ana hat bütün devreleri taşır, bir kategoriye ait değil (null). */
 export function pickCategory(mask: number): CategoryId | null {
@@ -189,7 +189,7 @@ function nearestOn(pts: THREE.Vector3[], cum: number[], p: THREE.Vector3) {
 /** eski şema kabloları için tür → devre */
 const KIND_CATS: Record<WireKind, number> = {
   main: ALL_CATS,
-  rear: CAT_BIT.stop | CAT_BIT.plate | CAT_BIT.arm,
+  rear: CAT_BIT.stop | CAT_BIT.plate | CAT_BIT.arm | CAT_BIT.strip,
   side: CAT_BIT.side | CAT_BIT.front | CAT_BIT.arm,
   plate: CAT_BIT.plate,
   marker: CAT_BIT.front | CAT_BIT.arm,

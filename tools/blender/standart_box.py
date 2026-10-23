@@ -142,6 +142,10 @@ def mounts_dict():
                  for s in (1, -1)],
         # arka tampon türevleri (bumpers.py VARIANTS, lambaya göre delinmiş): türev stop lambasından (data.ts BUMPER_BY_STOP)
         'bumper': anchors_for(CARRIER_X),
+        # arka şerit lambalar (kullanıcı 2026-10-23): arka çerçevenin üst başlığının arka yüzünde, iki üst köşede, kırmızı kontur
+        # bandının (y −0,115 … −0,07) üstünde yatay; dış uç kenardan 30 mm içte. Kablo başlığın içinden köşe dikmesine (post: x, |z|)
+        # iner, dikmenin içinden şasiye
+        'strip': {'x': XR, 'y': round(Y_TOP - 0.035, 3), 'zOuter': round(W2 - 0.03, 3), 'post': [round(XR - 0.09, 3), round(W2 - 0.055, 3)]},
         'beacon': [{'x': XR - 0.065, 'y': Y_TOP, 'z': s * BEACON_Z, 'bracket': [[XR - 0.13, Y_TOP, s * BEACON_Z], [XR + 0.02, Y_TOP, s * BEACON_Z]]}
                    for s in (1, -1)],
         'harness': {'trunkY': HARNESS_Y, 'trunkZ': TRUNK_Z, 'profile': [[XF, HARNESS_Y], [XR, HARNESS_Y]], 'moduleX': MODULE_X,
@@ -152,7 +156,7 @@ def mounts_dict():
                              'başlığın altında. Arka dallar arka traversin önünden lamba taşıyıcının içine iner. Tesisat görünümünde '
                              '(top) aynı hatlar şasinin üstünden gösterilir.'},
         'parents': {'rear': 'chassis', 'plate': 'chassis', 'side': 'chassis', 'front': 'body', 'armFront': 'body', 'armRear': 'body',
-                    'armRearAlt': 'chassis', 'work': 'chassis', 'beacon': 'body', 'harness': 'chassis'},
+                    'armRearAlt': 'chassis', 'work': 'chassis', 'beacon': 'body', 'strip': 'body', 'harness': 'chassis'},
         'notes': 'Kapalı kasa sabit (devrilmez), bu yüzden ön pozisyon, lastik kol ve tepe lambaları kasaya bağlanır. '
                  'Ön pozisyon ön traversin ön yüzünde, alt köşede, yan markerla aynı yükseklikte (y 1,19). Lastik kollar köşe dikmelerinin '
                  'yan yüzünde, kasanın alt köşelerinde (y 1,36). Yan markerlar şasinin '

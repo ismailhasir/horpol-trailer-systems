@@ -19,7 +19,7 @@ export type TrailerId =
 
 export type SocketId = '7x2' | '15' | '7x2+15';
 export type LengthId = '13.6' | '12' | '9';
-export type CategoryId = 'stop' | 'side' | 'plate' | 'front' | 'arm' | 'work' | 'beacon';
+export type CategoryId = 'stop' | 'strip' | 'side' | 'plate' | 'front' | 'arm' | 'work' | 'beacon';
 
 export interface TrailerDef {
   id: TrailerId;
@@ -97,6 +97,8 @@ export interface CategoryDef {
   products: LampProduct[];
   /** sahnede ışık rengi (temsili) */
   color: string;
+  /** yalnız bu dorselerde (listede yalnız onlarda görünür; diğerlerinde adet 0) */
+  only?: TrailerId[];
 }
 
 // Tavanlar (2026-10-19): arka lambalar çift (sol + sağ); büyük kombine lambalar tek çift, yuvarlak/küçük lambalar lamba
@@ -127,6 +129,20 @@ export const CATEGORIES: CategoryDef[] = [
       // STRADA (HOR 124): sağ eşi LZD 2821 (STEP "LZD 2820, 2821"). HORUS LZD 3223 (HOR 153A): sağ eşinin kodu doğrulanmadı
       { id: 'lzd2820', code: 'LZD 2820', codeR: 'LZD 2821', max: 2 },
       { id: 'lzd3223', code: 'LZD 3223', max: 2 },
+    ],
+  },
+  {
+    // arka şerit lambalar (kullanıcı 2026-10-23): yalnız standart dorse, kasanın arka üst köşelerinde bir çift (sol / sağ aynı ürün,
+    // "universal"). Kablo: stop LZD 3194 ise lambanın boştaki 4. Superseal çıkışına, değilse Horpol modülüne
+    id: 'strip',
+    min: 0,
+    max: 2,
+    step: 2,
+    color: '#e0322d',
+    only: ['standart'],
+    products: [
+      { id: 'lzd2246', code: 'LZD 2246' },
+      { id: 'lzd3141', code: 'LZD 3141' },
     ],
   },
   {
@@ -239,7 +255,9 @@ export const TRAILER_RULES: Partial<Record<TrailerId, TrailerRules>> = {
 export const BUMPER_BY_STOP: Record<string, string> = { luna: 'hamburger' };
 export const rulesFor = (t: TrailerId): TrailerRules => TRAILER_RULES[t] ?? {};
 /** Konfigüratör listesinde bu dorse için görünen kategoriler */
-export const categoriesFor = (t: TrailerId) => CATEGORIES.filter((c) => !rulesFor(t).hide?.includes(c.id));
+/** Kategori bu dorsede seçilebilir mi (dorse kuralı hide, kategori only) */
+export const categoryAllowed = (t: TrailerId, c: CategoryDef) => !rulesFor(t).hide?.includes(c.id) && (!c.only || c.only.includes(t));
+export const categoriesFor = (t: TrailerId) => CATEGORIES.filter((c) => categoryAllowed(t, c));
 /** Kategoride seçilebilen ürünler (sabit plaka çerçevesi seçenek değildir) */
 export const productsFor = (t: TrailerId, cat: CategoryId) => {
   const ps = categoryById(cat).products;
@@ -296,6 +314,7 @@ export const DEFAULT_CONFIG: Config = {
   length: '13.6',
   lamps: {
     stop: { product: 'lzd3194', qty: 2 },
+    strip: { product: 'lzd2246', qty: 0 },
     side: { product: 'ld2774', qty: 12 },
     plate: { product: 'ltd2834', qty: 2 },
     front: { product: 'ld2773', qty: 2 },
@@ -317,7 +336,7 @@ export function normalize(c: Config): Config {
     const opts = productsFor(t.id, cat.id);
     let product = opts.some((p) => p.id === cur.product) ? cur.product : opts[0].id;
     let qty = Math.round(Number(cur.qty) || 0);
-    if (rules.hide?.includes(cat.id)) qty = 0;
+    if (!categoryAllowed(t.id, cat)) qty = 0;
     // ön pozisyon yan markerın eşi (yan marker ön kategoriden önce işlenir)
     if (cat.id === 'front' && rules.frontFromSide) {
       const f = productById('side', lamps.side.product).front;

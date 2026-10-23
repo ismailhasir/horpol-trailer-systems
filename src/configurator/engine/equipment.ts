@@ -85,6 +85,7 @@ interface MountsLike {
   /** between: lamba taşıyıcıda stop ile plaka arasında (z sitede seçime göre hesaplanır) */
   work?: (P3 & { dir?: [number, number, number]; bracket?: Bracket; rise?: number[]; between?: boolean })[];
   beacon?: (P3 & { bracket?: Bracket; rise?: number[] })[];
+  strip?: { x: number; y: number; zOuter: number; post: number[] };
   harness?: {
     trunkY?: number;
     trunkZ?: number;
@@ -146,6 +147,9 @@ const LAMP_PORTS: Record<string, { amp?: Port; ss?: Partial<Record<SsOut, Port>>
   lzd2876: { tail: { p: [0, -0.01, -0.036], d: [0, -0.2, -1] } },
   lzd2820: { tail: { p: [0, -0.01, -0.03], d: [0, -0.3, -0.95] }, pin7: true },
   lzd3223: { tail: { p: [0, -0.01, -0.03], d: [0, -0.3, -0.95] }, pin7: true },
+  // arka şerit lambalar: arka ortadaki 1 m kablo (4 × 0,5); tesisatla hat içi Superseal çifti
+  lzd2246: { tail: { p: [0, -0.01, -0.034], d: [0, -0.7, -0.7] } },
+  lzd3141: { tail: { p: [0, -0.01, -0.036], d: [0, -0.7, -0.7] } },
   ltd2834: { tail: { p: [0, -0.03, -0.026], d: [0, -0.96, -0.27] } },
   ld2774: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
   ld2773: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
@@ -185,6 +189,7 @@ const PH_SIZE: Record<CategoryId, [number, number, number]> = {
   arm: [0.04, 0.16, 0.18],
   work: [0.11, 0.11, 0.06],
   beacon: [0.15, 0.12, 0.15],
+  strip: [0.257, 0.027, 0.02],
 };
 function placeholder(cat: CategoryId, mats: Mats) {
   const g = new THREE.Group();
@@ -226,7 +231,7 @@ function controlModule(mats: Mats) {
 
 // Işıma (hale, zemin ışığı) Engine'deki bloom ile yanan parçanın kendi biçiminden gelir (2026-10-20); sprite efektleri kaldırıldı.
 /** Arka lambaların genişliği (lamba yerel X), dizilim için: modelden ölçülür, yoksa ürüne göre tahmin */
-const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2854: 0.449, lzd2448: 0.168, lzd2452: 0.168, lzd2875: 0.1156, lzd2876: 0.1156, lzd2820: 0.2396, lzd3223: 0.2 };
+const LAMP_W: Record<string, number> = { lzd3194: 0.405, lzd2854: 0.449, lzd2448: 0.168, lzd2452: 0.168, lzd2875: 0.1156, lzd2876: 0.1156, lzd2820: 0.2396, lzd3223: 0.2, lzd2246: 0.257, lzd3141: 0.252 };
 
 export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuild {
   const group = new THREE.Group();
@@ -582,6 +587,20 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     if (sp.bracket) brackets.push(sp.bracket);
   }
 
+  // =========================== ARKA ŞERİT LAMBALAR ===========================
+  // kasanın arka üst köşeleri (montaj haritası strip; yalnız standart dorse): lens arkaya (+X), uzun kenar yatay, dış uç kenardan
+  // 30 mm içte. Ürün "universal": sağda lens ekseni çevresinde 180° döndürülür (kırmızı uç iki yanda dışta)
+  const stc = c.lamps.strip;
+  const ST = M.strip;
+  const stripObj: { s: number; obj: THREE.Object3D; id: string }[] = [];
+  if (ST && stc.qty > 0) {
+    for (const s of [1, -1]) {
+      const o = mount('strip', stc.product, V(ST.x, ST.y, 0), (obj) => obj.rotation.set(0, Math.PI / 2, s < 0 ? Math.PI : 0));
+      o.position.z = s * (ST.zOuter - lampWidth(stc.product, o) / 2);
+      stripObj.push({ s, obj: o, id: stc.product });
+    }
+  }
+
   // =========================== BRAKETLER (sabit montaj) ===========================
   const addBrackets = () => {
     for (const b of brackets) {
@@ -877,9 +896,46 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
         wire('aux', 0.0035, [st, sn, V(xq, sn.y, sn.z), V(xq, wn.y, sn.z), V(xq, wn.y, wn.z), wn, wt], B.work, 3);
       }
     }
-    // boş çıkış (sinyal yanıp sönmeli pozisyon): kör tapa
+    // --- arka şerit lambalar (kullanıcı 2026-10-23): stop LZD 3194 ise aynı yandaki lambanın boştaki 4. Superseal çıkışından
+    // (sinyal yanıp sönmeli pozisyon), değilse modülün ön yüzündeki dış Superseal'den (sol +z, sağ −z). Uzatma kablosu şasi
+    // seviyesinde köşe dikmesine gider, dikmenin içinden başlığa çıkar, başlığın içinde lambanın kısa kablosunun çiftine ---
+    const flashUsed = new Set<THREE.Object3D>();
+    for (const sp of stripObj) {
+      const t = portOf(sp.obj, sp.id, 'tail');
+      if (!t || !ST) continue;
+      const s = sp.s;
+      // kablo lambanın arka ortasından çıkan esnek kablo: iki yanda da aşağı, kasanın içine (sağ lamba lens ekseni çevresinde 180°
+      // döndüğü için tablodaki yön yukarıyı gösteriyordu: kablo tavanın üstünden, dorsenin dışından dolaşıyordu)
+      if (t.d.y > 0) {
+        t.d.y = -t.d.y;
+        t.p.y = 2 * sp.obj.position.y - t.p.y;
+      }
+      const [sn, stt] = plugEnd(t, 'ss');
+      const [px, pz0] = ST.post;
+      const pz = s * pz0;
+      const yH = sn.y;
+      const up = [V(px, Y, pz), V(px, yH, pz), V(px, yH, sn.z), sn, stt];
+      const lamp = rearSide.find((r) => r.s === s)?.mine[0];
+      const q = lamp && portOf(lamp.obj, lamp.id, 'flash');
+      if (lamp && q) {
+        flashUsed.add(lamp.obj);
+        const [fn, ft] = plugEnd(q, 'ssPlug');
+        const xq = fn.x - 0.02;
+        wire('rear', 0.004, [ft, fn, V(xq, fn.y, fn.z), V(xq, Y, fn.z), ...lateral(xq, Y, fn.z, pz), ...up], B.strip, 3);
+      } else {
+        const pzM = s > 0 ? zS1 : zS3;
+        const P = port('front', pzM);
+        plug('ssPlug', P, toModule);
+        const x1 = P.x - 0.12;
+        const lane = s * (busZ - 0.06); // yan hattın hemen içinde: marker dallarını kesmez
+        const xT = xb - 0.08; // yan hattın arkada içe döndüğü yerin önünde dışa döner
+        wire('rear', 0.004, [P, ...lateral(x1, Y, pzM, lane, s < 0 ? [zR] : [], -1), V(xT, Y, lane), ...lateral(xT, Y, lane, pz, [s * busZ]), ...up],
+          B.strip, 3);
+      }
+    }
+    // boş çıkış (sinyal yanıp sönmeli pozisyon; şerit lamba takılı değilse): kör tapa
     for (const { mine } of rearSide) {
-      const q = mine[0] && portOf(mine[0].obj, mine[0].id, 'flash');
+      const q = mine[0] && !flashUsed.has(mine[0].obj) && portOf(mine[0].obj, mine[0].id, 'flash');
       if (q) plug('ssCap', q.p.clone(), q.d.clone().negate());
     }
     if (inCarrier.length && !fromLamp) {

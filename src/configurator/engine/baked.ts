@@ -66,6 +66,8 @@ export interface BakedMounts {
   work: (P3 & { dir: number[]; bracket: BakedBracket })[];
   /** tepe lambaları (en çok 2): taban yatay yüzeyde, y taban yüksekliği */
   beacon: (P3 & { bracket: BakedBracket })[];
+  /** arka şerit lambalar: başlığın arka yüzü (x), y, dış ucun |z|'si; post: kablonun indiği köşe dikmesi [x, |z|] */
+  strip?: { x: number; y: number; zOuter: number; post: number[] };
   /** ana demet: kirişin iç yanında korumalı güzergâh; profile [x, y] (x artan), modül ve arka dağıtım x'i */
   /** top: tesisat görünümünde yatay hatların gösterildiği şasi üstü (y) ve yan hattın |z|'si (yalnız yeni şemalı dorseler) */
   harness: { trunkY: number; trunkZ: number; profile: number[][]; moduleX: number; rearJunctionX: number; top?: { y: number; sideZ: number; turnX?: number; profile?: number[][] }; notes: string };

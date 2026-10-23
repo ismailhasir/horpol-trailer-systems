@@ -116,6 +116,17 @@ test('CUBE seti: LUNA gibi toplam yalnız 0, 6 ya da 8; içte LZD 2876 (kullanı
   assert.equal(q(12), 8);
 });
 
+test('arka şerit lambalar yalnız standart dorsede, bir çift (kullanıcı 2026-10-23)', () => {
+  assert.deepEqual(productsFor('standart', 'strip').map((p) => p.id), ['lzd2246', 'lzd3141']);
+  assert.ok(categoriesFor('standart').some((c) => c.id === 'strip'));
+  for (const t of ['lowbed', 'silo', 'tanker', 'damper']) {
+    assert.ok(!categoriesFor(t).some((c) => c.id === 'strip'), t);
+    assert.equal(normalize(withLamps({ strip: { product: 'lzd3141', qty: 2 } }, { trailer: t })).lamps.strip.qty, 0, t);
+  }
+  assert.equal(normalize(withLamps({ strip: { product: 'lzd3141', qty: 1 } })).lamps.strip.qty, 2);
+  assert.equal(normalize(withLamps({ strip: { product: 'lzd2246', qty: 6 } })).lamps.strip.qty, 2);
+});
+
 test('büyük kombine stoplar tek çift', () => {
   assert.equal(normalize(withLamps({ stop: { product: 'lzd2854', qty: 6 } })).lamps.stop.qty, 2);
   assert.equal(normalize(withLamps({ stop: { product: 'lzd2820', qty: 6 } })).lamps.stop.qty, 2);

@@ -15,7 +15,7 @@ import { ALL_CATS, CAT_BIT, harnessFx, pickCategory } from './harness';
 export type View = 'overview' | 'rear' | 'side' | 'front' | 'top';
 export type Theme = 'light' | 'dark';
 /** Arayüz düğmeleri dışında motorun kendi kullandığı kamera pozları */
-type Pose = View | 'arm' | 'beacon' | 'system' | 'extra';
+type Pose = View | 'arm' | 'beacon' | 'strip' | 'system' | 'extra';
 
 export interface EngineOptions {
   theme: Theme;
@@ -223,10 +223,6 @@ function gradientTexture(top: string, horizon: string) {
 }
 
 /** zayıf cihaz (dokunmatik/küçük ekran/az bellek): daha küçük ortam ve gölge haritası */
-function lowEnd() {
-  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
-  return matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700 || mem <= 4;
-}
 
 export class Engine {
   private renderer: THREE.WebGLRenderer;
@@ -241,7 +237,6 @@ export class Engine {
   private envKind: EnvKind | null = null;
   private envRT: THREE.WebGLRenderTarget | null = null;
   private envBaker: EnvBaker | null = null;
-  private low = lowEnd();
   /** artık boş: arka kırmızı nokta ışıkları kaldırıldı (zemine/arka yüze renkli ışık + her malzemede ışık döngüsü maliyeti) */
   private trailer: TrailerBuild | null = null;
   private equip: EquipmentBuild | null = null;
@@ -253,9 +248,6 @@ export class Engine {
   private raf = 0;
   private tween: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t0: number; dur: number } | null = null;
   private ro: ResizeObserver;
-  private frameTimes: number[] = [];
-  private dpr: number;
-  private lastFrame = 0;
   private opts: EngineOptions;
   private raycaster = new THREE.Raycaster();
   private down: { x: number; y: number } | null = null;
@@ -267,8 +259,10 @@ export class Engine {
     this.opts = opts;
     this.theme = opts.theme;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.renderer.setPixelRatio(this.dpr);
+    // çözünürlük her zaman en yüksek kalitede (kullanıcı 2026-10-23): ekranın piksel oranı (2'de sınırlı; üstü gözle ayırt edilmez,
+    // yalnız yük). Eskiden yavaş karelerde kademeli düşürülüyor ve hiç geri yükselmiyordu: ışıklar (bloom) açılıp kapandıktan ya da
+    // model yüklerken birkaç yavaş kareden sonra görüntü kalıcı olarak bulanık kalıyordu. Düşük donanım ayarları da kaldırıldı
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Khronos PBR Neutral: ürün renklerini (beyaz boya, logo mavisi) kaydırmadan korur; ACES kırmızıyı turuncuya,
     // sarıya; AgX doygun renkleri soluk pastele çeker. Yanan lambalar ton eşlemesiz (lampfx), bundan etkilenmez.
@@ -351,11 +345,10 @@ export class Engine {
     // tek yönlü ışık (gündüz güneş, gece ay); gölge haritası yalnız sahne değişince güncellenir
     this.sun = new THREE.DirectionalLight('#ffffff', 2.5);
     this.sun.castShadow = true;
-    const sm = this.low ? 1024 : 2048;
-    this.sun.shadow.mapSize.set(sm, sm);
+    this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.02;
-    this.sun.shadow.radius = this.low ? 2.5 : 4;
+    this.sun.shadow.radius = 4;
     this.scene.add(this.sun, this.sun.target);
     // yanan lambaların gövdeye ve zemine düşen ışığı yok (kullanıcı 2026-10-20: yanıltmasın). Şiddeti 0 olan ışıklar da her
     // malzemenin gölgelendiricisinde döngü maliyeti yaratıyordu; ışıma yalnız bloom ile
@@ -486,6 +479,15 @@ export class Engine {
         const rear = t.x > cx; // arka kollar → arkadan, yalnız önde ise önden
         return [V(t.x + (rear ? 2.9 : -2.9) * k, t.y + 0.55, 2.1 * k), V(t.x, t.y, 0)];
       }
+      case 'strip': {
+        // arka şerit lambalar (kasanın arka üst köşeleri): sol (+z) şeride arkadan, hafif yandan ve üstten yakın bakış; köşe dikmesi
+        // ve kasanın yan yüzü kadrajda kalır. Model yoksa montaj haritasındaki yer
+        const st = this.equip?.lampsByCat.strip ?? [];
+        const o = st.find((q) => q.getWorldPosition(new THREE.Vector3()).z > 0) ?? st[0];
+        const t = o ? o.getWorldPosition(new THREE.Vector3()) : V(0, a.topY - 0.04, a.W / 2 - 0.16);
+        // uzaklık ~0,62 m (OrbitControls minDistance 0,6): şerit kadrajın boş alanını doldurur
+        return [V(t.x + 0.56 * k, t.y + 0.13, t.z + 0.24 * k), V(t.x, t.y - 0.01, t.z - 0.01)];
+      }
       case 'beacon':
         // tepe lambaları: üst arka köşe (eski "arm" pozu)
         return [V(4.6 * k, a.topY + 1.4, 4.6 * k), V(-0.8, a.topY - 0.6, 0)];
@@ -568,7 +570,7 @@ export class Engine {
   }
 
   focusCategory(cat: CategoryId) {
-    const map: Record<CategoryId, Pose> = { stop: 'rear', plate: 'rear', side: 'side', front: 'front', arm: 'arm', work: 'extra', beacon: 'beacon' };
+    const map: Record<CategoryId, Pose> = { stop: 'rear', strip: 'strip', plate: 'rear', side: 'side', front: 'front', arm: 'arm', work: 'extra', beacon: 'beacon' };
     if (this.system) return;
     this.setView(map[cat]);
   }
@@ -658,7 +660,7 @@ export class Engine {
   /** Ortam haritası: yalnızca etkin olan tutulur (256 px; zayıf cihazda 128 px), değişince yeniden pişirilir */
   private setEnvironment(kind: EnvKind) {
     if (this.envKind === kind) return;
-    this.envBaker ??= new EnvBaker(this.renderer, this.low ? 128 : 256);
+    this.envBaker ??= new EnvBaker(this.renderer, 256);
     const rt = this.envBaker.bake(ENVS[kind]);
     this.envRT?.dispose();
     this.envRT = rt;
@@ -737,7 +739,6 @@ export class Engine {
     const moved = this.controls.update();
     this.controls.target.y = Math.max(0.2, this.controls.target.y);
     this.draw();
-    this.adapt(now, busy || moved);
     if (busy || moved) this.invalidate();
   };
 
@@ -805,7 +806,7 @@ export class Engine {
     const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = mods;
     if (this.disposed) return;
     // HDR ara görüntü + MSAA (kenar yumuşatma kaybolmasın); ton eşleme ve sRGB dönüşümü OutputPass'te
-    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: this.low ? 0 : 4 });
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
     const c = new EffectComposer(this.renderer, rt);
     c.addPass(new RenderPass(this.scene, this.camera));
     const b = new UnrealBloomPass(new THREE.Vector2(256, 256), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
@@ -819,28 +820,6 @@ export class Engine {
     this.composer = c;
     this.resize();
     this.invalidate();
-  }
-
-  /** Yavaş cihazda çözünürlüğü kademeli düşür */
-  private adapt(now: number, active: boolean) {
-    if (!active) {
-      this.lastFrame = 0;
-      return;
-    }
-    if (this.lastFrame) {
-      this.frameTimes.push(now - this.lastFrame);
-      if (this.frameTimes.length > 40) this.frameTimes.shift();
-      if (this.frameTimes.length === 40) {
-        const avg = this.frameTimes.reduce((a, b) => a + b, 0) / 40;
-        if (avg > 26 && this.dpr > 1) {
-          this.dpr = Math.max(1, this.dpr - 0.25);
-          this.renderer.setPixelRatio(this.dpr);
-          this.resize();
-          this.frameTimes = [];
-        }
-      }
-    }
-    this.lastFrame = now;
   }
 
   /** Sahnenin üstündeki paneller: dorse, panellerin arasında kalan boş alanda ortalanır (px). */
@@ -868,7 +847,7 @@ export class Engine {
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
     if (this.composer) {
-      this.composer.setPixelRatio(this.renderer.getPixelRatio() * (this.low ? 0.75 : 1));
+      this.composer.setPixelRatio(this.renderer.getPixelRatio());
       this.composer.setSize(w, h);
     }
     this.camera.aspect = w / h;

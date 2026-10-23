@@ -45,6 +45,8 @@ seçer (pozisyon, fren, sinyal, geri vites, sis, çalışma, tepe); sinyal ~1,5 
 - **Yansıtıcı kaplar** (`.g<yüzde>`): şiddet × oran. Oranlar bloom eşiğinin altında tutulur: kap parlak ama yapısı okunur, haleyi yalnız LED verir.
 - Videoyla karşılaştırma ışıklar modunda yakın planda yapıldı. Gerçek cihazda bloom maliyeti ölçülmedi; zayıf cihazda MSAA kapalı ve çözünürlük 0,75.
 
+**Çözünürlük (kullanıcı 2026-10-23: "her zaman en iyi kalitede"):** `Engine.ts` piksel oranı her zaman ekranınki (2'de sınırlı). Eskiden yavaş karelerde kademeli düşürülüp hiç geri yükseltilmiyordu: ışıklar (bloom) açılıp kapandıktan ya da model yüklerken görüntü kalıcı olarak bulanık kalıyordu. Düşük donanım ayarları (gölge haritası 1024, bloom 0,75 çözünürlük, MSAA yok, ortam haritası 128) da kaldırıldı: her cihazda gölge 2048, bloom tam çözünürlük + 4× MSAA, ortam 256.
+
 ## 4. Tesisat (yeni Horpol şeması)
 
 `src/configurator/engine/equipment.ts`:
@@ -301,3 +303,17 @@ STEP'lerin dördünde de yalnız dış zarf var (gövde, düz lens kabuğu, çer
 - **Malzeme:** retro yüzeyler renkli ayna (metalik kırmızı, kaplamasız): kaplama gökyüzünü beyaz yansıtınca renksiz lensin ardında pembe okunuyordu. HORUS lensinin üçgen bölgesi kırmızı (CAD lensinde retro prizmalar kalıplı). HORUS turuncu / beyaz hücreleri: şeffaf kaburgalı optik + altı fasetli krom kap + LED. Bu dosyadaki ışık malzemeleri `.c2` / `.d` / `.x…` ekli: `_glow` / `_retro_cad` ile aynı ad önbellekte başka ürünün malzemesini döndürüyordu.
 - **Doğrulanmadı:** CUBE'un CAD'de "yukarı" yönü (lamba simetrik); HORUS sağ eşinin kodu; iç elemanların derinlikleri (fotoğraf önden); LED sayıları föydeki toplamla birebir değil.
 - **Not:** LZD 3223 föyde **12 V**. Dorselerde genelde 24 V sistem kullanılır; kullanıcıya bildirildi.
+
+## 11. Arka şerit lambalar ve LRD 2681 CAD'den (2026-10-23)
+
+Betik `tools/blender/lamps_cad2.py` (sonu). STEP → STL: `tools/blender/cad/lzd2246`, `lzd3141`, `lrd2679`.
+
+| Ürün | Ölçü (mm) | İşlevler (EMIT) | Kaynak |
+|---|---|---|---|
+| LZD 2246 (HOR 86, universal) | 257 × 27 × 20, 2 × Ø4,5 (230) | position+stop (6 kırmızı kap), turn (6 turuncu kap) | STEP: lens kabuğu + lastik conta; kaplar fotoğraftan |
+| LZD 3141 LIZARD (HOR 145AD, universal) | 252 × 27 × 21 | position (22 üçgen kılavuz), stop (uçlarda 2 + 2 altıgen), turn (ortada 8 altıgen; föyde dinamik, sitede sabit) | STEP: lens, uç kapakları, arka kapak, taban; iç fotoğraftan |
+| LRD 2681 (HOR 111) | 101 × 127 × 50,5, M8 | work (12 LED halka), work+reverse (ortadaki 3 büyük LED) | STEP'i yok: **aynı gövdenin LRD 2679 STEP'i** (gövde, ön çerçeve, C braket, cıvata, pul, somun, ped); orta beyaz blok ve halka 2681 fotoğraflarından |
+
+- **Site (kullanıcı 2026-10-23):** yeni kategori `strip` "Arka şerit lambalar", **yalnız standart dorse** (`CategoryDef.only`), bir çift. Montaj haritası `strip`: arka çerçevenin üst başlığı, kırmızı kontur bandının üstü, dış uç kenardan 30 mm içte; sağ lamba lens ekseni çevresinde 180° döner (kırmızı uç iki yanda dışta).
+- **Kablolama:** stop LZD 3194 ise aynı yandaki lambanın boştaki 4. Superseal çıkışından (sinyal yanıp sönmeli pozisyon; kör tapa kalkar), değilse Horpol modülünün ön yüzündeki dış Superseal'lerden, yan hattın içinden. Uzatma şasiden köşe dikmesinin içinden başlığa çıkar; lambanın 1 m kablosuyla hat içi Superseal çifti.
+- **Doğrulanmadı:** şerit lambaların başlıktaki tam yüksekliği ve yatay mı takıldığı (kullanıcı "üst köşeler" dedi); LZD 3194'ün 4. çıkışının şerit lambaya uygun devre olduğu (föyde "sinyal yanıp sönmeli pozisyon"); LRD 2681'in LRD 2679 ile aynı gövde olduğu (çizim ve fotoğraflar aynı; 2681'in kendi STEP'i hâlâ yok).
