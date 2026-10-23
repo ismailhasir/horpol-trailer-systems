@@ -298,14 +298,16 @@ def build_lzd2876_cad(L):
 
 
 # =====================================================================
-# STRADA — LZD 2820 (sol; sağ: LZD 2821, ayna), HOR 124, 71 LED. Föy: neon pozisyon, fren, geri vites, sis, sinyal, PLAKA
-# aydınlatması, reflektör üçgen; 7 × 0,5 kablo 2 m. Kaynaklar: üretici STEP "LZD 2820, 2821" (gövde 548F1, lens 549F1, 2 saplama),
+# STRADA — LZD 2820 (sol; sağ: LZD 2821, ayna), HOR 124, 71 LED. Föy: neon pozisyon, fren, geri vites, sis, sinyal, reflektör
+# üçgen (föyde plaka aydınlatması da geçiyor; kullanıcı 2026-10-23: LZD 2820'de yok, modelde yok); 7 × 0,5 kablo 2 m. Kaynaklar: üretici STEP "LZD 2820, 2821" (gövde 548F1, lens 549F1, 2 saplama),
 # ürün paketi (Downloads/LZD-2820.zip: föy, çizim, 15 fotoğraf). Ölçü 240 × 141 × 49,6 (saplamalar hariç), saplamalar ±76 mm.
 #   İç düzen (önden fotoğraf 2-1; ölçek lens 239,6 mm): ortada büyük kırmızı retro üçgen ("yol"), kenarlarında neon "yol
 #   çizgileri" (üstte iki eğik çizgi, altta dışa ayaklı iki eğik çizgi, ortada kesik orta çizgi) POZİSYON; ortada boydan boya
-#   turuncu SİNYAL çubuğu; üstte iki beyaz pencere (3'er LED, krom kap) GERİ VİTES; yanlarda kırmızı retro paneller: arkalarında
-#   ")" dizili LED'ler, dış uçta FREN, iç uçta SİS (fotoğraf 5 / 6: hangisinin fren olduğu doğrulanmadı; LZD 2854 düzeniyle aynı
-#   varsayıldı); iç yan yüzde beyaz PLAKA şeridi (fotoğraf 14).
+#   turuncu SİNYAL çubuğu; üstte iki beyaz pencere (3'er LED, krom kap) GERİ VİTES; yanlarda ">" biçimli kırmızı retro paneller,
+#   arkalarında panelin orta çizgisine dizili 10 LED (fotoğraf 5-1): iç uçta FREN, dış uçta SİS (kullanıcı 2026-10-23). Panelin
+#   dış kenarında siyah "bumerang" (gövde; ışımaz).
+#   Biçimler fotoğraf 2-1'in piksel satırlarından ölçüldü (2026-10-23): üçgen kenarı eğimi 0,555 (tepe lensin üstünde, taban ±76,9),
+#   neon şeritlerin iç kenarı üçgene 3 mm aralıkla PARALEL, dış kenarı daha dik (şerit aşağı doğru genişler).
 # CAD ekseni (mm): x genişlik (sağ +x, önden), y yukarı (0 … 140,8), lens +z, arka yüz z −7. Yerel: X = x, Y = y − 70,4, Z = z + 7.
 # =====================================================================
 STRADA_M = Matrix(((1, 0, 0, 0), (0, 0, -1, -0.007), (0, 1, 0, -0.0704), (0, 0, 0, 1)))
@@ -330,18 +332,33 @@ def build_lzd2820_cad(L):
     prism(L.inner, 'strada_panel', _m(rrect(229.0, 131.0, 8.0)), _z(29.5), _z(ZP), mat('HousingGloss'), 0.0)
 
     # ===== 3) ölçülen biçimler (yerel mm) =====
-    TRI = _round_poly([(0.0, 64.0), (-97.0, -65.0), (97.0, -65.0)], 3.0)
     mx = lambda pl: [(-x, y) for x, y in pl]
-    NEON = [[(-12.5, 62.5), (-48.5, 8.5)], [(-61.0, -8.5), (-93.5, -56.5), (-113.0, -56.5)]]
-    NEON += [mx(p) for p in NEON]
-    CENTER = [[(0.0, 33.5), (0.0, 6.5)], [(0.0, -8.0), (0.0, -56.5)]]
+    # orta üçgen: sol kenar x = 0,555·y − 40,78 (tepe y 73,5 lensin üstünde: yamuk), taban y −65
+    tri_x = lambda y: 0.555 * y - 40.78
+    TRI = _round_poly([(tri_x(63.8), 63.8), (-tri_x(63.8), 63.8), (-tri_x(-65.0), -65.0), (tri_x(-65.0), -65.0)], 2.5)
+    # neon şeritler (sol yarı): iç kenar üçgene paralel (3 mm), dış kenar daha dik; üstteki sinyal çubuğunun üstünde biter, alttaki
+    # dışa ayakla lens kenarına uzanır
+    up_in = lambda y: tri_x(y) - 3.0
+    up_out = lambda y: -17.9 - 0.702 * (59.6 - y)
+    lo_in = lambda y: tri_x(y) - 3.2
+    lo_out = lambda y: -68.7 - 0.694 * (-12.4 - y)
+    NEON = [[(up_out(63.5), 63.5), (up_in(63.5), 63.5), (up_in(8.0), 8.0), (up_out(8.0), 8.0)],
+            [(lo_out(-8.5), -8.5), (lo_in(-8.5), -8.5), (lo_in(-64.0), -64.0), (-114.0, -64.0), (-114.0, -52.0), (lo_out(-52.0), -52.0)]]
+    NEON = [_s_ccw(p) for p in NEON] + [_s_ccw(mx(p)) for p in NEON]
+    CENTER = [[(0.0, 32.5), (0.0, 8.0)], [(0.0, -9.0), (0.0, -56.0)]]
     BAR = rrect(143.0, 8.8, 1.5, 4, 0.0, -0.8)
-    WIN = [(-98.8, 63.0), (-25.4, 63.0), (-51.2, 12.8), (-69.0, 12.8)]
-    WIN_LED = [(-79.0, 51.6), (-45.2, 51.6), (-61.1, 31.6)]
-    PANEL = [(-112.5, 49.6), (-92.5, 49.6), (-73.5, 12.8), (-75.0, 5.5), (-75.0, -7.0), (-68.5, -9.0), (-99.5, -50.5), (-112.5, -50.5)]
+    # geri vites penceresi: sağ kenar üçgene paralel, sol kenar şeridin dış kenarına paralel, sol üst köşe pahlı
+    WIN = [(-98.8, 63.0), (-25.9, 63.0), (-53.4, 14.5), (-70.8, 14.5), (-98.3, 54.0)]
+    WIN_LED = [(-79.5, 51.0), (-45.5, 51.0), (-62.0, 30.5)]
+    # yan panel ">" biçimi: iç kenar pencereye ve alt şeride ~4 mm aralıkla paralel; dış kenarda siyah bumerang (y ±37,5 … ±22,5
+    # arası eğik, ortada x −104,2'ye kadar içe girer)
+    PANEL = [(-114.0, 50.0), (-99.3, 50.0), (-74.6, 14.5), (-74.6, -15.0), (-98.9, -50.0), (-114.0, -50.0), (-114.0, -38.7),
+             (-104.2, -25.0), (-104.2, 22.5), (-114.0, 37.5)]
+    # LED'ler panelin orta çizgisinde (fotoğraf 5-1: ">" dizili 10 LED)
+    PANEL_LED = _polyline_pts([(-106.5, 45.0), (-97.0, 30.0), (-89.4, 12.0), (-89.4, -12.0), (-96.4, -30.0), (-106.0, -45.0)], 10.0)
 
     # ===== 4) retro üçgen (ışımaz): orta çizgi ve sinyal çubuğu delerek geçer =====
-    neon_c = [_s_ccw(_band(p, 7.6)) for p in CENTER]
+    neon_c = [_s_ccw(_band(p, 8.4)) for p in CENTER]
     holes = [offset(p, -1.0) for p in neon_c] + [offset(BAR, -1.0)]
     prism(L.inner, 'tri_base', _m(TRI), _z(ZP), _z(43.8), mat('ReflectorRed'), 0.0)
     _s_hex_retro(L.inner, 'tri_retro', _m(TRI), [_m(h) for h in holes], _z(44.6), 0.0021, 0.0008, _retro_plain('red'))
@@ -349,8 +366,7 @@ def build_lzd2820_cad(L):
     # ===== 5) neon yol çizgileri (pozisyon): koyu yuvada süt beyazı kılavuz, retronun 1 mm önünde =====
     # sönükken kırmızı ışık borusu (fotoğraf 2-1; renksiz lensin ardında soluk pembe okunmasın)
     neon_m = _emat('position', 'red', '#b8302c', 'strada')
-    for i, pl in enumerate(NEON):
-        band = _s_ccw(_band(pl, 7.6))
+    for i, band in enumerate(NEON):
         _slot(L.inner, band, ZP, 45.0)
         prism(L.E('position'), f'neon{i}', _m(band), _z(ZP), _z(45.6), neon_m, 0.0008)
     for i, band in enumerate(neon_c):
@@ -375,21 +391,17 @@ def build_lzd2820_cad(L):
             _cup_bands(L.E('reverse'), _z(lx), _z(ly), _z(44.0), 0.0088, 0.0036, _z(44.0 - ZP - 1.5), (0.33, 0.26, 0.19), 'reverse', 'white')
             box(L.E('reverse'), 'rev_led', _z(lx - 2.6), _z(lx + 2.6), _z(ly - 2.6), _z(ly + 2.6), _z(ZP + 1.6), _z(ZP + 3.0), E('reverse', 'white'))
 
-    # ===== 8) yan paneller: kırmızı retro, ardında ")" dizili 8 LED (iç uç FREN, dış uç SİS; kullanıcı 2026-10-23) =====
-    ys = [38.0, 27.0, 16.0, 5.0, -6.0, -17.0, -28.0, -39.0]
+    # ===== 8) yan paneller: ">" biçimli kırmızı retro, ardında 10 LED (iç uç FREN, dış uç SİS; kullanıcı 2026-10-23) =====
     for sx, fn in ((1, 'fog'), (-1, 'stop')):  # sx 1: dış (−X) panel
-        poly = PANEL if sx > 0 else _s_ccw(mx(PANEL))
-        leds = [(sx * (-100.5 + 5.5 * (1 - (y / 42.0) ** 2)), y) for y in ys]
+        poly = _s_ccw(PANEL) if sx > 0 else _s_ccw(mx(PANEL))
+        leds = PANEL_LED if sx > 0 else mx(PANEL_LED)
         frame(L.inner, 'panel_frame', _m(poly), _m(offset(poly, 1.0)), _z(ZP), _z(44.8), mat('HousingGloss'), 0.0)
         prism(L.inner, 'panel_base', _m(offset(poly, 0.8)), _z(ZP), _z(43.8), mat('ReflectorRed'), 0.0)
         # yalnız LED'lerin önündeki hücreler parlak (fotoğraf 5 / 6: LED dizisi seçik, panelin geri kalanı koyu kırmızı)
         _banded(L.E(fn), f'panel_{fn}', offset(poly, 1.0), [], 44.6, 2.1, 0.8, leds, lambda g, fn=fn: _retro_dark(fn, 'red', g),
                 ((0.0, 2.4, 0.95), (2.4, 4.5, 0.45), (4.5, 7.0, 0.2), (7.0, 1e9, 0.07)))
 
-    # ===== 9) plaka şeridi: iç (+X) yan yüzde, lensin yan duvarının ardında =====
-    box(L.E('plate'), 'plate_strip', _z(113.2), _z(115.0), _z(-48.0), _z(40.0), _z(31.0), _z(46.0), _gl('plate', 'white', '#e6e8ec', 0.8))
-
-    # ===== 10) ön vidalar (panelde) ve kablo =====
+    # ===== 9) ön vidalar (panelde) ve kablo =====
     for x, y in ((-109.5, 58.4), (-63.0, 8.8), (63.0, 8.8), (109.5, 58.4)):
         cyl(L.inner, 'screw', 0.0028, (_z(x), _z(y), _z(ZP)), (_z(x), _z(y), _z(ZP + 2.2)), mat('HousingGloss'), 16, bevel=0.0005)
     tube(L.body, 'cable', [(0.0, 0.0, -0.002), (0.0, 0.0, -0.016), (0.0, -0.010, -0.028)], 0.0036, mat('Cable'), 3, smooth=True)

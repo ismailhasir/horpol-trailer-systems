@@ -851,7 +851,7 @@ def render_views(pid, objs, folder, views, size=900, lit_fns=None, fmt='PNG'):
 
 
 ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan imza)
-    'stop': ('position', 'turn', 'stop'),
+    'stop': ('position', 'turn', 'stop', 'reverse', 'fog'),  # kullanıcı 2026-10-23: seçeneklerde hover'da bütün ışıklar
     'side': ('marker',),
     'front': ('front',),
     'plate': ('plate', 'position'),
@@ -861,7 +861,7 @@ ICON_LIT = {  # simgenin "yanık" hâlinde açık işlevler (ürünü tanıtan i
 }
 # yanık simgede ürüne özel şiddet çarpanı (tepe lambası: ışık kaplardan yansır, turuncu kılavuz çubuklarından zayıf kalıyordu)
 ICON_BOOST = {'ldo2660': 1.8}
-ICON_LIT_P = {'lzd2452': ('position', 'fog', 'reverse')}  # kategorinin imzası ürüne uymuyorsa (LUNA 2452: sis + geri vites)
+ICON_LIT_P = {}  # kategorinin imzası ürüne uymuyorsa ürüne özel (stop kategorisi artık bütün işlevleri yakar)
 ICON_DIR_VEC = {'arm': (0.55, 0.25, 0.8), 'beacon': (0.45, 0.45, 1.0), 'plate': (-0.35, 0.55, 1.0)}
 
 
