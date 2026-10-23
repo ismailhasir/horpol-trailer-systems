@@ -502,7 +502,7 @@ def build_mudflap(parts, mats, x, y_top, y_bot, half_w, text='TRAILER SYSTEMS', 
 # ---------------- lamba bağlantı takımları (plaka lambaları) ----------------
 # Plaka lambasının yeri seçime göre değişir (tampon türevine pişirilmez): takım lambanın yerel koordinatında pul + somun (saplamalar)
 # ve lastik rakor (kablo geçişi); site lambayla aynı dönüşümle yerleştirir. Yerel: taban düzlemi y = 0, saplamalar −y, sac kalınlığı T.
-KITS = ['ltd2834']
+KITS = ['ltd2834', 'ltd669']
 
 
 def build_kit(pid, mats, parts):
@@ -535,7 +535,7 @@ def build_kit(pid, mats, parts):
     _remove(objs)
     for xc, zc, dx, dz in boxes:
         d = max(dx, dz)
-        if d < 0.0045:  # saplama (kesit diş dibinden ince: anma M5)
+        if d < 0.0053:  # saplama (anma M5: LTD 2834'te diş dibi ~4,4, LTD 669'da 5,0); kablo Ø 5,6 ve üstü
             d = 0.005
             # pul + somun: sacın arka yüzünden (y = −T) −y yönünde (three: lamba yerel)
             cylinder(parts, 'washer', 1.05 * d, (xc, -T * MM, zc), (xc, -T * MM - 0.2 * d, zc), mats['zinc'], 20, 0.0)

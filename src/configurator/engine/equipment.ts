@@ -153,6 +153,10 @@ const LAMP_PORTS: Record<string, { amp?: Port; ss?: Partial<Record<SsOut, Port>>
   ltd2834: { tail: { p: [0, -0.03, -0.026], d: [0, -0.96, -0.27] } },
   ld2774: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
   ld2773: { tail: { p: [0, -0.019, -0.016], d: [0, -0.32, -0.95] } },
+  // LD 500 / LD 499: kablo lambanın arkasındaki yakadan (tools/blender/lamps_cad2.py)
+  ld500: { tail: { p: [0, -0.0155, -0.02], d: [0, -0.6, -0.8] } },
+  ld499: { tail: { p: [0, -0.0155, -0.02], d: [0, -0.6, -0.8] } },
+  ltd669: { tail: { p: [0, -0.03, -0.006], d: [0, -0.94, -0.34] } },
   lrd2681: { tail: { p: [0, 0.04, -0.058], d: [0, -0.707, -0.707] } },
   // RTR 3366: kısa kablo alt kenardan iner; tesisat çifti çerçevenin arkasından dorseye doğru (tamponun açık sırtından)
   rtr3366: { tail: { p: [0, -0.115, 0.002], d: [0, 0, -1] } },
@@ -381,7 +385,7 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
     if (BK && BK.plateX - BK.faceX > 0.01) for (const z of [-0.18, 0.18]) brackets.push([[BK.faceX, plateCy, z], [BK.plateX - 0.002, plateCy, z]]);
   }
   if (sideId) {
-    // LTD 2834 ve LTD 229: plakanın İKİ YANINDA (çizim HOR 47: lamba ekseni plaka kenarından 40–80 mm), TABANI taşıyıcının
+    // LTD 2834, LTD 669 ve LTD 229: plakanın İKİ YANINDA (çizim HOR 47: lamba ekseni plaka kenarından 40–80 mm), TABANI taşıyıcının
     // dikey arka yüzüne vidalı (civatalar öne, taşıyıcıya girer), ışık penceresi plakanın ortasına bakar. Yerel eksenler:
     // Y (taban → üst) = dünya +X (arkaya), Z (pencere) = plakaya doğru (∓z), X = Y × Z.
     // Çerçeve varsa lamba çerçevenin dış kenarının dışına (RTR yarı genişliği 265 mm + lamba yarı derinliği 35 mm + 12 mm pay).
@@ -395,8 +399,9 @@ export function buildEquipment(c: Config, a: Anchors, mats: Mats): EquipmentBuil
       const base = V(BK ? BK.faceX : plateFace - 0.002, plateCy, z);
       plateSpots.push({ id: sideId, pos: base, q: basis(Yw.clone().cross(Zw), Yw, Zw), entry: V(base.x - 0.02, base.y, z) });
     }
-    // ışık penceresi lambanın derinlik ortasından ~31 mm plakaya doğru
-    plateLight = { ...plateLight, side: zs.map((z) => z - Math.sign(z) * 0.031) };
+    // ışık penceresi lambanın derinlik ortasından plakaya doğru: LTD 2834 ~31 mm (70 mm derin), LTD 669 ~13 mm (30 mm derin)
+    const win = sideId === 'ltd669' ? 0.013 : 0.031;
+    plateLight = { ...plateLight, side: zs.map((z) => z - Math.sign(z) * win) };
   }
   for (const sp of plateSpots) {
     const o = mount('plate', sp.id, sp.pos, (obj) => {

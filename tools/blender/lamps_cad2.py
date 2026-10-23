@@ -709,3 +709,186 @@ def build_lrd2681_cad(L):
     prism(L.lens, 'lens_window', _m(win), _z(33.6), _z(34.6), _lmat_flat('clear'), 0.0)
     # kablo: gövdenin arka ortasındaki rakordan aşağı (sitede tesisat sürer; bağlantı noktası equipment.ts LAMP_PORTS)
     cable(L, [(0, _z(Hc - 10.0), -0.0140), (0, _z(Hc - 14.0), -0.0300), (0, 0.040, -0.058)], 0.0030)
+
+
+# =====================================================================
+# Tutuculu marker LD 500 (turuncu yan, HOR 55/SM1, 3 LED) / LD 499 (beyaz ön, HOR 55, 1 LED). Üretici STEP'leri (ek paket
+# 2026-10-22): "LD 500, 522" ve "LD 499". İkisinde de siyah gövde tabanı + arkada kablo yakası (p000), lens (p001), L tutucu
+# (p002: dikey plaka + üstte geriye flanş, 2 kaburga, 2 delik) ve 2 lens vidası (p003, p004); tutucu, gövde ve vidalar iki STEP'te
+# aynı. LD 500'ün lensinin İÇ YÜZÜNDE GERÇEK altıgen retro prizmalar, penceresinde 3 LED'lik Fresnel dilimleri var; LD 499'un lensi
+# sadeleştirilmiş (retrosuz düz levha). Fotoğraf ve çizimlere göre iki lens aynı kalıp, yalnız pencere optiği farklı: LD 499
+# LD 500'ün lensinden kurulur, penceresinde tek LED'in önünde iç içe halkalar (fotoğraf). Pencerenin ardındaki LED kartı, kablo
+# yakasındaki dolgu ve kablo CAD'de yok (fotoğraf; çizim: 2 × 0,75 kablo yakadan çıkar).
+# Kaynaklar: Downloads/LD-500.zip, LD-499.zip (2 fotoğraf, teknik çizim, homologasyon).
+# CAD ekseni (mm): x genişlik, y yukarı, z GERİYE (lens ön yüzü −5,9; tutucu plakası 2,0 … 4,5; flanş z 21'e uzanır).
+# Yerel (eski geçici modelle aynı sözleşme: yan markerin sitedeki yeri değişmez): tutucu plakasının arka yüzü Z = 0, lens +Z,
+# Y yukarı, orijin toplam yüksekliğin ortası (lens altı −15,5 … flanş üstü 34,5: y 9,5). X = −x, Y = y − 9,5, Z = 4,5 − z.
+# =====================================================================
+LD500_M = Matrix(((-1, 0, 0, 0), (0, 0, 1, -0.0045), (0, 1, 0, -0.0095), (0, 0, 0, 1)))
+LD500_YW = -9.5  # pencere (lamba) merkezinin yerel Y'si, mm
+LD500_SCREW = 37.8  # lens vidalarının x'i (CAD, ±)
+
+
+def _ld500_cad(L, fn, color):
+    cad = os.path.join(CAD_ROOT, 'ld500')
+    if not os.path.exists(os.path.join(cad, 'p004.stl')):
+        print('CAD YOK, geçici model:', cad)
+        return _s_ld500_like(L, color)
+    amber = color == 'amber'
+    lens_col = 'amber' if amber else 'clear'
+    yw = LD500_YW
+    # ===== 1) opak parçalar: dışarıdan görünen yüzler (saydam lens ışını kesmez: ardındaki gövde görünür kalır) =====
+    parts = _cad_parts(cad, LD500_M, ['p000', 'p002', 'p003', 'p004'], angle=0.5)
+    ext = _assembly_exterior(parts)
+    _plate_parts(L, parts, ext, {'p000': ([mat('Housing')], L.body, 1800), 'p002': ([mat('Housing')], L.body, 4000),
+                                 'p003': ([mat('Zinc')], L.body, 400), 'p004': ([mat('Zinc')], L.body, 400)}, 'ld500')
+
+    # ===== 2) lens: yüz yüz sınıflandırma (CAD mm) =====
+    lens = _stl(os.path.join(cad, 'p001.stl'), False)
+    if not amber:
+        # LD 499: pencerenin 3 LED'lik Fresnel dilimleri ve tabanı (z −4,5 … −4,0) silinir, delik düz tabanla kapanır
+        lens.faces.ensure_lookup_table()
+        kill = []
+        for f in lens.faces:
+            c = f.calc_center_median() * 1000
+            if abs(c.x) < 10.2 and abs(c.y) < 9.2 and -4.95 < c.z < -3.45:
+                kill.append(f)
+        bmesh.ops.delete(lens, geom=kill, context='FACES')
+        hole = [e for e in lens.edges if e.is_boundary]
+        zs = [v.co.z * 1000 for e in hole for v in e.verts]
+        print(f'LD499 window: removed {len(kill)} faces, hole edges {len(hole)}, z {min(zs):.2f}..{max(zs):.2f}')
+        bmesh.ops.holes_fill(lens, edges=hole, sides=0)
+        bmesh.ops.recalc_face_normals(lens, faces=lens.faces[:])
+    win = lambda c: abs(c.x) <= 10.0 and abs(c.y) <= 9.0
+    frm = lambda c: abs(c.x) <= 11.4 and abs(c.y) <= 10.4  # pencere tüneli (duvarları x ±11, y ±10)
+    n_r = n_o = 0
+    for f in lens.faces:
+        c = f.calc_center_median() * 1000
+        n = f.normal
+        f.material_index = 0
+        if win(c) and -4.95 < c.z < -3.45 and abs(n.z) < 0.97:
+            f.material_index = 2  # pencere optiğinin eğik yüzleri (Fresnel dilimleri): ışır
+            n_o += 1
+        elif (not frm(c) and abs(c.x) < 46.6 and abs(c.y) < 12.9 and -3.8 < c.z < -1.9 and abs(n.z) < 0.97
+              and math.hypot(abs(c.x) - LD500_SCREW, c.y) > 4.6):
+            f.material_index = 1  # iç yüzdeki retro prizmalar
+            n_r += 1
+    print(f'LD500 lens faces: retro {n_r} optic {n_o} total {len(lens.faces)}')
+    _simplify(lens, 0.5)
+    glow_off = '#e6832a' if amber else '#e9edf2'
+    # pencere lambanın ışık veren yüzü (LD 2774'ün neon çubuğu gibi); beyazda düşük: hale halkaları örtüyordu
+    optic = _gl(fn, color, glow_off, 0.55 if amber else 0.4)
+    _mesh_obj(f'ld500_lens_{lens_col}', _xf(lens, LD500_M), [_lmat_flat(lens_col), _retro_cad(fn, color, 0.16), optic], L.lens, 40,
+              decimate=None if FAST else 9000)
+    if not amber:
+        # LD 499: tek LED'in önünde iç içe Fresnel halkaları, pencerenin iç yüzünde (Z 9,0) arkaya 0,6 mm
+        for r in (1.6, 2.9, 4.2, 5.5, 6.8):
+            frame(L.lens, 'fresnel', _m(circle(r + 0.35, 40, 0.0, yw)), _m(circle(r - 0.35, 40, 0.0, yw)), _z(8.4), _z(9.0), optic, 0.0)
+
+    # ===== 3) pencerenin ardı: gövde tabanının açıklığında (CAD z 0,5 … 1,1) beyaz LED kartı, SMD LED'ler =====
+    prism(L.inner, 'led_board', _m(rrect(16.4, 16.4, 1.6, 4, 0.0, yw)), _z(3.4), _z(4.0), _gl(fn, color, '#efeee9', 0.45 if amber else 0.3), 0.0)
+    # LED'ler Fresnel dilimlerinin merkezlerinde (CAD: üstte ±4,8, altta orta; LD 499 tek LED ortada)
+    leds = [(-4.8, 3.5), (4.8, 3.5), (0.0, -3.5)] if amber else [(0.0, 0.0)]
+    for x, y in leds:
+        X, Y = -x, y + yw
+        box(L.inner, 'led_pkg', _z(X - 1.7), _z(X + 1.7), _z(Y - 1.4), _z(Y + 1.4), _z(4.0), _z(4.6), mat('Reflector'))
+        cyl(L.E(fn), 'led', 0.0010, (_z(X), _z(Y), _z(4.6)), (_z(X), _z(Y), _z(4.75)), E(fn, color), 16)
+    # kablo yakası (CAD z 2 … 13): içi dolgu reçinesi, ortasından 2 × 0,75 kablo (sitede tesisat sürer)
+    cyl(L.body, 'potting', 0.0101, (0.0, _z(yw), -0.0035), (0.0, _z(yw), -0.0043), mat('Seal'), 32)
+    tube(L.body, 'cable', [(0.0, _z(yw), -0.0043), (0.0, _z(yw), -0.0120), (0.0, _z(yw - 6.0), -0.0200)], 0.0028, mat('Cable'), 3, smooth=True)
+
+
+@product('ld500', 'LD 500', 'side', 'Turuncu yan marker (HOR 55/SM1), 3 LED, retro reflektör, L tutucu — üretici CAD + fotoğraflar')
+def build_ld500_cad(L):
+    _ld500_cad(L, 'marker', 'amber')
+
+
+@product('ld499', 'LD 499', 'front', 'Beyaz ön pozisyon (HOR 55), 1 LED, retro reflektör, L tutucu — üretici CAD (LD 500 lensi) + fotoğraflar')
+def build_ld499_cad(L):
+    _ld500_cad(L, 'front', 'white')
+
+
+# =====================================================================
+# LTD 669 — evrensel plaka lambası + arka pozisyon (çizim: plaka 3 LED 0,25 / 0,5 W, pozisyon 2 LED 0,6 / 1,2 W; 93 × 30 × 47;
+# 2 × M5 saplama, 52,5 mm; 2 × 0,75 kablo 500 mm). Üretici STEP "LTD 669" (ek paket 2026-10-22): kırmızı yarı saydam kubbe
+# (p000, içi boş kabuk, 2 mm duvar, tepesinde kabartma E işareti), yan yüzdeki şeffaf plaka penceresi (p001: önü kapalı, arkası
+# açık kutu), siyah taban (p013), kablo rakoru (p002), uçlarda iki yıldız vida (p003, p004), 2 × M5 saplama (p005, p006).
+# Saplamaların pul + somunu (p007 … p010) ve tabanın altındaki etiket (p011, p012) alınmaz: lamba tampona oturunca somunlar
+# webin arkasında (bağlantı takımı, bumpers.py KITS). İç parçalar CAD'de yok: beyaz LED kartı, 3 beyaz SMD LED ve elemanlar
+# fotoğraftan (Downloads/LTD-669.zip, picture-scaled-2); 2 kırmızı pozisyon LED'i kubbenin tepesinin altında (çizim, ayrıntı B:
+# pozisyon ışığı üstten görünür).
+# Evrensel: pencere tek yanda, aynı lamba plakanın iki yanına takılır (sitede çift, LTD 2834 gibi: taban tampona, kubbe arkaya,
+# pencere plakaya). CAD ekseni (mm): x genişlik, pencere −y (taban ortası y 45,34), yukarı +z (taban altı −6,0).
+# Yerel (LTD 2834 ile aynı sözleşme): taban altı Y = 0 (saplamalar −Y), pencere +Z. Blender'da (x, y − 45,34, z + 6,0).
+# =====================================================================
+LTD669_M = Matrix(((1, 0, 0, 0), (0, 1, 0, -0.04534), (0, 0, 1, 0.0060), (0, 0, 0, 1)))
+
+
+def _ltd669_dome(gain=0.3):
+    """Kubbe: yoğun kırmızı yarı saydam (fotoğraf: Lens.red'den koyu ve az geçirgen); kubbenin kendisi pozisyon ışığı veren yüzey:
+    yanınca bütünü gain oranında kırmızı ışır (sitede Lens.* ışımıyor; alttaki ışık katmanı tek başına %60 opak kubbenin ardında
+    sönük kalıyordu). Ad E.position.red.g<yüzde>.dome: site işlev malzemesi olarak yakar, saydamlık GLB'den gelir."""
+    key = f'E.position.red.g{int(round(gain * 100))}.dome'
+    if key not in MATS:
+        m = _lmat_flat('red').copy()
+        m.name = key
+        p = m.node_tree.nodes['Principled BSDF']
+        p.inputs['Base Color'].default_value = srgb('#b3070f')
+        p.inputs['Alpha'].default_value = 0.6
+        p.inputs['Emission Color'].default_value = (*GLOW['red'], 1.0)
+        p.inputs['Emission Strength'].default_value = 0.0
+        m['fn'] = 'position'
+        m['gain'] = gain
+        if 'lens' in m:
+            del m['lens']  # set_icon_glass lens saydamlığını tablodan (kırmızı 0,32) yazmasın
+        MATS[key] = m
+    return MATS[key]
+
+
+@product('ltd669', 'LTD 669', 'plate', 'Evrensel plaka lambası + kırmızı arka pozisyon, 3 + 2 LED, 2 × M5 — üretici CAD + fotoğraflar')
+def build_ltd669_cad(L):
+    cad = os.path.join(CAD_ROOT, 'ltd669')
+    if not os.path.exists(os.path.join(cad, 'p013.stl')):
+        print('CAD YOK (LTD 669 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    # ===== 1) opak parçalar (saydam kubbe ve pencere ışını kesmez: içleri görünür) =====
+    parts = _cad_parts(cad, LTD669_M, ['p002', 'p003', 'p004', 'p005', 'p006', 'p013'], angle=0.5)
+    ext = _assembly_exterior(parts)
+    zinc, steel = mat('Zinc'), mat('Stainless')
+    _plate_parts(L, parts, ext, {'p013': ([mat('Housing')], L.body, 4000), 'p002': ([mat('Rubber')], L.body, 300),
+                                 'p003': ([zinc], L.body, 300), 'p004': ([zinc], L.body, 300),
+                                 'p005': ([steel], L.body, 200), 'p006': ([steel], L.body, 200)}, 'ltd669')
+
+    # ===== 2) kubbe (iç yüzü pencereden ve duvardan görünür: bütünü) + tepenin altında pozisyon ışığı katmanı =====
+    dome = _stl(os.path.join(cad, 'p000.stl'), LTD669_M)
+    _drop_small(dome, lambda mn, mx, n: n < 10)
+    # tepenin iç yüzü (CAD z 39; taban altından 45 mm): aşağı bakan yüzler. Kopyası 0,4 mm altta, kubbeye (yukarı) bakar
+    top = _subset(dome, lambda f: f.normal.z < -0.25 and f.calc_center_median().z > 0.040)
+    bmesh.ops.reverse_faces(top, faces=top.faces[:])
+    _move(top, (0, 0, -0.0004))
+    print('LTD669 dome top faces', len(top.faces))
+    _simplify(dome, 0.5)
+    _mesh_obj('ltd669_dome', dome, [_ltd669_dome()], L.E('position'), 35, decimate=None if FAST else 9000)
+    _simplify(top, 0.5)
+    _mesh_obj('ltd669_pos', top, [_gl('position', 'red', '#5a0b10', 0.7)], L.E('position'), 35, decimate=None if FAST else 1500)
+    # plaka penceresi: şeffaf kutu (iç yüzü kaburgalı)
+    win = _stl(os.path.join(cad, 'p001.stl'), LTD669_M)
+    _simplify(win, 0.5)
+    _mesh_obj('ltd669_window', win, [_lmat_flat('clear')], L.lens, 35, decimate=None if FAST else 3000)
+
+    # ===== 3) iç: pencerenin ardında dikey beyaz LED kartı (CAD y 45,6 … 46,6), 3 beyaz SMD LED, elemanlar; tepesinde pozisyon kartı =====
+    prism(L.inner, 'pcb', _m(rrect(45.0, 23.5, 1.0, 3, 0.0, 20.25)), _z(-1.26), _z(-0.26), _gl('plate', 'white', '#e9eae5', 0.5), 0.0)
+    yl = 22.0  # pencerenin ortası (CAD z 16)
+    for x in (-12.5, 0.0, 12.5):
+        box(L.inner, 'led_pkg', _z(x - 1.75), _z(x + 1.75), _z(yl - 1.4), _z(yl + 1.4), _z(-0.26), _z(0.6), mat('Reflector'))
+        box(L.E('plate'), 'led', _z(x - 1.1), _z(x + 1.1), _z(yl - 1.1), _z(yl + 1.1), _z(0.6), _z(0.75), E('plate', 'white'))
+    for x, w, h in ((-6.5, 3.0, 5.0), (16.5, 3.2, 5.5), (5.5, 2.0, 1.2)):
+        box(L.inner, 'chip', _z(x - w / 2), _z(x + w / 2), _z(yl - h / 2), _z(yl + h / 2), _z(-0.26), _z(0.9), mat('HousingGloss'))
+    for dy in (-3.6, 3.6):
+        cyl(L.inner, 'pad', 0.0012, (_z(-17.5), _z(yl + dy), _z(-0.26)), (_z(-17.5), _z(yl + dy), _z(0.1)), mat('Zinc'), 16)
+    box(L.inner, 'pos_board', _z(-14.0), _z(14.0), _z(33.0), _z(34.0), _z(-3.5), _z(0.5), _gl('position', 'red', '#e2e3df', 0.25))
+    for x in (-9.0, 9.0):
+        box(L.inner, 'led_pkg', _z(x - 1.6), _z(x + 1.6), _z(34.0), _z(34.6), _z(-3.1), _z(0.1), mat('Reflector'))
+        box(L.E('position'), 'led', _z(x - 1.0), _z(x + 1.0), _z(34.6), _z(34.75), _z(-2.5), _z(-0.5), E('position', 'red'))
+    # kablo: tabanın altındaki rakordan webin içinden geriye (sitede tesisat sürer; bağlantı noktası equipment.ts LAMP_PORTS)
+    tube(L.body, 'cable', [(0.0, -0.0002, 0.0), (0.0, -0.0140, 0.0), (0.0, -0.0300, -0.0060)], 0.0029, mat('Cable'), 3, smooth=True)

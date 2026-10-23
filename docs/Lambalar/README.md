@@ -314,6 +314,29 @@ Betik `tools/blender/lamps_cad2.py` (sonu). STEP → STL: `tools/blender/cad/lzd
 | LZD 3141 LIZARD (HOR 145AD, universal) | 252 × 27 × 21 | position (22 üçgen kılavuz), stop (uçlarda 2 + 2 altıgen), turn (ortada 8 altıgen; föyde dinamik, sitede sabit) | STEP: lens, uç kapakları, arka kapak, taban; iç fotoğraftan |
 | LRD 2681 (HOR 111) | 101 × 127 × 50,5, M8 | work (12 LED halka), work+reverse (ortadaki 3 büyük LED) | STEP'i yok: **aynı gövdenin LRD 2679 STEP'i** (gövde, ön çerçeve, C braket, cıvata, pul, somun, ped); orta beyaz blok ve halka 2681 fotoğraflarından |
 
-- **Site (kullanıcı 2026-10-23):** yeni kategori `strip` "Arka şerit lambalar", **yalnız standart dorse** (`CategoryDef.only`), bir çift. Montaj haritası `strip`: arka çerçevenin üst başlığı, kırmızı kontur bandının üstü, dış uç kenardan 30 mm içte; sağ lamba lens ekseni çevresinde 180° döner (kırmızı uç iki yanda dışta).
+- **Site (kullanıcı 2026-10-23):** yeni kategori `strip` "Arka şerit lambalar", **yalnız standart dorse** (`CategoryDef.only`), bir çift. Montaj haritası `strip`: arka çerçevenin üst başlığı, kırmızı kontur bandının üstü, dış uç kenardan 30 mm içte; sağ lamba lens ekseni çevresinde 180° döner (lambanın −X ucu iki yanda dışta: LZD 2246'da turuncu sinyal, LZD 3141'de uçtaki fren).
 - **Kablolama:** stop LZD 3194 ise aynı yandaki lambanın boştaki 4. Superseal çıkışından (sinyal yanıp sönmeli pozisyon; kör tapa kalkar), değilse Horpol modülünün ön yüzündeki dış Superseal'lerden, yan hattın içinden. Uzatma şasiden köşe dikmesinin içinden başlığa çıkar; lambanın 1 m kablosuyla hat içi Superseal çifti.
 - **Doğrulanmadı:** şerit lambaların başlıktaki tam yüksekliği ve yatay mı takıldığı (kullanıcı "üst köşeler" dedi); LZD 3194'ün 4. çıkışının şerit lambaya uygun devre olduğu (föyde "sinyal yanıp sönmeli pozisyon"); LRD 2681'in LRD 2679 ile aynı gövde olduğu (çizim ve fotoğraflar aynı; 2681'in kendi STEP'i hâlâ yok).
+
+## 12. LD 500, LD 499 ve LTD 669 CAD'den (2026-10-23)
+
+Betik `tools/blender/lamps_cad2.py` (sonu; `lamps_small.py`'deki geçici LD 500 / LD 499 modelleri CAD yoksa yedek). STEP → STL: `tools/blender/cad/ld500` ("LD 500, 522"), `ld499`, `ltd669` (ek paket 2026-10-22). Ürün paketleri: `Downloads/LD-500.zip`, `LD-499.zip`, `LTD-669.zip` (fotoğraf, teknik çizim).
+
+```bash
+blender -b -P tools/blender/lamps.py -- --only ld500,ld499,ltd669 --icons
+blender -b -P tools/blender/bumpers.py -- --kits   # plaka lambası bağlantı takımları (mount-ltd2834, mount-ltd669)
+npm run models:pack -- lamp-ld500 lamp-ld499 lamp-ltd669 mount-ltd669 mount-ltd2834
+```
+
+| Ürün | Ölçü (mm) | İşlevler (EMIT) | Kaynak |
+|---|---|---|---|
+| LD 500 (HOR 55/SM1) | lens 98 × 31; toplam yükseklik 50, derinlik 27; flanş delikleri 50 | marker: pencere (3 LED'lik Fresnel dilimleri + LED kartı), retro hafif | STEP: gövde + kablo yakası, lens (**iç yüzde gerçek retro prizmalar**, pencere optiği), L tutucu, 2 vida. LED kartı, yaka dolgusu, kablo fotoğraf / çizimden |
+| LD 499 (HOR 55) | LD 500 ile aynı | front: pencere (tek LED, iç içe halkalar) | LD 499 STEP'inin lensi sadeleştirilmiş (retrosuz): **LD 500'ün lensi** kullanıldı, pencere optiği silinip fotoğraftaki halkalar eklendi |
+| LTD 669 (evrensel) | 93 × 30 × 47; 2 × M5 (52,5) | position: kırmızı yarı saydam kubbenin bütünü + tepenin altında katman + 2 kırmızı LED; plate: beyaz LED kartı + 3 SMD LED | STEP: kubbe (içi boş, tepesinde kabartma E işareti), şeffaf pencere kutusu, taban, rakor, uç vidaları, saplamalar. Saplamaların somunları ve tabanın altındaki etiket alınmadı. İç (kart, LED'ler, elemanlar) fotoğraftan |
+
+- **Yerleşim değişmedi:** LD 500 / LD 499 geçici modelle aynı yerel eksende (tutucu plakasının arka yüzü Z = 0, orijin toplam yüksekliğin ortası). LTD 669, LTD 2834 ile aynı sözleşmede: taban tampona, kubbe arkaya, pencere plakaya. Plakanın iki yanında aynı lamba (pencere tek yanda, evrensel); adet hâlâ varsayım.
+- **Site:** LD 500 / LD 499 / LTD 669 için `LAMP_PORTS` kablo uçları (Superseal çifti lambanın kısa kablosunda). Plaka ışığının kaynağı lambanın penceresinde: LTD 669 30 mm derin olduğu için 13 mm (LTD 2834: 31 mm).
+- **Bağlantı takımı:** `bumpers.py` KITS'e `ltd669` eklendi. Saplama / kablo ayrımı kesit genişliğiyle: eşik 4,5 → 5,3 mm. İki lambanın M5 saplaması da kesitte 5,0 mm: eski eşikle LTD 2834'ün saplamaları da somun yerine lastik rakor alıyordu (düzeldi).
+- **Kubbe malzemesi:** `E.position.red.g30.dome` (yarı saydam, %60 opak, kendisi ışır). Sitede `Lens.*` ışımıyor; kubbenin altındaki katman tek başına sönük kalıyordu. Ad `E.` ile başladığı için `lens` etiketi silindi (`set_icon_glass` kırmızı lens saydamlığını 0,32'ye çekiyordu).
+- **Işık oranları:** pencere optiği amber 0,55, beyaz 0,4 (beyazın halesi halkaları örtüyordu); LED kartı amber 0,45, beyaz 0,3; LTD 669 kubbe tepesi katmanı 0,7, LED kartı 0,5.
+- **Doğrulanmadı:** LD 500'ün 3 LED'inin yerleri (Fresnel dilimlerinin merkezlerinden), LED kartının derinliği; LTD 669'un kırmızı LED'lerinin yeri ve sayısı (çizimde 2 LED, yeri fotoğrafta görünmüyor), plaka LED'lerinin yatay aralığı (fotoğraftan ±12,5).

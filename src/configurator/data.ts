@@ -176,7 +176,7 @@ export const CATEGORIES: CategoryDef[] = [
     color: '#f4f7ff',
     products: [
       // plaka lambaları plakanın iki yanında çift (çizim HOR 47); LED aydınlatmalı plaka çerçevesi (HOR 160) plakanın yerine tek.
-      // LTD 669 da çift varsayıldı (montaj biçimi doğrulanmadı).
+      // LTD 669 evrensel (STEP + çizim: pencere tek yanda, aynı lamba iki yana takılır): LTD 2834 gibi çift (adet doğrulanmadı).
       { id: 'ltd2834', code: 'LTD 2834', fixed: 2 },
       { id: 'ltd669', code: 'LTD 669', fixed: 2 },
       { id: 'rtr3366', code: 'RTR 3366', fixed: 1 },
