@@ -191,6 +191,9 @@ export const CATEGORIES: CategoryDef[] = [
     products: [
       { id: 'ldcc2698', code: 'LDCC 2698' },
       { id: 'ld2994', code: 'LD 2994 Dragon' },
+      // kısa saplı gabari lambaları (kullanıcı 2026-10-23: lastik kol kategorisinde; yerleşim LD 2994 / LDCC 2698 ile aynı)
+      { id: 'ld3065', code: 'LD 3065 Dragon' },
+      { id: 'ldcc2776', code: 'LDCC 2776' },
     ],
   },
   {

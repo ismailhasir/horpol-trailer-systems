@@ -892,3 +892,147 @@ def build_ltd669_cad(L):
         box(L.E('position'), 'led', _z(x - 1.0), _z(x + 1.0), _z(34.6), _z(34.75), _z(-2.5), _z(-0.5), E('position', 'red'))
     # kablo: tabanın altındaki rakordan webin içinden geriye (sitede tesisat sürer; bağlantı noktası equipment.ts LAMP_PORTS)
     tube(L.body, 'cable', [(0.0, -0.0002, 0.0), (0.0, -0.0140, 0.0), (0.0, -0.0300, -0.0060)], 0.0029, mat('Cable'), 3, smooth=True)
+
+
+# =====================================================================
+# Kısa saplı gabari lambaları (kullanıcı 2026-10-23: lastik kol kategorisinde, LD 2994 / LDCC 2698 ile aynı yerleşim).
+# Sözleşme (lamps_cad.py LD_M / LDCC_M ile aynı): taban plakasının duvar yüzü Z = 0, Z dışa, Y yukarı, beyaz yüz −X (öne),
+# kırmızı +X (arkaya), uçta turuncu (yana); orijin plakanın merkezi.
+# =====================================================================
+# LD 3065 DRAGON kısa (LD 2994'ün kısa saplı kardeşi). Üretici STEP "LD 3065" (ek paket 2026-10-22): taban plakası + sap + fasetli
+# kafa gövdesi (p002), beyaz yüzün ⟨ ⟩ ışık kılavuzları ve uçtaki iki turuncu blok (p000), kırmızı yüzün kılavuzları (p001),
+# 2 cıvata (p003, p004), kablo (p005, duvarın içinde: alınmaz). Kaynak: Downloads/LD-3065.zip (fotoğraflar; yanık: beyaz çift
+# şevron + turuncu uç).
+# CAD ekseni (mm): dışa +x (plakanın duvar yüzü x 209,7), plaka yüksekliği z (±52,6), kafanın iki yüzü ±y (beyaz +y; merkez
+# y −57,35). Yerel: X = −(y + 57,35), Y = −z (model z'de simetrik), Z = x − 209,7.
+LD3065_M = Matrix(((0, -1, 0, -0.05735), (-1, 0, 0, 0.2097), (0, 0, -1, 0), (0, 0, 0, 1)))
+
+
+@product('ld3065', 'LD 3065', 'arm', 'DRAGON kısa saplı gabari lambası: beyaz / kırmızı neon şevron, turuncu uç — üretici CAD')
+def build_ld3065_cad(L):
+    cad = os.path.join(CAD_ROOT, 'ld3065')
+    if not os.path.exists(os.path.join(cad, 'p004.stl')):
+        print('CAD YOK (LD 3065 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    parts = _cad_parts(cad, False, ['p000', 'p001', 'p002', 'p003', 'p004'], angle=0.5)
+    ext = _assembly_exterior(parts)
+    # gövde: sap ve plaka kauçuk, kafa (x > 233) sert plastik
+    body = parts.pop('p002')
+    keep = ext['p002']
+    for nm, sel, mats_, dec in (('arm', lambda c: c.x < 0.233, [mat('Rubber')], 6000), ('head', lambda c: c.x >= 0.233, [mat('Housing')], 6000)):
+        sb = _subset(body, lambda f: keep[f.index] and sel(f.calc_center_median()))
+        _simplify(sb, 1.0)
+        _mesh_obj('ld3065_' + nm, _xf(sb, LD3065_M), mats_, L.body, 35, decimate=None if FAST else dec)
+    body.free()
+    off = {'white': '#dde1e6', 'red': '#a3201b', 'amber': '#e39a35'}
+    guides = {'white': (parts.pop('p000'), ext['p000']), 'red': (parts.pop('p001'), ext['p001'])}
+    for side, (b, ex) in guides.items():
+        # uçtaki turuncu bloklar merkeze yakın (|z| < 10,8 mm); şevronların uç kolları daha dışta (|z| ≥ 12)
+        amb = lambda c: c.x > 0.2960 and abs(c.z) < 0.0108
+        for key, sel in ((side, lambda c: not amb(c)), ('amber', amb)):
+            sb = _subset(b, lambda f: ex[f.index] and sel(f.calc_center_median()))
+            if not sb.faces:
+                sb.free()
+                continue
+            print('LD3065', side, key, len(sb.faces))
+            _simplify(sb, 1.0)
+            _mesh_obj(f'neon_{side}_{key}', _xf(sb, LD3065_M), [_emat('outline', key, off[key], 'cad')], L.E('outline'), 40,
+                      decimate=None if FAST else 2500)
+        b.free()
+    for nm in ('p003', 'p004'):
+        sb = _subset(parts[nm], lambda f: ext[nm][f.index])
+        parts[nm].free()
+        _simplify(sb, 2.0)
+        _mesh_obj('ld3065_' + nm, _xf(sb, LD3065_M), [mat('Zinc')], L.body, 35, decimate=None if FAST else 300)
+
+
+# LDCC 2776 kısa saplı gabari lambası. Üretici STEP "LDCC 2776, 2777" (ek paket 2026-10-22): TEK parça dış zarf (p000: plaka,
+# sap, kafa; lens yüzleri, LED piramitleri, uçtaki turuncu pencere aynı kabukta) + uçta iki ince iç levha (p001, p002; alınmaz).
+# Yüzler sınıflanır; lensin ardındaki katmanlar fotoğraflardan (Downloads/LDCC-2776.zip): iki yüzde de şeffaf lens, ardında
+# gümüş reflektör, iki uçta 5'er LED piramidi; ortadaki pencere beyaz yüzde logolu gümüş panel, kırmızı yüzde kırmızı
+# reflektör + 2 LED; uçta turuncu lens.
+# CAD ekseni (mm): dışa +x (plakanın duvar yüzü x −52,7; ardındaki pimler duvarın içinde, alınmaz), yukarı +y (plaka merkezi
+# y −0,2), lens yüzleri ±z (beyaz +z; yüz düzlemi ±18,5, orta pencere ±17, LED piramitleri ±20'ye çıkar).
+LDCC2776_M = Matrix(((0, 0, -1, 0), (-1, 0, 0, -0.0527), (0, 1, 0, 0.0002), (0, 0, 0, 1)))
+
+
+@product('ldcc2776', 'LDCC 2776', 'arm', 'Kısa saplı gabari lambası: beyaz / kırmızı, turuncu uç, LED piramitleri — üretici CAD + fotoğraflar')
+def build_ldcc2776_cad(L):
+    cad = os.path.join(CAD_ROOT, 'ldcc2776')
+    if not os.path.exists(os.path.join(cad, 'p000.stl')):
+        print('CAD YOK (LDCC 2776 yalnız CAD verisinden kurulur):', cad)
+        return 'skip'
+    raw = _stl(os.path.join(cad, 'p000.stl'), False)
+    # lensin dış hattı yüz düzleminin (±18,5; x −25,7 … 35,4, y ±23,7) 4 mm içinde, köşeleri 6 mm pahlı (fotoğraf: kauçuk çerçeve).
+    # Düzlem bu hattan kesilir: yüz merkeziyle sınıflama büyük üçgenlerde dişli kenar bırakıyordu
+    LX0, LX1, LY, CH = -21.7, 31.4, 19.7, 6.0
+    cuts = [((LX0, 0, 0), (1, 0, 0)), ((LX1, 0, 0), (1, 0, 0)), ((0, LY, 0), (0, 1, 0)), ((0, -LY, 0), (0, 1, 0))]
+    for sx, x in ((1, LX1), (-1, LX0)):
+        for sy in (1, -1):
+            cuts.append(((x - sx * CH, sy * LY, 0), (sx, sy, 0)))
+    for co, no in cuts:
+        bmesh.ops.bisect_plane(raw, geom=raw.verts[:] + raw.edges[:] + raw.faces[:], plane_co=Vector(co) / 1000, plane_no=Vector(no).normalized())
+    bmesh.ops.triangulate(raw, faces=raw.faces[:], quad_method='BEAUTY', ngon_method='EAR_CLIP')
+    raw.faces.ensure_lookup_table()
+
+    def in_lens(c):
+        if not (LX0 <= c.x <= LX1 and abs(c.y) <= LY):
+            return False
+        return all(sx * (c.x - (LX1 if sx > 0 else LX0)) + sy * (c.y - sy * LY) <= -CH + 1e-3 for sx in (1, -1) for sy in (1, -1)) or             (LX0 + CH <= c.x <= LX1 - CH) or abs(c.y) <= LY - CH
+
+    def zone(f):
+        c = f.calc_center_median() * 1000
+        n = f.normal
+        if c.x < -52.9:
+            return None  # duvarın içindeki pimler
+        sg = 1 if c.z > 0 else -1
+        side = 'white' if sg > 0 else 'red'
+        zs = c.z * sg
+        if zs > 18.65 and in_lens(c):
+            return 'led_' + side  # LED piramitleri (yüz düzleminin üstünde)
+        if n.z * sg > 0.99 and abs(zs - 17.0) < 0.15:
+            return 'win_' + side  # orta pencere (x −15,5 … 25,3, y ±13,2): logo paneli / kırmızı reflektör
+        if 16.95 < zs < 18.45 and abs(n.z) < 0.99 and -15.8 < c.x < 25.6 and abs(c.y) < 13.5:
+            return 'lens_' + side  # pencerenin duvarları: lensin parçası
+        if n.z * sg > 0.99 and abs(zs - 18.5) < 0.2 and in_lens(c):
+            return 'lens_' + side
+        return 'body'
+    zones = [zone(f) for f in raw.faces]
+    counts = {}
+    for z in zones:
+        counts[z] = counts.get(z, 0) + 1
+    print('LDCC2776 zones', counts)
+    sub = lambda key: _subset(raw, lambda f: zones[f.index] == key)
+    b = sub('body')
+    _simplify(b, 1.0)
+    _mesh_obj('ldcc2776_body', _xf(b, LDCC2776_M), [mat('Rubber')], L.body, 35, decimate=None if FAST else 12000)
+    off = {'white': '#dde1e6', 'red': '#a3201b'}
+    for side, sg in (('white', 1.0), ('red', -1.0)):
+        # lens yüzü (pencere, duvarları ve piramitler dahil): şeffaf
+        lens = _subset(raw, lambda f: zones[f.index] in (f'lens_{side}', f'win_{side}', f'led_{side}'))
+        _simplify(lens, 1.0)
+        _mesh_obj(f'ldcc2776_lens_{side}', _xf(lens, LDCC2776_M), [_lmat_flat('clear')], L.lens, 40, decimate=None if FAST else 3000)
+        # lensin 0,8 mm ardında gümüş reflektör: yanınca LED'in ışığını yansıtır
+        refl = sub(f'lens_{side}')
+        _simplify(refl, 1.0)
+        _mesh_obj(f'ldcc2776_refl_{side}', _xf(_move(refl, (0, 0, -0.0008 * sg)), LDCC2776_M), [_refl('outline', side, 0.3)], L.inner, 40,
+                  decimate=None if FAST else 2000)
+        # orta pencere 1 mm geride: beyaz yüzde logolu gümüş panel, kırmızı yüzde kırmızı reflektör
+        win = sub(f'win_{side}')
+        _simplify(win, 1.0)
+        wm = _refl('outline', 'white', 0.45) if side == 'white' else _gl('outline', 'red', '#b0141c', 0.5)
+        _mesh_obj(f'ldcc2776_win_{side}', _xf(_move(win, (0, 0, -0.0010 * sg)), LDCC2776_M), [wm], L.inner, 40)
+        # LED piramitleri: ışık veren optik
+        led_ = sub(f'led_{side}')
+        _mesh_obj(f'ldcc2776_led_{side}', _xf(led_, LDCC2776_M), [_emat('outline', side, off[side], 'cad')], L.E('outline'), 40)
+    # kırmızı yüzün ortasında 2 kırmızı LED (fotoğraf 3-1), lens penceresi (yerel X 17) ile kırmızı reflektörün (X 16) arasında
+    for x in (8.0, 14.0):
+        cyl(L.E('outline'), 'led_red_center', 0.0012, (0.0166, 0.0, x / 1000 + 0.0527), (0.0161, 0.0, x / 1000 + 0.0527),
+            E('outline', 'red'), 16)
+    # uçtaki turuncu lens STEP'te yok: yalnız yuvası var (CAD x 39,2 … 45, y ±14, z ±8; 6 mm derin). Fotoğraftaki gibi yuvayı
+    # dolduran, uçtan 0,8 mm taşan turuncu lens; dibinde ışık veren katman. Yerel: X = −z, Y = y + 0,2, Z = x + 52,7
+    box(L.E('outline'), 'amber_glow', _z(-7.7), _z(7.7), _z(-13.6), _z(14.0), _z(91.95), _z(92.5), _emat('outline', 'amber', '#e39a35', 'cad'))
+    # lensin ön yüzünün 1 mm ardında ikinci ışık katmanı: dipteki tek başına 6 mm turuncu lensin ardında sönük kalıyordu
+    box(L.E('outline'), 'amber_glow_front', _z(-7.0), _z(7.0), _z(-12.9), _z(13.3), _z(97.2), _z(97.5), _gl('outline', 'amber', '#e8892a', 0.6))
+    box(L.lens, 'amber_lens', _z(-7.85), _z(7.85), _z(-13.75), _z(14.15), _z(92.5), _z(98.5), _lmat_flat('amber'), 0.0012)
+    raw.free()

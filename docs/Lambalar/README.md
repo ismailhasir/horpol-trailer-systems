@@ -340,3 +340,21 @@ npm run models:pack -- lamp-ld500 lamp-ld499 lamp-ltd669 mount-ltd669 mount-ltd2
 - **Kubbe malzemesi:** `E.position.red.g30.dome` (yarı saydam, %60 opak, kendisi ışır). Sitede `Lens.*` ışımıyor; kubbenin altındaki katman tek başına sönük kalıyordu. Ad `E.` ile başladığı için `lens` etiketi silindi (`set_icon_glass` kırmızı lens saydamlığını 0,32'ye çekiyordu).
 - **Işık oranları:** pencere optiği amber 0,55, beyaz 0,4 (beyazın halesi halkaları örtüyordu); LED kartı amber 0,45, beyaz 0,3; LTD 669 kubbe tepesi katmanı 0,7, LED kartı 0,5.
 - **Doğrulanmadı:** LD 500'ün 3 LED'inin yerleri (Fresnel dilimlerinin merkezlerinden), LED kartının derinliği; LTD 669'un kırmızı LED'lerinin yeri ve sayısı (çizimde 2 LED, yeri fotoğrafta görünmüyor), plaka LED'lerinin yatay aralığı (fotoğraftan ±12,5).
+
+## 13. Kısa saplı gabari lambaları LD 3065 ve LDCC 2776 (2026-10-23)
+
+Kullanıcı 2026-10-23 akşamı: lastik kol kategorisine (`arm`) eklendi, yerleşim LD 2994 / LDCC 2698 ile aynı. Betik `tools/blender/lamps_cad2.py` (sonu); STEP → STL `tools/blender/cad/ld3065`, `ldcc2776`; ürün paketleri `Downloads/LD-3065.zip`, `LDCC-2776.zip`.
+
+```bash
+blender -b -P tools/blender/lamps.py -- --only ld3065,ldcc2776 --icons
+npm run models:pack -- lamp-ld3065 lamp-ldcc2776
+```
+
+| Ürün | İşlevler (EMIT) | Kaynak |
+|---|---|---|
+| LD 3065 DRAGON kısa | outline: beyaz yüzde ⟨ ⟩ çift şevron, kırmızı yüzde aynısı, uçta 2 turuncu blok | STEP: taban + sap + fasetli kafa (sap ve plaka kauçuk, kafa sert plastik), beyaz kılavuz + turuncu bloklar (tek parça, uçtaki bloklar \|z\| < 10,8 mm'den ayrıldı), kırmızı kılavuz, 2 cıvata. Kablo duvarın içinde: alınmadı |
+| LDCC 2776 | outline: iki yüzde 5'er LED piramidi, beyaz yüzde logolu gümüş panel, kırmızı yüzde kırmızı reflektör + 2 LED, uçta turuncu | STEP **tek parça dış zarf**: yüzler sınıflandı (düzlem üyeliği). Lens hattı yüz düzleminin 4 mm içinde, 6 mm pahlı; düzlem bu hattan kesildi (yüz merkeziyle sınıflama dişli kenar bırakıyordu). Lensin ardındaki gümüş reflektör ve pencere panelleri, uçtaki turuncu lens (STEP'te yalnız 6 mm'lik yuvası var) fotoğraflardan |
+
+- **Yerel eksen** (kol sözleşmesi): plakanın duvar yüzü Z = 0, Z dışa, Y yukarı, beyaz −X, kırmızı +X, orijin plaka merkezi. LD 3065: X = −(y + 57,35), Y = −z, Z = x − 209,7. LDCC 2776: X = −z, Y = y + 0,2, Z = x + 52,7.
+- **Site:** LZD 3194 seçiliyse kol yine LDCC 2698'e kilitli (`armForStop`), yeni kollar diğer stoplarla seçilir.
+- **Doğrulanmadı:** LD 3065'te hangi kılavuzun beyaz / kırmızı olduğu (STEP'te parça adı ve renk yok; fotoğraf yönünden), LDCC 2776'nın lens hattı (fotoğraftan), turuncu lensin biçimi (fotoğrafta dikey kaburgalı; modelde düz).
