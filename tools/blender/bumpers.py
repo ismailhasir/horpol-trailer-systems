@@ -359,7 +359,9 @@ def build_set(variant, mats, parts):
         if m < 0.016:  # saplama / cıvata: Ø + 1 mm delik, arkada pul + somun
             holes.append(_circle(zc / MM, yc / MM, (m + 0.001) / MM, 20))
             hw.append(('stud', zc, yc, m))
-        elif m / max(n, 1e-6) < 1.35:  # yuvarlak fiş / rakor: + 3 mm delik, arkada lastik rakor
+        elif m < 0.032 and m / max(n, 1e-6) < 1.35:  # yuvarlak fiş / rakor (Ø < 32 mm): + 3 mm delik, arkada lastik rakor
+            # (büyük kareye yakın kesitler soket bloğudur, ör. LZD 3194'ün 46 × 40 Superseal plakası: dar dikdörtgen kesik; önceden
+            # en/boy oranına bakıldığı için Ø49 daire deliniyordu, kullanıcı 2026-10-23)
             holes.append(_circle(zc / MM, yc / MM, (m + 0.003) / MM, 40))
             hw.append(('grommet', zc, yc, m + 0.003))
         else:

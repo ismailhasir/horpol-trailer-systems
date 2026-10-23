@@ -25,6 +25,7 @@ import sys
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 FAST = '--fast' in argv
 ANCHORS_ONLY = '--anchors' in argv
+BUMPERS_ONLY = '--bumpers' in argv  # yalnız tampon türevleri: tools/blender/out/<tip>-bumper-*.glb
 PREVIEW = os.path.abspath(argv[argv.index('--preview') + 1]) if '--preview' in argv else None
 OUT_DIR = os.path.abspath('src/assets/models')
 RAW_DIR = os.path.abspath('tools/blender/out')
@@ -38,7 +39,7 @@ from bl_common import (  # noqa: E402
     poly_tube, prism_xy, prism_zy, rear_quad, rect_x, rect_y, run_bake, select_only, side_quad, smart_uv, tex_material,
     write_anchors,
 )
-from bumpers import BUMPERS, MM as BMM, T as BT, anchors_for, build_mudflap, export_variants, web_x  # noqa: E402
+from bumpers import BUMPERS, LEN as BUMPER_LEN, MM as BMM, T as BT, anchors_for, build_mudflap, export_variants, web_x  # noqa: E402
 
 scene = bpy.context.scene
 
@@ -548,10 +549,12 @@ def bumper_extras(Q, kind):
         for dz in (-0.02, 0.02):
             cylinder(Q, 'bolt_head', 0.0095, (lip + BT * BMM, LAMP_Y + dy, z + dz), (lip + BT * BMM + 0.008, LAMP_Y + dy, z + dz), MQ['zinc'], 6, 0.001)
     yb = LAMP_Y - dy
-    Q.objs.append(build_mudflap(Q, MQ, lip - 0.0145, yb + 0.014, 0.10, 1.15))
+    Q.objs.append(build_mudflap(Q, MQ, lip - 0.0145, yb + 0.014, 0.10, BUMPER_LEN / 2 * BMM))  # tampon genişliğinde
 
 
 export_variants('lowbed', BUMPER_X, LAMP_Y, MQ, bumper_extras, RAW_DIR)
+if BUMPERS_ONLY:  # yalnız tampon türevleri (lamba eklenince; AO pişirme ve render yok, dakikalar yerine saniyeler)
+    raise SystemExit(0)
 decor = join(N, 'LbChassisDecor')
 tiled = join(T, 'LbChassisTiled')
 planar_uv(tiled, DECK_UV)

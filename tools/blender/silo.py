@@ -27,6 +27,7 @@ import sys
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 FAST = '--fast' in argv
 ANCHORS_ONLY = '--anchors' in argv
+BUMPERS_ONLY = '--bumpers' in argv  # yalnız tampon türevleri: tools/blender/out/<tip>-bumper-*.glb
 PREVIEW = os.path.abspath(argv[argv.index('--preview') + 1]) if '--preview' in argv else None
 OUT_DIR = os.path.abspath('src/assets/models')
 RAW_DIR = os.path.abspath('tools/blender/out')
@@ -530,7 +531,7 @@ for s in (-1, 1):
     box2(C, 'underrun_cap', -0.135, -0.005, 0.295, 0.425, s * 1.18, s * 1.2, M['rubber'], 0.005)
 # eski paça levhası, reflektörleri ve logosu yerine tek parça tozluk (TRAILER SYSTEMS); boşaltma borusunun rakoruna delik
 MF = {'rubber': M['rubber'], 'zinc': material('MudflapZinc', '#b8bdc2', 0.3, 1.0), 'print': material('MudflapPrint', '#f2f3f5', 0.5, 0.0)}
-chassis_logos = build_mudflap(C, MF, -0.01, 0.33, 0.10, 1.15, holes=[(-0.22, 0.38, 0.085)])  # demirin (0,30–0,42) alt kenarına kenetli
+chassis_logos = build_mudflap(C, MF, -0.01, 0.33, 0.10, 1.18, holes=[(-0.22, 0.38, 0.085)])  # demirin (0,30–0,42) alt kenarına kenetli, demir genişliğinde (±1,18)
 chassis = join(C, 'SiChassis')
 
 # --- arka lamba tamponu türevleri (ayrı GLB, site stop lambasına göre birini yükler): dikmelerden üst dudağa kollar ---
@@ -550,6 +551,8 @@ def bumper_extras(Q, kind):
 
 
 export_variants('silo', BUMPER_X, LAMP_Y, MQ, bumper_extras, RAW_DIR)
+if BUMPERS_ONLY:  # yalnız tampon türevleri (lamba eklenince; AO pişirme ve render yok, dakikalar yerine saniyeler)
+    raise SystemExit(0)
 
 # --- tekerlekler (tek model, 6 örnek) ---
 wheel = build_wheel(MW)

@@ -32,6 +32,7 @@ import sys
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 FAST = '--fast' in argv
 ANCHORS_ONLY = '--anchors' in argv  # yalnız bağlantı noktası JSON'u (modelsiz, saniyeler)
+BUMPERS_ONLY = '--bumpers' in argv  # yalnız tampon türevleri: tools/blender/out/<tip>-bumper-*.glb
 PREVIEW = os.path.abspath(argv[argv.index('--preview') + 1]) if '--preview' in argv else None
 OUT_DIR = os.path.abspath('src/assets/models')  # temas gölgesi (WebP)
 RAW_DIR = os.path.abspath('tools/blender/out')  # ham GLB; npm run models:pack sıkıştırıp OUT_DIR'e yazar
@@ -459,7 +460,7 @@ for s in (-1, 1):
 # logolu levha kaldırıldı (kullanıcı 2026-10-22); tek parça tozluk, üzerinde TRAILER SYSTEMS (revize md. 11). Demirin ön (dorseye
 # bakan) yüzüne arkadan monte (kullanıcı 2026-10-23): demirin arka yüzü temiz kalır, yalnız cıvata başları görünür
 MF = {'rubber': M['rubber'], 'zinc': M['galv'], 'print': material('MudflapPrint', '#f2f3f5', 0.5, 0.0)}
-mudflap_text = build_mudflap(C, MF, -0.11, 0.505, 0.20, 1.15, behind=-0.005)  # demirin (0,475–0,585) alt kenarına kenetli
+mudflap_text = build_mudflap(C, MF, -0.11, 0.505, 0.20, 1.2, behind=-0.005)  # demirin (0,475–0,585) alt kenarına kenetli, demir genişliğinde (±1,2)
 
 # --- şasiye ait çıkartmalar: yan koruma ve arka levha logoları ---
 lq = []
@@ -501,6 +502,8 @@ def bumper_extras(Q, kind):
 
 
 export_variants('standart', CARRIER_X, LAMP_Y, MQ, bumper_extras, RAW_DIR)
+if BUMPERS_ONLY:  # yalnız tampon türevleri (lamba eklenince; AO pişirme ve render yok, dakikalar yerine saniyeler)
+    raise SystemExit(0)
 
 # --- tekerlekler (tek model, 6 örnek + yedek) ---
 wheel = build_wheel(MW)

@@ -25,6 +25,7 @@ import sys
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 FAST = '--fast' in argv
 ANCHORS_ONLY = '--anchors' in argv
+BUMPERS_ONLY = '--bumpers' in argv  # yalnız tampon türevleri: tools/blender/out/<tip>-bumper-*.glb
 PREVIEW = os.path.abspath(argv[argv.index('--preview') + 1]) if '--preview' in argv else None
 OUT_DIR = os.path.abspath('src/assets/models')
 RAW_DIR = os.path.abspath('tools/blender/out')
@@ -401,7 +402,7 @@ box2(C, 'underrun_bar', -0.25, -0.13, 0.44, 0.56, -1.19, 1.19, M['alu'], 0.012)
 for s in (-1, 1):
     box2(C, 'rear_refl', -0.13, -0.127, 0.49, 0.55, s * 0.5, s * 0.9, M['red'], 0.0)
 MF = {'rubber': M['rubber'], 'zinc': material('MudflapZinc', '#b8bdc2', 0.3, 1.0), 'print': material('MudflapPrint', '#f2f3f5', 0.5, 0.0)}
-mudflap_text = build_mudflap(C, MF, -0.13, 0.47, 0.20, 1.15)
+mudflap_text = build_mudflap(C, MF, -0.13, 0.47, 0.20, 1.19)  # katlanır demir genişliğinde (±1,19)
 chassis_logos = decal_mesh('ChassisLogos', [side_quad((TB[0] + TB[1]) / 2, 1.22, 0.16 * 720 / 528, 0.16, 1.188, 1)], LOGO_W)
 chassis = join(C, 'DmChassis')
 
@@ -423,6 +424,8 @@ def bumper_extras(Q, kind):
 
 
 export_variants('damper', BUMPER_X, REAR_LAMP_Y, MQ, bumper_extras, RAW_DIR)
+if BUMPERS_ONLY:  # yalnız tampon türevleri (lamba eklenince; AO pişirme ve render yok, dakikalar yerine saniyeler)
+    raise SystemExit(0)
 
 # --- tekerlekler (tek model, 6 örnek) ---
 wheel = build_wheel(MW)
