@@ -1,6 +1,7 @@
 // 3D motor: sahne, kamera, ışık, istek üzerine çizim (boşta GPU ~0), kamera geçişleri, seçim ve modlar.
 // UI'dan bağımsızdır: yalnızca Config alır, olaylarla (onPick) geri bildirir.
 import * as THREE from 'three';
+import { withBase } from '../../lib/url';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import type { CategoryId, Config, TrailerId } from '../data';
@@ -321,7 +322,7 @@ export class Engine {
           () => res(null),
         ),
       );
-    this.mats = createMaterials(await load('/brand/logo-white.png'));
+    this.mats = createMaterials(await load(withBase('/brand/logo-white.png')));
 
     const fade = fadeTexture();
     this.floor = new THREE.Mesh(

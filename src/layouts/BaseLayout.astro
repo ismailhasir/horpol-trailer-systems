@@ -20,6 +20,7 @@ import Footer from '../components/Footer.astro';
 import { DEFAULT_LANG, LANGS, isRtl, type Lang } from '../lib/labels';
 import { useUi } from '../i18n/ui';
 import { loadCatalog } from '../lib/catalog';
+import { withBase } from '../lib/url';
 
 interface Props {
   lang: Lang;
@@ -44,8 +45,10 @@ const preload = lang === 'ar' ? [ar400, ar600] : lang === 'ru' ? [cyr400, cyr600
 // Paylaşım önizlemesi (Open Graph). Kanonik adres, og:url ve hreflang mutlak adres ister: alan adı belli olunca
 // astro.config'e "site" yazılması yeter (o zamana kadar göreli yollar, kanonik ve og:url yazılmaz).
 const OG_LOCALE: Record<Lang, string> = { tr: 'tr_TR', en: 'en_US', ru: 'ru_RU', ar: 'ar_AR' };
+// geçici önizleme (GitHub Pages): arama motorlarına kapalı
+const preview = import.meta.env.PUBLIC_PREVIEW === '1';
 const abs = (p: string) => (Astro.site ? new URL(p, Astro.site).href : p);
-const self = `/${lang}${path}`;
+const self = withBase(`/${lang}${path}`);
 ---
 
 <!doctype html>
@@ -55,7 +58,7 @@ const self = `/${lang}${path}`;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     {description && <meta name="description" content={description} />}
-    {noindex && <meta name="robots" content="noindex" />}
+    {(noindex || preview) && <meta name="robots" content="noindex" />}
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={ui.site_name} />
     <meta property="og:title" content={fullTitle} />
@@ -64,10 +67,10 @@ const self = `/${lang}${path}`;
     {description && <meta property="og:description" content={description} />}
     <meta property="og:locale" content={OG_LOCALE[lang]} />
     {LANGS.filter((l) => l !== lang).map((l) => <meta property="og:locale:alternate" content={OG_LOCALE[l]} />)}
-    <link rel="icon" type="image/png" href="/brand/logo-blue.png" />
+    <link rel="icon" type="image/png" href={withBase('/brand/logo-blue.png')} />
     {preload.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
-    {!noindex && LANGS.map((l) => <link rel="alternate" hreflang={l} href={abs(`/${l}${path}`)} />)}
-    {!noindex && <link rel="alternate" hreflang="x-default" href={abs(`/${DEFAULT_LANG}${path}`)} />}
+    {!noindex && LANGS.map((l) => <link rel="alternate" hreflang={l} href={abs(withBase(`/${l}${path}`))} />)}
+    {!noindex && <link rel="alternate" hreflang="x-default" href={abs(withBase(`/${DEFAULT_LANG}${path}`))} />}
     <!-- Tema: kayıtlı seçim yoksa sistem tercihi. Titremeyi önlemek için render'dan önce çalışır. -->
     <script is:inline>
       (function () {
@@ -90,7 +93,7 @@ const self = `/${lang}${path}`;
     {
       stickybar && (
         <div class="stickybar">
-          <a class="btn" href={`/${lang}/konfigurator/`}>{ui.nav_configurator}</a>
+          <a class="btn" href={withBase(`/${lang}/konfigurator/`)}>{ui.nav_configurator}</a>
           <a class="btn btn-primary" href="#urunler">{ui.nav_products}</a>
         </div>
       )

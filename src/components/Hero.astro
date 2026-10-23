@@ -1,4 +1,5 @@
 ---
+import { withBase } from '../lib/url';
 // Üst bölüm: kısa başlık, iki net yol (konfigüratör / ürünler) ve konfigüratör vitrini.
 // Vitrin görseli: 3D konfigüratörün ekran görüntüsü (1865x900, koyu tema, İngilizce, standart dorse, yan marker kategorisi açık;
 // 2026-10-21). Konfigüratör arayüzü değişince yenilenmeli.
@@ -13,7 +14,7 @@ interface Props {
 }
 const { lang } = Astro.props;
 const ui = useUi(lang);
-const home = `/${lang}/`;
+const home = withBase(`/${lang}/`);
 ---
 
 <section class="hero">

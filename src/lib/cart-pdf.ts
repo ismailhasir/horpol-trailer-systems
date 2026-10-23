@@ -4,6 +4,7 @@
 import type { Ui } from '../i18n/ui';
 import { isRtl, type Lang } from './labels';
 import { loadImg, pdfFromJpegs, saveBlob } from './pdf-core';
+import { withBase } from './url';
 
 const W = 1240; // A4 @150 dpi
 const H = 1754;
@@ -38,7 +39,7 @@ export async function downloadCartPdf(i: CartPdfInput) {
     document.fonts.load(`500 28px "IBM Plex Mono"`),
     ...(lang === 'ar' ? [document.fonts.load(`600 40px "IBM Plex Sans Arabic"`), document.fonts.load(`400 30px "IBM Plex Sans Arabic"`)] : []),
   ]).catch(() => {});
-  const logo = await loadImg('/brand/logo-blue.png');
+  const logo = await loadImg(withBase('/brand/logo-blue.png'));
 
   const pages: HTMLCanvasElement[] = [];
   let ctx!: CanvasRenderingContext2D;

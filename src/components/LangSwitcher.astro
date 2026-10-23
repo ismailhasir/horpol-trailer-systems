@@ -1,4 +1,5 @@
 ---
+import { withBase } from '../lib/url';
 // Dil menüsü. Kapalıyken yalnızca seçili dilin bayrağı görünür, açılınca "bayrak + dil adı" listelenir.
 import Flag from './Flag.astro';
 import { LANGS, LANG_NAMES, type Lang } from '../lib/labels';
@@ -21,7 +22,7 @@ const ui = useUi(lang);
     {
       LANGS.map((l) => (
         <li>
-          <a href={`/${l}${path}`} hreflang={l} lang={l} aria-current={l === lang ? 'true' : undefined}>
+          <a href={withBase(`/${l}${path}`)} hreflang={l} lang={l} aria-current={l === lang ? 'true' : undefined}>
             <Flag lang={l} />
             <span>{LANG_NAMES[l]}</span>
           </a>

@@ -2,6 +2,7 @@
 // IBM Plex yazı tipleriyle, böylece TR/RU/AR karakterleri ve Arapça bağlama doğru çıkar), JPEG'e çevrilir ve
 // tek sayfalık minimal bir PDF'in içine konur. PDF'te 3D görüntü yoktur, yalnızca özet. Bu modül yalnızca "PDF indir"e basılınca yüklenir.
 import { summaryRows } from './summary';
+import { withBase } from '../lib/url';
 import type { CUi } from './i18n';
 import type { Config } from './data';
 import { isRtl, type Lang } from '../lib/labels';
@@ -38,7 +39,7 @@ export async function downloadSummaryPdf(i: PdfInput) {
     ...(lang === 'ar' ? [document.fonts.load(`600 40px "IBM Plex Sans Arabic"`), document.fonts.load(`400 30px "IBM Plex Sans Arabic"`)] : []),
   ]).catch(() => {});
 
-  const logo = await loadImg('/brand/logo-blue.png');
+  const logo = await loadImg(withBase('/brand/logo-blue.png'));
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;

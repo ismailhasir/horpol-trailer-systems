@@ -1,4 +1,5 @@
 ---
+import { withBase } from '../lib/url';
 import Icon from './Icon.astro';
 import LangSwitcher from './LangSwitcher.astro';
 import HeaderTools from './HeaderTools';
@@ -15,7 +16,7 @@ interface Props {
 }
 const { lang, path, items, shop = true } = Astro.props;
 const ui = useUi(lang);
-const home = `/${lang}/`;
+const home = withBase(`/${lang}/`);
 const links = [
   { href: `${home}#urunler`, label: ui.nav_products },
   { href: `${home}#set-nedir`, label: ui.nav_about },
@@ -27,8 +28,8 @@ const links = [
 <header class="top">
   <div class="wrap top-row">
     <a class="brand" href={home} aria-label={ui.site_name}>
-      <img class="logo-light" src="/brand/logo-blue.png" alt="" width="720" height="528" />
-      <img class="logo-dark" src="/brand/logo-white.png" alt="" width="720" height="528" />
+      <img class="logo-light" src={withBase('/brand/logo-blue.png')} alt="" width="720" height="528" />
+      <img class="logo-dark" src={withBase('/brand/logo-white.png')} alt="" width="720" height="528" />
     </a>
     <nav class="nav" aria-label={ui.nav_main}>
       {links.map((l) => <a href={l.href}>{l.label}</a>)}

@@ -1,4 +1,5 @@
 ---
+import { withBase } from '../lib/url';
 import { useUi } from '../i18n/ui';
 import { site } from '../config/site';
 import type { Lang } from '../lib/labels';
@@ -13,7 +14,7 @@ const ui = useUi(lang);
 <footer class="footer" id="iletisim">
   <div class="wrap footer-grid">
     <div class="footer-brand">
-      <img src="/brand/logo-white.png" alt={site.name} width="720" height="528" loading="lazy" />
+      <img src={withBase('/brand/logo-white.png')} alt={site.name} width="720" height="528" loading="lazy" />
       <p style="max-width:38ch">{ui.footer_about}</p>
     </div>
     <div>

@@ -1,4 +1,5 @@
 ---
+import { withBase } from '../lib/url';
 // Bulunamayan adres: statik barındırma (Cloudflare Pages vb.) bu sayfayı 404.html olarak sunar. Dil adresten bilinemez:
 // ana metin varsayılan dilde, altında her dilin kendi diliyle ana sayfa bağlantısı.
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -16,8 +17,8 @@ const ui = useUi(lang);
       <h1>{ui.nf_title}</h1>
       <p class="lead">{ui.nf_text}</p>
       <div class="cta">
-        <a class="btn btn-primary" href={`/${lang}/`}>{ui.nf_home}</a>
-        <a class="btn" href={`/${lang}/konfigurator/`}>{ui.nav_configurator}</a>
+        <a class="btn btn-primary" href={withBase(`/${lang}/`)}>{ui.nf_home}</a>
+        <a class="btn" href={withBase(`/${lang}/konfigurator/`)}>{ui.nav_configurator}</a>
       </div>
       <ul class="nf-langs">
         {
@@ -25,7 +26,7 @@ const ui = useUi(lang);
             const u = useUi(l);
             return (
               <li>
-                <a href={`/${l}/`} lang={l} dir={isRtl(l) ? 'rtl' : 'ltr'}>
+                <a href={withBase(`/${l}/`)} lang={l} dir={isRtl(l) ? 'rtl' : 'ltr'}>
                   {u.nf_title}: {u.nf_home}
                 </a>
               </li>
